@@ -20,6 +20,13 @@ AnhPT is a voice-guided workout timer designed for hands-free exercise. The user
 - The app advances only after both the timer has finished and the protected step announcement has finished.
 - If the timer reaches zero while the guide is still speaking, the UI waits for the guide to complete before advancing.
 - Pause/resume applies to the timed portion of a running step.
+- On Windows, a user can record device-local coach audio for the workout
+  description and for individual step cues, review it, replace it, or delete
+  it. Recordings are not uploaded; an unavailable recording falls back to the
+  corresponding device TTS text.
+- A workout can use an offline background track selected from the local music
+  library. Music loops independently, follows workout pause/resume/end, and can
+  duck gently or moderately while coach audio is active.
 
 ## 3. Voice Behavior
 

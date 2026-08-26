@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_controller.dart';
+import '../models/workout.dart';
+import '../widgets/coach_recording_card.dart';
 import '../widgets/common.dart';
 import '../widgets/workout_widgets.dart';
+import '../widgets/workout_music_card.dart';
 import 'workout_builder_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
@@ -12,7 +15,38 @@ class WorkoutDetailScreen extends StatelessWidget {
   final AppController controller;
   final String workoutId;
 
-  const WorkoutDetailScreen({super.key, required this.controller, required this.workoutId});
+  const WorkoutDetailScreen(
+      {super.key, required this.controller, required this.workoutId});
+
+  Future<void> _openStepRecording(
+    BuildContext context,
+    Workout workout,
+    WorkoutStep step,
+    String stepKey,
+  ) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: CoachRecordingCard(
+            controller: controller,
+            workout: workout,
+            scope: 'step',
+            stepKey: stepKey,
+            title: 'Step recording: ${step.name}',
+            cueDescription: 'Record the spoken cue for this step.',
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,14 +54,27 @@ class WorkoutDetailScreen extends StatelessWidget {
       animation: controller,
       builder: (_, __) {
         final workout = controller.byId(workoutId);
-        if (workout == null) return const Scaffold(body: Center(child: Text('Workout not found')));
+        if (workout == null) {
+          return const Scaffold(body: Center(child: Text('Workout not found')));
+        }
+        final recordedStepKeys = controller.coachRecordings.values
+            .where((recording) =>
+                recording.workoutId == workout.id &&
+                recording.scope == 'step' &&
+                recording.stepKey != null)
+            .map((recording) => recording.stepKey!)
+            .toSet();
         return Scaffold(
           appBar: AppBar(
             title: Text(workout.name),
-            actions: [IconButton(
-              onPressed: () => controller.toggleFavorite(workout.id),
-              icon: Icon(workout.favorite ? Icons.star_rounded : Icons.star_border_rounded),
-            )],
+            actions: [
+              IconButton(
+                onPressed: () => controller.toggleFavorite(workout.id),
+                icon: Icon(workout.favorite
+                    ? Icons.star_rounded
+                    : Icons.star_border_rounded),
+              )
+            ],
           ),
           body: Center(
             child: ConstrainedBox(
@@ -35,8 +82,14 @@ class WorkoutDetailScreen extends StatelessWidget {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  Text(workout.name, style: Theme.of(context).textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 8), Text(workout.description), const SizedBox(height: 14),
+                  Text(workout.name,
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineLarge
+                          ?.copyWith(fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 8),
+                  Text(workout.description),
+                  const SizedBox(height: 14),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     Chip(label: Text(formatDuration(workout.totalDuration))),
                     Chip(label: Text('${workout.effectiveStepCount} steps')),
@@ -44,52 +97,113 @@ class WorkoutDetailScreen extends StatelessWidget {
                     Chip(label: Text(workout.voice.mode)),
                   ]),
                   const SizedBox(height: 22),
-                  SizedBox(height: 54, child: FilledButton.icon(
-                    onPressed: () {
-                      controller.markUsed(workout.id);
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutPlayerScreen(controller: controller, workoutId: workout.id)));
-                    },
-                    icon: const Icon(Icons.play_arrow_rounded), label: const Text('START WORKOUT'),
-                  )),
-                  const SizedBox(height: 28), const SectionTitle('Structure'), const SizedBox(height: 10),
-                  WorkoutStructure(nodes: workout.steps), const SizedBox(height: 22),
+                  SizedBox(
+                      height: 54,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          controller.markUsed(workout.id);
+                          Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => WorkoutPlayerScreen(
+                                      controller: controller,
+                                      workoutId: workout.id)));
+                        },
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('START WORKOUT'),
+                      )),
+                  const SizedBox(height: 18),
+                  CoachRecordingCard(
+                    controller: controller,
+                    workout: workout,
+                    scope: 'description',
+                    title: 'Workout introduction recording',
+                    cueDescription:
+                        'Record the spoken description for this workout.',
+                  ),
+                  const SizedBox(height: 18),
+                  WorkoutMusicCard(controller: controller, workout: workout),
+                  const SizedBox(height: 28),
+                  const SectionTitle('Structure'),
+                  const SizedBox(height: 10),
+                  WorkoutStructure(
+                    nodes: workout.steps,
+                    recordedStepKeys: recordedStepKeys,
+                    onRecordStep: (context, step, stepKey) =>
+                        _openStepRecording(context, workout, step, stepKey),
+                  ),
+                  const SizedBox(height: 22),
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     FilledButton.tonalIcon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutBuilderScreen(controller: controller, workoutId: workout.id))),
-                      icon: const Icon(Icons.edit_outlined), label: const Text('Edit'),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => WorkoutBuilderScreen(
+                                  controller: controller,
+                                  workoutId: workout.id))),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutBuilderScreen(controller: controller, duplicateFromId: workout.id))),
-                      icon: const Icon(Icons.copy_outlined), label: const Text('Duplicate'),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => WorkoutBuilderScreen(
+                                  controller: controller,
+                                  duplicateFromId: workout.id))),
+                      icon: const Icon(Icons.copy_outlined),
+                      label: const Text('Duplicate'),
                     ),
                     OutlinedButton.icon(
-                      onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => WorkoutEditorScreen(controller: controller, workoutId: workout.id))),
-                      icon: const Icon(Icons.code), label: const Text('Edit YAML'),
+                      onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (_) => WorkoutEditorScreen(
+                                  controller: controller,
+                                  workoutId: workout.id))),
+                      icon: const Icon(Icons.code),
+                      label: const Text('Edit YAML'),
                     ),
                     OutlinedButton.icon(
                       onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: workout.rawYaml));
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('YAML copied to clipboard')));
+                        await Clipboard.setData(
+                            ClipboardData(text: workout.rawYaml));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('YAML copied to clipboard')));
+                        }
                       },
-                      icon: const Icon(Icons.copy_all_outlined), label: const Text('Copy YAML'),
+                      icon: const Icon(Icons.copy_all_outlined),
+                      label: const Text('Copy YAML'),
                     ),
                   ]),
                   const SizedBox(height: 18),
                   TextButton.icon(
                     onPressed: () async {
-                      final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
-                        title: Text('Delete "${workout.name}"?'), content: const Text('This cannot be undone.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete')),
-                        ],
-                      ));
+                      final ok = await showDialog<bool>(
+                          context: context,
+                          builder: (_) => AlertDialog(
+                                title: Text('Delete "${workout.name}"?'),
+                                content: const Text('This cannot be undone.'),
+                                actions: [
+                                  TextButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, false),
+                                      child: const Text('Cancel')),
+                                  FilledButton(
+                                      onPressed: () =>
+                                          Navigator.pop(context, true),
+                                      child: const Text('Delete')),
+                                ],
+                              ));
                       if (ok == true) {
                         await controller.deleteWorkout(workout.id);
                         if (context.mounted) Navigator.pop(context);
                       }
                     },
-                    icon: const Icon(Icons.delete_outline), label: const Text('Delete Workout'),
+                    icon: const Icon(Icons.delete_outline),
+                    label: const Text('Delete Workout'),
                   ),
                 ],
               ),

@@ -6,6 +6,8 @@ class VoiceGuideController {
   final Workout workout;
   final SessionEngine engine;
   final AudioFeedbackService audio;
+  final String? descriptionRecordingPath;
+  final Map<String, String> stepRecordingPaths;
 
   SessionStatus? _lastStatus;
   int _lastStepIndex = -1;
@@ -19,6 +21,8 @@ class VoiceGuideController {
     required this.workout,
     required this.engine,
     required this.audio,
+    this.descriptionRecordingPath,
+    this.stepRecordingPaths = const {},
   });
 
   Future<void> initialize() async {
@@ -71,10 +75,20 @@ class VoiceGuideController {
         if (!_started) {
           _started = true;
           if (workout.voice.announceStart) {
-            await audio.speakAndWait(
-              audio.startPhrase(workout.name),
-              interrupt: true,
-            );
+            final description = workout.description.trim();
+            final recordingPlayed = descriptionRecordingPath != null &&
+                await audio
+                    .playLocalRecordingAndWait(descriptionRecordingPath!);
+            if (!recordingPlayed) {
+              final introParts = <String>[audio.startPhrase(workout.name)];
+              if (description.isNotEmpty) {
+                introParts.add(description);
+              }
+              await audio.speakAndWait(
+                introParts.join('. '),
+                interrupt: true,
+              );
+            }
           }
         }
 
@@ -102,7 +116,11 @@ class VoiceGuideController {
           parts.add(guide);
         }
 
-        if (parts.isNotEmpty) {
+        final stepRecordingPath =
+            stepRecordingPaths[engine.currentExecutableStep.stepKey];
+        final recordingPlayed = stepRecordingPath != null &&
+            await audio.playLocalRecordingAndWait(stepRecordingPath);
+        if (!recordingPlayed && parts.isNotEmpty) {
           await audio.speakAndWait(
             parts.join('. '),
             interrupt: true,
@@ -151,9 +169,8 @@ class VoiceGuideController {
     if (remainingMs <= 0) return;
 
     final adjustedRemainingMs = remainingMs - speechLeadMs;
-    final remainingSec = adjustedRemainingMs <= 0
-        ? 0
-        : ((adjustedRemainingMs - 1) ~/ 1000) + 1;
+    final remainingSec =
+        adjustedRemainingMs <= 0 ? 0 : ((adjustedRemainingMs - 1) ~/ 1000) + 1;
 
     final elapsedMs = durationMs - remainingMs + speechLeadMs;
     final elapsedSec = elapsedMs <= 0 ? 0 : elapsedMs ~/ 1000;
@@ -164,8 +181,7 @@ class VoiceGuideController {
     final countdownFrom = workout.voice.countdownFrom.inSeconds;
     final interval = workout.voice.announceEvery.inSeconds;
     final inEnding = remainingSec > 0 && remainingSec <= countdownFrom;
-    final shouldEnding =
-        (mode == 'ending' || mode == 'combined') && inEnding;
+    final shouldEnding = (mode == 'ending' || mode == 'combined') && inEnding;
 
     if (shouldEnding) {
       _lastSpokenSecond = remainingSec;

@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Generated coach TTS evaluation audio (reproducible from committed config).
+/tools/tts_experiment/output/
+
 # Symbolication related
 app.*.symbols
 

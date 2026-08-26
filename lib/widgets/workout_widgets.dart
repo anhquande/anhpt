@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 import '../models/workout.dart';
 import 'common.dart';
 
+typedef StepRecordingCallback = void Function(
+  BuildContext context,
+  WorkoutStep step,
+  String stepKey,
+);
+
 class WorkoutCard extends StatelessWidget {
   final Workout workout;
   final VoidCallback onOpen;
@@ -53,24 +59,32 @@ class WorkoutCard extends StatelessWidget {
 class WorkoutStructure extends StatelessWidget {
   final List<WorkoutNode> nodes;
   final int depth;
+  final String pathPrefix;
+  final StepRecordingCallback? onRecordStep;
+  final Set<String> recordedStepKeys;
 
   const WorkoutStructure({
     super.key,
     required this.nodes,
     this.depth = 0,
+    this.pathPrefix = '',
+    this.onRecordStep,
+    this.recordedStepKeys = const {},
   });
 
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: nodes
-          .map(
-            (node) => _NodeView(
-              node: node,
-              depth: depth,
-            ),
-          )
-          .toList(),
+      children: List.generate(nodes.length, (index) {
+        final stepKey = pathPrefix.isEmpty ? '$index' : '$pathPrefix.$index';
+        return _NodeView(
+          node: nodes[index],
+          depth: depth,
+          stepKey: stepKey,
+          onRecordStep: onRecordStep,
+          recordedStepKeys: recordedStepKeys,
+        );
+      }),
     );
   }
 }
@@ -78,10 +92,16 @@ class WorkoutStructure extends StatelessWidget {
 class _NodeView extends StatelessWidget {
   final WorkoutNode node;
   final int depth;
+  final String stepKey;
+  final StepRecordingCallback? onRecordStep;
+  final Set<String> recordedStepKeys;
 
   const _NodeView({
     required this.node,
     required this.depth,
+    required this.stepKey,
+    required this.onRecordStep,
+    required this.recordedStepKeys,
   });
 
   @override
@@ -115,6 +135,22 @@ class _NodeView extends StatelessWidget {
                   ),
                 ),
               ),
+              if (onRecordStep != null)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: recordedStepKeys.contains(stepKey)
+                      ? 'Edit step recording'
+                      : 'Record step cue',
+                  onPressed: () => onRecordStep!(context, step, stepKey),
+                  icon: Icon(
+                    recordedStepKeys.contains(stepKey)
+                        ? Icons.mic
+                        : Icons.mic_none_outlined,
+                    color: recordedStepKeys.contains(stepKey)
+                        ? cs.primary
+                        : cs.onSurfaceVariant,
+                  ),
+                ),
               Text(formatDuration(step.duration)),
             ],
           ),
@@ -161,6 +197,9 @@ class _NodeView extends StatelessWidget {
               WorkoutStructure(
                 nodes: group.steps,
                 depth: depth + 1,
+                pathPrefix: stepKey,
+                onRecordStep: onRecordStep,
+                recordedStepKeys: recordedStepKeys,
               ),
             ],
           ),

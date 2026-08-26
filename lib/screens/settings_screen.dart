@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
+import 'music_library_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final AppController controller;
@@ -44,6 +45,18 @@ class SettingsScreen extends StatelessWidget {
                       }
                     },
                   ),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.library_music_outlined),
+                  title: const Text('Offline Music Library'),
+                  subtitle: const Text('Bundled and personal tracks'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) =>
+                              MusicLibraryScreen(controller: controller))),
                 ),
                 const Divider(),
                 const ListTile(

@@ -1,0 +1,40 @@
+{
+  "experiment_version": "vi-coach-v1",
+  "language": "vi-VN",
+  "provider": "openai",
+  "model": "gpt-4o-mini-tts",
+  "voice": "marin",
+  "response_format": "mp3",
+  "profiles": {
+    "calm_guidance": {
+      "speed": 0.88,
+      "instructions": "Nói tiếng Việt tự nhiên, ấm áp và nhẹ nhàng như hướng dẫn viên yoga. Nhịp chậm vừa, ngắt câu mềm, âm lượng ổn định, không kịch tính."
+    },
+    "energetic_coach": {
+      "speed": 1.03,
+      "instructions": "Nói tiếng Việt tự nhiên như huấn luyện viên tích cực. Giọng sáng, rõ nhịp, khích lệ và có năng lượng, nhưng không la hét."
+    },
+    "intense_interval": {
+      "speed": 1.12,
+      "instructions": "Nói tiếng Việt tự nhiên như huấn luyện viên HIIT. Mạnh, ngắn, dứt khoát, nhấn động từ và con số, giữ lời thoại thật rõ."
+    },
+    "recovery_cue": {
+      "speed": 0.92,
+      "instructions": "Nói tiếng Việt tự nhiên với giọng dịu, rõ và trấn an. Nhịp vừa chậm để người tập hồi phục, tránh kéo dài quá mức."
+    }
+  },
+  "cues": [
+    {"id": "calm_01", "profile": "calm_guidance", "text": "Hít vào thật sâu bằng mũi, thả lỏng vai."},
+    {"id": "calm_02", "profile": "calm_guidance", "text": "Thở ra chậm rãi, cảm nhận cơ thể đang mềm lại."},
+    {"id": "calm_03", "profile": "calm_guidance", "text": "Giữ tư thế em bé, để trán chạm nhẹ xuống thảm."},
+    {"id": "energy_01", "profile": "energetic_coach", "text": "Bắt đầu squat, giữ ngực mở và đẩy hông ra sau."},
+    {"id": "energy_02", "profile": "energetic_coach", "text": "Tốt lắm, giữ nhịp đều, bạn đang làm rất tốt!"},
+    {"id": "energy_03", "profile": "energetic_coach", "text": "Đổi bên, chân trái bước lên và siết chắc cơ bụng."},
+    {"id": "intense_01", "profile": "intense_interval", "text": "Sẵn sàng. Ba, hai, một, bắt đầu!"},
+    {"id": "intense_02", "profile": "intense_interval", "text": "Mười giây cuối, tăng tốc!"},
+    {"id": "intense_03", "profile": "intense_interval", "text": "Hết hiệp. Dừng lại!"},
+    {"id": "recovery_01", "profile": "recovery_cue", "text": "Nghỉ ba mươi giây, hít thở đều."},
+    {"id": "recovery_02", "profile": "recovery_cue", "text": "Thả lỏng hai tay và bước chậm tại chỗ."},
+    {"id": "recovery_03", "profile": "recovery_cue", "text": "Nhịp tim đang hạ xuống. Chuẩn bị cho hiệp tiếp theo."}
+  ]
+}

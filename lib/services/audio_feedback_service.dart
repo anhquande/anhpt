@@ -1,16 +1,20 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 
 import '../models/workout.dart';
 
 class AudioFeedbackService {
+  final void Function(bool active)? onCoachAudioChanged;
   final FlutterTts _tts = FlutterTts();
   final AudioPlayer _player = AudioPlayer();
 
   String _language = 'vi';
   bool _ready = false;
   Completer<void>? _speechCompleter;
+
+  AudioFeedbackService({this.onCoachAudioChanged});
 
   Future<void> configure(Workout workout) async {
     _language = workout.voice.language;
@@ -35,6 +39,7 @@ class AudioFeedbackService {
       completer.complete();
     }
     _speechCompleter = null;
+    onCoachAudioChanged?.call(false);
   }
 
   Future<void> stopSpeech() async {
@@ -48,6 +53,7 @@ class AudioFeedbackService {
     if (interrupt) {
       await stopSpeech();
     }
+    onCoachAudioChanged?.call(true);
     await _tts.speak(text);
   }
 
@@ -70,6 +76,7 @@ class AudioFeedbackService {
     _speechCompleter = completer;
 
     try {
+      onCoachAudioChanged?.call(true);
       await _tts.speak(text);
       await completer.future.timeout(
         timeout,
@@ -94,6 +101,27 @@ class AudioFeedbackService {
     await _player.play(AssetSource(asset), volume: 0.75);
   }
 
+  Future<bool> playLocalRecordingAndWait(String path) async {
+    if (path.trim().isEmpty || !await File(path).exists()) return false;
+    final completer = Completer<void>();
+    late final StreamSubscription<void> subscription;
+    subscription = _player.onPlayerComplete.listen((_) {
+      if (!completer.isCompleted) completer.complete();
+    });
+    try {
+      onCoachAudioChanged?.call(true);
+      await _player.stop();
+      await _player.play(DeviceFileSource(path));
+      await completer.future.timeout(const Duration(minutes: 5));
+      return true;
+    } catch (_) {
+      return false;
+    } finally {
+      onCoachAudioChanged?.call(false);
+      await subscription.cancel();
+    }
+  }
+
   String remainingPhrase(int seconds) {
     if (_language == 'vi') return 'Còn $seconds giây';
     return '$seconds seconds remaining';
@@ -109,8 +137,9 @@ class AudioFeedbackService {
   String resumePhrase(String stepName) =>
       _language == 'vi' ? 'Tiếp tục. $stepName' : 'Resume. $stepName';
 
-  String finishPhrase() =>
-      _language == 'vi' ? 'Hoàn thành. Làm tốt lắm!' : 'Workout complete. Great job!';
+  String finishPhrase() => _language == 'vi'
+      ? 'Hoàn thành. Làm tốt lắm!'
+      : 'Workout complete. Great job!';
 
   Future<void> dispose() async {
     _finishWaitingSpeech();

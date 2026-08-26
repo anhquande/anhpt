@@ -16,6 +16,12 @@
 - Parallel timer + protected step announcement.
 - AND-gated step completion: advance only when timer and protected announcement are both finished.
 - Windows TTS completion callback handling with safe failure fallback.
+- Windows local workout-description and per-step coach recording with
+  permission guidance, listen-back, scoped assignment, replacement/deletion,
+  and device-TTS fallback.
+- Windows offline background music library and per-workout assignment, with
+  looped lifecycle playback, volume control, smooth coach ducking, personal
+  import/delete safety, and missing-file fallback.
 
 ## 2. Near-Term Backlog
 
