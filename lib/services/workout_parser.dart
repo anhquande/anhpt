@@ -98,7 +98,9 @@ class WorkoutParser {
       } else {
         _unknown(map,_stepFields,'timed step');
         final name = _string(map['name'],'step.name',100);
-        final duration = DurationParser.parse(map['duration'],field:'step.duration');
+        final duration = map['duration'] == null
+            ? Duration.zero
+            : DurationParser.parseAllowZero(map['duration'],field:'step.duration');
         final guide = map['guide'] == null ? null : _string(map['guide'],'step.guide',500);
         final countdown = _bool(map['countdown'],true,'step.countdown');
         out.add(WorkoutStep(name:name,duration:duration,guide:guide,countdown:countdown));
