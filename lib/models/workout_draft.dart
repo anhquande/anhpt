@@ -8,11 +8,13 @@ class StepDraft extends WorkoutDraftNode {
   String name;
   String duration;
   String guide;
+  bool countdown;
 
   StepDraft({
     this.name = 'New Step',
     this.duration = '30s',
     this.guide = '',
+    this.countdown = true,
   });
 
   @override
@@ -20,6 +22,7 @@ class StepDraft extends WorkoutDraftNode {
         name: name,
         duration: duration,
         guide: guide,
+        countdown: countdown,
       );
 }
 
@@ -95,6 +98,7 @@ class WorkoutDraft {
         name: node.name,
         duration: _duration(node.duration),
         guide: node.guide ?? '',
+        countdown: node.countdown,
       );
     }
 
