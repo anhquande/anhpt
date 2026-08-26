@@ -32,7 +32,6 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   @override
   void initState() {
     super.initState();
-
     final workout = widget.controller.byId(widget.workoutId)!;
     engine = SessionEngine(workout);
     audio = AudioFeedbackService();
@@ -41,7 +40,6 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       engine: engine,
       audio: audio,
     );
-
     engine.addListener(_changed);
     _initializeAndStart();
   }
@@ -59,7 +57,6 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
 
   void _changed() {
     unawaited(voiceGuide.onEngineChanged());
-
     if (!mounted) return;
     setState(() {});
 
@@ -73,14 +70,11 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
 
   Future<void> _summary() async {
     final complete = engine.status == SessionStatus.completed;
-
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Text(
-          complete ? 'Workout Complete 🎉' : 'Workout Incomplete',
-        ),
+        title: Text(complete ? 'Workout Complete 🎉' : 'Workout Incomplete'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -134,7 +128,9 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final preparing = engine.status == SessionStatus.preparing;
+    final announcing = engine.status == SessionStatus.announcing;
     final paused = engine.status == SessionStatus.paused;
+    final timingStarted = engine.status == SessionStatus.running || paused;
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -145,30 +141,23 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             children: [
               Row(
                 children: [
-                  const Text(
-                    'AnhPT',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
+                  const Text('AnhPT', style: TextStyle(fontWeight: FontWeight.w900)),
                   const Spacer(),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        audioReady ? Icons.volume_up : Icons.volume_off,
-                        size: 18,
-                        color: cs.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'End workout',
-                        onPressed: _end,
-                        icon: const Icon(Icons.close),
-                      ),
-                    ],
+                  Icon(
+                    audioReady ? Icons.volume_up : Icons.volume_off,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    tooltip: 'End workout',
+                    onPressed: _end,
+                    icon: const Icon(Icons.close),
                   ),
                 ],
               ),
               const Spacer(),
+              if (announcing) const Chip(label: Text('GUIDE')),
               if (paused) const Chip(label: Text('PAUSED')),
               const SizedBox(height: 16),
               Text(
@@ -192,15 +181,9 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               ),
               if (!preparing) ...[
                 const SizedBox(height: 16),
-                Text(
-                  'Step ${engine.stepIndex + 1} / '
-                  '${engine.workout.effectiveStepCount}',
-                ),
+                Text('Step ${engine.stepIndex + 1} / ${engine.totalEffectiveSteps}'),
                 const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: engine.progress,
-                  minHeight: 10,
-                ),
+                LinearProgressIndicator(value: engine.progress, minHeight: 10),
                 const SizedBox(height: 14),
                 Text(
                   engine.nextStep == null
@@ -208,27 +191,23 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                       : 'Next: ${engine.nextStep!.name}',
                 ),
                 const SizedBox(height: 28),
-                SizedBox(
-                  width: 240,
-                  height: 58,
-                  child: FilledButton.icon(
-                    onPressed: paused ? engine.resume : engine.pause,
-                    icon: Icon(
-                      paused
-                          ? Icons.play_arrow_rounded
-                          : Icons.pause_rounded,
+                if (announcing)
+                  const Text('Timer starts after the voice guide finishes.')
+                else if (timingStarted)
+                  SizedBox(
+                    width: 240,
+                    height: 58,
+                    child: FilledButton.icon(
+                      onPressed: paused ? engine.resume : engine.pause,
+                      icon: Icon(paused ? Icons.play_arrow_rounded : Icons.pause_rounded),
+                      label: Text(paused ? 'RESUME' : 'PAUSE'),
                     ),
-                    label: Text(paused ? 'RESUME' : 'PAUSE'),
                   ),
-                ),
               ],
               const Spacer(),
               Text(
                 'Voice + sound enabled on Web/Windows',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurfaceVariant,
-                ),
+                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
               ),
             ],
           ),
