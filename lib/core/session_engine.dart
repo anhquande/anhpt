@@ -6,6 +6,7 @@ import '../models/workout.dart';
 
 enum SessionStatus {
   preparing,
+  announcing,
   running,
   paused,
   completed,
@@ -14,14 +15,12 @@ enum SessionStatus {
 
 class SessionEngine extends ChangeNotifier {
   final Workout workout;
-
   late final List<ExecutableStep> _steps;
 
   SessionStatus status;
   int stepIndex = 0;
 
   Timer? _ticker;
-
   final Stopwatch _prepareWatch = Stopwatch();
   final Stopwatch _stepWatch = Stopwatch();
   final Stopwatch _activeWatch = Stopwatch();
@@ -32,87 +31,59 @@ class SessionEngine extends ChangeNotifier {
   SessionEngine(this.workout)
       : status = workout.startCountdown > Duration.zero
             ? SessionStatus.preparing
-            : SessionStatus.running {
+            : SessionStatus.announcing {
     _steps = workout.expand();
-
     if (_steps.isEmpty) {
-      throw StateError(
-        'Workout must contain at least one executable step.',
-      );
+      throw StateError('Workout must contain at least one executable step.');
     }
   }
 
-  /// Current executable item including repeat context.
   ExecutableStep get currentExecutableStep => _steps[stepIndex];
-
-  /// Current real workout step.
-  ///
-  /// UI and voice code should normally use this getter.
   WorkoutStep get currentStep => currentExecutableStep.step;
-
-  /// Repeat context for the current step.
-  ///
-  /// Null means the current step is not inside an
-  /// announceable inner repeat.
   RepeatContext? get currentRepeat => currentExecutableStep.repeat;
 
-  /// Next real workout step, if any.
   WorkoutStep? get nextStep {
     final nextIndex = stepIndex + 1;
-
-    if (nextIndex >= _steps.length) {
-      return null;
-    }
-
-    return _steps[nextIndex].step;
+    return nextIndex < _steps.length ? _steps[nextIndex].step : null;
   }
 
   int get totalEffectiveSteps => _steps.length;
 
-  Duration get activeElapsed {
-    return _activeElapsedBefore +
-        (status == SessionStatus.running
-            ? _activeWatch.elapsed
-            : Duration.zero);
-  }
+  Duration get activeElapsed =>
+      _activeElapsedBefore +
+      (status == SessionStatus.running ? _activeWatch.elapsed : Duration.zero);
 
-  Duration get stepElapsed {
-    return _stepElapsedBefore +
-        (status == SessionStatus.running ? _stepWatch.elapsed : Duration.zero);
-  }
+  Duration get stepElapsed =>
+      _stepElapsedBefore +
+      (status == SessionStatus.running ? _stepWatch.elapsed : Duration.zero);
 
   Duration get remaining {
     if (status == SessionStatus.preparing) {
-      final remaining = workout.startCountdown - _prepareWatch.elapsed;
-
-      return remaining.isNegative ? Duration.zero : remaining;
+      final r = workout.startCountdown - _prepareWatch.elapsed;
+      return r.isNegative ? Duration.zero : r;
     }
-
-    final remaining = currentStep.duration - stepElapsed;
-
-    return remaining.isNegative ? Duration.zero : remaining;
+    if (status == SessionStatus.announcing) {
+      return currentStep.duration;
+    }
+    final r = currentStep.duration - stepElapsed;
+    return r.isNegative ? Duration.zero : r;
   }
 
   double get progress {
     final totalMs = workout.totalDuration.inMilliseconds;
-
     if (totalMs <= 0) {
-      return 0;
+      return status == SessionStatus.completed ? 1.0 : 0.0;
     }
-
     return (activeElapsed.inMilliseconds / totalMs).clamp(0.0, 1.0);
   }
 
   void start() {
-    if (_ticker != null) {
-      return;
-    }
+    if (_ticker != null) return;
 
     if (status == SessionStatus.preparing) {
       _prepareWatch.start();
-    } else if (status == SessionStatus.running) {
-      _activeWatch.start();
-      _stepWatch.start();
+    } else if (status == SessionStatus.announcing) {
+      notifyListeners();
     }
 
     _ticker = Timer.periodic(
@@ -123,158 +94,125 @@ class SessionEngine extends ChangeNotifier {
 
   void _evaluate() {
     if (status == SessionStatus.preparing) {
-      _evaluatePreparing();
+      if (_prepareWatch.elapsed >= workout.startCountdown) {
+        _prepareWatch.stop();
+        status = SessionStatus.announcing;
+      }
+      notifyListeners();
       return;
     }
 
-    if (status != SessionStatus.running) {
-      return;
-    }
+    if (status != SessionStatus.running) return;
 
-    _evaluateRunning();
-  }
-
-  void _evaluatePreparing() {
-    if (_prepareWatch.elapsed >= workout.startCountdown) {
-      _prepareWatch.stop();
-
-      status = SessionStatus.running;
-
-      _activeWatch
-        ..reset()
-        ..start();
-
-      _stepWatch
-        ..reset()
-        ..start();
-
-      _stepElapsedBefore = Duration.zero;
-    }
-
-    notifyListeners();
-  }
-
-  void _evaluateRunning() {
-    /*
-     * Using while instead of if is intentional.
-     *
-     * If the UI/thread stalls for a moment and more than
-     * one step has theoretically passed, the engine can
-     * catch up rather than becoming permanently delayed.
-     */
-    while (stepElapsed >= currentStep.duration) {
-      final overflow = stepElapsed - currentStep.duration;
-
+    if (stepElapsed >= currentStep.duration) {
       _activeElapsedBefore += currentStep.duration;
-
       _activeWatch
-        ..reset()
-        ..start();
+        ..stop()
+        ..reset();
+      _stepWatch
+        ..stop()
+        ..reset();
+      _stepElapsedBefore = Duration.zero;
 
-      final isLastStep = stepIndex + 1 >= _steps.length;
-
-      if (isLastStep) {
+      if (stepIndex + 1 >= _steps.length) {
         _completeWorkout();
         return;
       }
 
       stepIndex++;
-
-      /*
-       * Preserve timing overflow when a scheduler tick
-       * occurs slightly after the exact step boundary.
-       */
-      _stepElapsedBefore = overflow;
-
-      _stepWatch
-        ..reset()
-        ..start();
+      status = SessionStatus.announcing;
+      notifyListeners();
+      return;
     }
 
+    notifyListeners();
+  }
+
+  /// Called by VoiceGuideController after the current step's
+  /// name + guide announcement has fully finished.
+  void completeAnnouncement() {
+    if (status != SessionStatus.announcing) return;
+
+    if (currentStep.duration <= Duration.zero) {
+      if (stepIndex + 1 >= _steps.length) {
+        _completeWorkout();
+        return;
+      }
+      stepIndex++;
+      status = SessionStatus.announcing;
+      notifyListeners();
+      return;
+    }
+
+    _stepElapsedBefore = Duration.zero;
+    _activeWatch
+      ..reset()
+      ..start();
+    _stepWatch
+      ..reset()
+      ..start();
+    status = SessionStatus.running;
     notifyListeners();
   }
 
   void _completeWorkout() {
     _activeElapsedBefore = workout.totalDuration;
-
     _activeWatch.stop();
     _stepWatch.stop();
-
     status = SessionStatus.completed;
-
     _ticker?.cancel();
     _ticker = null;
-
     notifyListeners();
   }
 
   void pause() {
-    if (status != SessionStatus.running) {
-      return;
-    }
+    if (status != SessionStatus.running) return;
 
     _activeElapsedBefore += _activeWatch.elapsed;
-
     _stepElapsedBefore += _stepWatch.elapsed;
-
     _activeWatch
       ..stop()
       ..reset();
-
     _stepWatch
       ..stop()
       ..reset();
-
     status = SessionStatus.paused;
-
     notifyListeners();
   }
 
   void resume() {
-    if (status != SessionStatus.paused) {
-      return;
-    }
-
+    if (status != SessionStatus.paused) return;
     status = SessionStatus.running;
-
     _activeWatch.start();
     _stepWatch.start();
-
     notifyListeners();
   }
 
   void endEarly() {
-    if (status == SessionStatus.completed ||
-        status == SessionStatus.incomplete) {
+    if (status == SessionStatus.completed || status == SessionStatus.incomplete) {
       return;
     }
 
     if (status == SessionStatus.running) {
       _activeElapsedBefore += _activeWatch.elapsed;
-
       _stepElapsedBefore += _stepWatch.elapsed;
     }
 
     _activeWatch.stop();
     _stepWatch.stop();
     _prepareWatch.stop();
-
     _ticker?.cancel();
     _ticker = null;
-
     status = SessionStatus.incomplete;
-
     notifyListeners();
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-
     _prepareWatch.stop();
     _stepWatch.stop();
     _activeWatch.stop();
-
     super.dispose();
   }
 }
