@@ -17,6 +17,7 @@ class AudioFeedbackService {
     await _tts.setSpeechRate(0.46);
     await _tts.setPitch(1.0);
     await _tts.setVolume(1.0);
+    await _tts.awaitSpeakCompletion(true);
     _ready = true;
   }
 
