@@ -45,6 +45,9 @@ class WorkoutSerializer {
       b
         ..writeln('$pad- name: ${_quote(node.name.trim())}')
         ..writeln('$pad  duration: ${node.duration.trim()}');
+      if (!node.countdown) {
+        b.writeln('$pad  countdown: false');
+      }
       if (node.guide.trim().isNotEmpty) {
         b.writeln('$pad  guide: >');
         for (final line in node.guide.trim().split('\n')) {
@@ -65,11 +68,7 @@ class WorkoutSerializer {
 
   static String _quote(String value) {
     if (value.isEmpty) return '""';
-    final mustQuote = value.contains(':') ||
-        value.contains('#') ||
-        value.startsWith('-') ||
-        value.startsWith('[') ||
-        value.startsWith('{');
+    final mustQuote = value.contains(':') || value.contains('#') || value.startsWith('-') || value.startsWith('[') || value.startsWith('{');
     if (!mustQuote) return value;
     final escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
     return '"$escaped"';
