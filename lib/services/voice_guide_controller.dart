@@ -27,43 +27,28 @@ class VoiceGuideController {
   Future<void> onEngineChanged() async {
     final status = engine.status;
 
-    // Workout starts.
     if (status == SessionStatus.running && !_started) {
       _started = true;
-
       if (workout.voice.announceStart) {
-        await audio.speak(
-          audio.startPhrase(workout.name),
-          interrupt: true,
-        );
+        await audio.speak(audio.startPhrase(workout.name), interrupt: true);
       }
     }
 
-    // Pause.
-    if (_lastStatus == SessionStatus.running &&
-        status == SessionStatus.paused) {
+    if (_lastStatus == SessionStatus.running && status == SessionStatus.paused) {
       await audio.stopSpeech();
-
-      await audio.speak(
-        audio.pausedPhrase(),
-        interrupt: true,
-      );
+      await audio.speak(audio.pausedPhrase(), interrupt: true);
     }
 
-    // Resume.
-    if (_lastStatus == SessionStatus.paused &&
-        status == SessionStatus.running) {
+    if (_lastStatus == SessionStatus.paused && status == SessionStatus.running) {
       await audio.speak(
         audio.resumePhrase(engine.currentStep.name),
         interrupt: true,
       );
     }
 
-    // New step.
     if (status == SessionStatus.running && _lastStepIndex != engine.stepIndex) {
       _lastStepIndex = engine.stepIndex;
       _lastSpokenSecond = null;
-
       _speakingStepGuide = true;
 
       try {
@@ -73,69 +58,45 @@ class VoiceGuideController {
         final step = engine.currentStep;
         final repeat = engine.currentRepeat;
         final guide = step.guide?.trim();
-
         final parts = <String>[];
 
         if (workout.voice.announceStepName) {
-          // At the first step of an inner repeat round:
-          //
-          // Vietnamese:
-          // "Plank lần thứ 1"
-          //
-          // English:
-          // "Plank, round 1"
           if (repeat != null && repeat.isFirstStepOfRound) {
             if (workout.voice.language == 'vi') {
-              parts.add(
-                '${step.name} lần thứ ${repeat.index}',
-              );
+              parts.add('${step.name} lần thứ ${repeat.index}');
             } else {
-              parts.add(
-                '${step.name}, round ${repeat.index}',
-              );
+              parts.add('${step.name}, round ${repeat.index}');
             }
           } else {
             parts.add(step.name);
           }
         }
 
-        // Optional step guide.
         if (guide != null && guide.isNotEmpty) {
           parts.add(guide);
         }
 
         if (parts.isNotEmpty) {
-          await audio.speak(
-            parts.join('. '),
-            interrupt: true,
-          );
+          await audio.speak(parts.join('. '), interrupt: true);
         }
       } finally {
         _speakingStepGuide = false;
       }
     }
 
-    // Timer voice.
     if (status == SessionStatus.running) {
       await _handleTimingVoice();
     }
 
-    // Workout completed.
     if (status == SessionStatus.completed && !_finished) {
       _finished = true;
-
       await audio.stopSpeech();
       await audio.playCue(workout.sound);
-
       if (workout.voice.announceFinish) {
-        await audio.speak(
-          audio.finishPhrase(),
-          interrupt: true,
-        );
+        await audio.speak(audio.finishPhrase(), interrupt: true);
       }
     }
 
-    // Workout ended early.
     if (status == SessionStatus.incomplete) {
       await audio.stopSpeech();
     }
@@ -144,92 +105,56 @@ class VoiceGuideController {
   }
 
   Future<void> _handleTimingVoice() async {
+    // Per-step switch. false disables ALL voice timing for this step,
+    // while step name, guide and transition cue still work normally.
+    if (!engine.currentStep.countdown) {
+      return;
+    }
+
     const speechLeadMs = 200;
-
     final remainingMs = engine.remaining.inMilliseconds;
-
     final durationMs = engine.currentStep.duration.inMilliseconds;
 
-    if (remainingMs <= 0) {
-      return;
-    }
+    if (remainingMs <= 0) return;
 
-    // Trigger voice slightly early to compensate
-    // for TTS latency.
     final adjustedRemainingMs = remainingMs - speechLeadMs;
-
-    final remainingSec =
-        adjustedRemainingMs <= 0 ? 0 : ((adjustedRemainingMs - 1) ~/ 1000) + 1;
+    final remainingSec = adjustedRemainingMs <= 0
+        ? 0
+        : ((adjustedRemainingMs - 1) ~/ 1000) + 1;
 
     final elapsedMs = durationMs - remainingMs + speechLeadMs;
-
     final elapsedSec = elapsedMs <= 0 ? 0 : elapsedMs ~/ 1000;
 
-    if (_lastSpokenSecond == remainingSec) {
-      return;
-    }
+    if (_lastSpokenSecond == remainingSec) return;
 
     final mode = workout.voice.mode;
-
     final countdownFrom = workout.voice.countdownFrom.inSeconds;
-
     final interval = workout.voice.announceEvery.inSeconds;
-
     final inEnding = remainingSec > 0 && remainingSec <= countdownFrom;
-
     final shouldEnding = (mode == 'ending' || mode == 'combined') && inEnding;
 
-    // Ending countdown has highest priority.
     if (shouldEnding) {
       _lastSpokenSecond = remainingSec;
-
-      await audio.speak(
-        '$remainingSec',
-        interrupt: true,
-      );
-
+      await audio.speak('$remainingSec', interrupt: true);
       return;
     }
 
-    // Interval announcement.
-    //
-    // Vietnamese:
-    // "Còn 20 giây"
-    //
-    // English:
-    // "20 seconds remaining"
     if (mode == 'interval' || mode == 'combined') {
       if (remainingSec > 0 &&
           interval > 0 &&
           remainingSec < engine.currentStep.duration.inSeconds &&
           remainingSec % interval == 0) {
         _lastSpokenSecond = remainingSec;
-
-        await audio.speak(
-          audio.remainingPhrase(
-            remainingSec,
-          ),
-        );
+        await audio.speak(audio.remainingPhrase(remainingSec));
       }
-
       return;
     }
 
-    // Continuous:
-    //
-    // 1, 2, 3, 4...
     if (mode == 'continuous' && elapsedSec > 0) {
-      // Use negative values so continuous elapsed
-      // seconds do not collide with remaining seconds.
       final spokenElapsedKey = -elapsedSec;
-
       if (_lastSpokenSecond != spokenElapsedKey) {
         _lastSpokenSecond = spokenElapsedKey;
-
-        await audio.speak(
-          '$elapsedSec',
-          interrupt: true,
-        );
+        await audio.speak('$elapsedSec', interrupt: true);
       }
     }
   }
