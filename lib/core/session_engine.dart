@@ -6,7 +6,6 @@ import '../models/workout.dart';
 
 enum SessionStatus {
   preparing,
-  announcing,
   running,
   paused,
   completed,
@@ -28,10 +27,13 @@ class SessionEngine extends ChangeNotifier {
   Duration _stepElapsedBefore = Duration.zero;
   Duration _activeElapsedBefore = Duration.zero;
 
+  bool _announcementComplete = false;
+  bool _timerFinished = false;
+
   SessionEngine(this.workout)
       : status = workout.startCountdown > Duration.zero
             ? SessionStatus.preparing
-            : SessionStatus.announcing {
+            : SessionStatus.running {
     _steps = workout.expand();
     if (_steps.isEmpty) {
       throw StateError('Workout must contain at least one executable step.');
@@ -49,22 +51,30 @@ class SessionEngine extends ChangeNotifier {
 
   int get totalEffectiveSteps => _steps.length;
 
+  bool get announcementComplete => _announcementComplete;
+  bool get timerFinished => _timerFinished;
+  bool get waitingForAnnouncement => _timerFinished && !_announcementComplete;
+
   Duration get activeElapsed =>
       _activeElapsedBefore +
-      (status == SessionStatus.running ? _activeWatch.elapsed : Duration.zero);
+      (status == SessionStatus.running && !_timerFinished
+          ? _activeWatch.elapsed
+          : Duration.zero);
 
   Duration get stepElapsed =>
       _stepElapsedBefore +
-      (status == SessionStatus.running ? _stepWatch.elapsed : Duration.zero);
+      (status == SessionStatus.running && !_timerFinished
+          ? _stepWatch.elapsed
+          : Duration.zero);
 
   Duration get remaining {
     if (status == SessionStatus.preparing) {
       final r = workout.startCountdown - _prepareWatch.elapsed;
       return r.isNegative ? Duration.zero : r;
     }
-    if (status == SessionStatus.announcing) {
-      return currentStep.duration;
-    }
+
+    if (_timerFinished) return Duration.zero;
+
     final r = currentStep.duration - stepElapsed;
     return r.isNegative ? Duration.zero : r;
   }
@@ -82,7 +92,8 @@ class SessionEngine extends ChangeNotifier {
 
     if (status == SessionStatus.preparing) {
       _prepareWatch.start();
-    } else if (status == SessionStatus.announcing) {
+    } else if (status == SessionStatus.running) {
+      _startCurrentStepTimer();
       notifyListeners();
     }
 
@@ -96,7 +107,8 @@ class SessionEngine extends ChangeNotifier {
     if (status == SessionStatus.preparing) {
       if (_prepareWatch.elapsed >= workout.startCountdown) {
         _prepareWatch.stop();
-        status = SessionStatus.announcing;
+        status = SessionStatus.running;
+        _startCurrentStepTimer();
       }
       notifyListeners();
       return;
@@ -104,54 +116,81 @@ class SessionEngine extends ChangeNotifier {
 
     if (status != SessionStatus.running) return;
 
-    if (stepElapsed >= currentStep.duration) {
-      _activeElapsedBefore += currentStep.duration;
-      _activeWatch
-        ..stop()
-        ..reset();
-      _stepWatch
-        ..stop()
-        ..reset();
-      _stepElapsedBefore = Duration.zero;
+    if (!_timerFinished && stepElapsed >= currentStep.duration) {
+      _finishCurrentStepTimer();
+    }
 
-      if (stepIndex + 1 >= _steps.length) {
-        _completeWorkout();
-        return;
-      }
-
-      stepIndex++;
-      status = SessionStatus.announcing;
-      notifyListeners();
+    if (_timerFinished && _announcementComplete) {
+      _advanceOrComplete();
       return;
     }
 
     notifyListeners();
   }
 
-  /// Called by VoiceGuideController after the current step's
-  /// name + guide announcement has fully finished.
-  void completeAnnouncement() {
-    if (status != SessionStatus.announcing) return;
+  void _startCurrentStepTimer() {
+    _announcementComplete = false;
+    _timerFinished = false;
+    _stepElapsedBefore = Duration.zero;
 
     if (currentStep.duration <= Duration.zero) {
-      if (stepIndex + 1 >= _steps.length) {
-        _completeWorkout();
-        return;
-      }
-      stepIndex++;
-      status = SessionStatus.announcing;
-      notifyListeners();
+      _timerFinished = true;
       return;
     }
 
-    _stepElapsedBefore = Duration.zero;
     _activeWatch
       ..reset()
       ..start();
     _stepWatch
       ..reset()
       ..start();
-    status = SessionStatus.running;
+  }
+
+  void _finishCurrentStepTimer() {
+    if (_timerFinished) return;
+
+    _timerFinished = true;
+    _activeElapsedBefore += currentStep.duration;
+    _stepElapsedBefore = currentStep.duration;
+
+    _activeWatch
+      ..stop()
+      ..reset();
+    _stepWatch
+      ..stop()
+      ..reset();
+  }
+
+  /// Called by VoiceGuideController after the current step's
+  /// name + guide announcement has fully finished.
+  void completeAnnouncement() {
+    if (status == SessionStatus.completed ||
+        status == SessionStatus.incomplete) {
+      return;
+    }
+
+    if (_announcementComplete) return;
+
+    _announcementComplete = true;
+
+    if (_timerFinished && status == SessionStatus.running) {
+      _advanceOrComplete();
+      return;
+    }
+
+    notifyListeners();
+  }
+
+  void _advanceOrComplete() {
+    if (!_timerFinished || !_announcementComplete) return;
+
+    if (stepIndex + 1 >= _steps.length) {
+      _completeWorkout();
+      return;
+    }
+
+    stepIndex++;
+    _startCurrentStepTimer();
     notifyListeners();
   }
 
@@ -166,22 +205,25 @@ class SessionEngine extends ChangeNotifier {
   }
 
   void pause() {
-    if (status != SessionStatus.running) return;
+    if (status != SessionStatus.running || _timerFinished) return;
 
     _activeElapsedBefore += _activeWatch.elapsed;
     _stepElapsedBefore += _stepWatch.elapsed;
+
     _activeWatch
       ..stop()
       ..reset();
     _stepWatch
       ..stop()
       ..reset();
+
     status = SessionStatus.paused;
     notifyListeners();
   }
 
   void resume() {
     if (status != SessionStatus.paused) return;
+
     status = SessionStatus.running;
     _activeWatch.start();
     _stepWatch.start();
@@ -189,11 +231,12 @@ class SessionEngine extends ChangeNotifier {
   }
 
   void endEarly() {
-    if (status == SessionStatus.completed || status == SessionStatus.incomplete) {
+    if (status == SessionStatus.completed ||
+        status == SessionStatus.incomplete) {
       return;
     }
 
-    if (status == SessionStatus.running) {
+    if (status == SessionStatus.running && !_timerFinished) {
       _activeElapsedBefore += _activeWatch.elapsed;
       _stepElapsedBefore += _stepWatch.elapsed;
     }
