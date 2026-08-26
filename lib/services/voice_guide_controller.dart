@@ -45,19 +45,24 @@ class VoiceGuideController {
   Future<void> _processCurrentState() async {
     final status = engine.status;
 
-    if (_lastStatus == SessionStatus.running && status == SessionStatus.paused) {
+    if (_lastStatus == SessionStatus.running &&
+        status == SessionStatus.paused) {
       await audio.stopSpeech();
       await audio.speak(audio.pausedPhrase(), interrupt: true);
     }
 
-    if (_lastStatus == SessionStatus.paused && status == SessionStatus.running) {
+    if (_lastStatus == SessionStatus.paused &&
+        status == SessionStatus.running) {
       await audio.speak(
         audio.resumePhrase(engine.currentStep.name),
         interrupt: true,
       );
     }
 
-    if (status == SessionStatus.announcing &&
+    // A new step starts its timer immediately. In parallel we speak
+    // the step name + guide. The engine advances only after both
+    // the timer and this announcement have finished.
+    if ((status == SessionStatus.running || status == SessionStatus.paused) &&
         _lastStepIndex != engine.stepIndex) {
       _lastStepIndex = engine.stepIndex;
       _lastSpokenSecond = null;
@@ -104,20 +109,18 @@ class VoiceGuideController {
           );
         }
       } catch (e) {
-        // A TTS problem must not leave the workout permanently stuck in GUIDE.
-        // The player can continue even if voice is unavailable on this device.
+        // Voice failure must never block progression permanently.
         // ignore: avoid_print
         print('Step announcement failed: $e');
       } finally {
-        _lastStatus = SessionStatus.announcing;
-        if (engine.status == SessionStatus.announcing) {
-          engine.completeAnnouncement();
-        }
+        engine.completeAnnouncement();
       }
       return;
     }
 
-    if (status == SessionStatus.running) {
+    // Timing voice starts only after the step announcement is finished,
+    // so interval/final-countdown speech cannot cut off name/guide speech.
+    if (status == SessionStatus.running && engine.announcementComplete) {
       await _handleTimingVoice();
     }
 
@@ -139,6 +142,7 @@ class VoiceGuideController {
 
   Future<void> _handleTimingVoice() async {
     if (!engine.currentStep.countdown) return;
+    if (engine.timerFinished) return;
 
     const speechLeadMs = 200;
     final remainingMs = engine.remaining.inMilliseconds;
@@ -160,7 +164,8 @@ class VoiceGuideController {
     final countdownFrom = workout.voice.countdownFrom.inSeconds;
     final interval = workout.voice.announceEvery.inSeconds;
     final inEnding = remainingSec > 0 && remainingSec <= countdownFrom;
-    final shouldEnding = (mode == 'ending' || mode == 'combined') && inEnding;
+    final shouldEnding =
+        (mode == 'ending' || mode == 'combined') && inEnding;
 
     if (shouldEnding) {
       _lastSpokenSecond = remainingSec;
