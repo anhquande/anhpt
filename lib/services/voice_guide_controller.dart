@@ -12,7 +12,8 @@ class VoiceGuideController {
   int? _lastSpokenSecond;
   bool _started = false;
   bool _finished = false;
-  bool _speakingStepGuide = false;
+  bool _processing = false;
+  bool _pending = false;
 
   VoiceGuideController({
     required this.workout,
@@ -25,14 +26,24 @@ class VoiceGuideController {
   }
 
   Future<void> onEngineChanged() async {
-    final status = engine.status;
-
-    if (status == SessionStatus.running && !_started) {
-      _started = true;
-      if (workout.voice.announceStart) {
-        await audio.speak(audio.startPhrase(workout.name), interrupt: true);
-      }
+    if (_processing) {
+      _pending = true;
+      return;
     }
+
+    _processing = true;
+    try {
+      do {
+        _pending = false;
+        await _processCurrentState();
+      } while (_pending);
+    } finally {
+      _processing = false;
+    }
+  }
+
+  Future<void> _processCurrentState() async {
+    final status = engine.status;
 
     if (_lastStatus == SessionStatus.running && status == SessionStatus.paused) {
       await audio.stopSpeech();
@@ -46,42 +57,55 @@ class VoiceGuideController {
       );
     }
 
-    if (status == SessionStatus.running && _lastStepIndex != engine.stepIndex) {
+    if (status == SessionStatus.announcing &&
+        _lastStepIndex != engine.stepIndex) {
       _lastStepIndex = engine.stepIndex;
       _lastSpokenSecond = null;
-      _speakingStepGuide = true;
 
-      try {
-        await audio.stopSpeech();
-        await audio.playCue(workout.sound);
-
-        final step = engine.currentStep;
-        final repeat = engine.currentRepeat;
-        final guide = step.guide?.trim();
-        final parts = <String>[];
-
-        if (workout.voice.announceStepName) {
-          if (repeat != null && repeat.isFirstStepOfRound) {
-            if (workout.voice.language == 'vi') {
-              parts.add('${step.name} lần thứ ${repeat.index}');
-            } else {
-              parts.add('${step.name}, round ${repeat.index}');
-            }
-          } else {
-            parts.add(step.name);
-          }
+      if (!_started) {
+        _started = true;
+        if (workout.voice.announceStart) {
+          await audio.speak(
+            audio.startPhrase(workout.name),
+            interrupt: true,
+          );
         }
-
-        if (guide != null && guide.isNotEmpty) {
-          parts.add(guide);
-        }
-
-        if (parts.isNotEmpty) {
-          await audio.speak(parts.join('. '), interrupt: true);
-        }
-      } finally {
-        _speakingStepGuide = false;
       }
+
+      await audio.stopSpeech();
+      await audio.playCue(workout.sound);
+
+      final step = engine.currentStep;
+      final repeat = engine.currentRepeat;
+      final guide = step.guide?.trim();
+      final parts = <String>[];
+
+      if (workout.voice.announceStepName) {
+        if (repeat != null && repeat.isFirstStepOfRound) {
+          if (workout.voice.language == 'vi') {
+            parts.add('${step.name} lần thứ ${repeat.index}');
+          } else {
+            parts.add('${step.name}, round ${repeat.index}');
+          }
+        } else {
+          parts.add(step.name);
+        }
+      }
+
+      if (guide != null && guide.isNotEmpty) {
+        parts.add(guide);
+      }
+
+      if (parts.isNotEmpty) {
+        await audio.speak(
+          parts.join('. '),
+          interrupt: true,
+        );
+      }
+
+      _lastStatus = SessionStatus.announcing;
+      engine.completeAnnouncement();
+      return;
     }
 
     if (status == SessionStatus.running) {
@@ -105,11 +129,7 @@ class VoiceGuideController {
   }
 
   Future<void> _handleTimingVoice() async {
-    // Per-step switch. false disables ALL voice timing for this step,
-    // while step name, guide and transition cue still work normally.
-    if (!engine.currentStep.countdown) {
-      return;
-    }
+    if (!engine.currentStep.countdown) return;
 
     const speechLeadMs = 200;
     final remainingMs = engine.remaining.inMilliseconds;
