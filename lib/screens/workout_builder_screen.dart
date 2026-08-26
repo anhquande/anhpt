@@ -72,9 +72,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
     }
   }
 
-  void _addStep(List<WorkoutDraftNode> nodes) {
-    setState(() => nodes.add(StepDraft()));
-  }
+  void _addStep(List<WorkoutDraftNode> nodes) => setState(() => nodes.add(StepDraft()));
 
   void _addRepeat(List<WorkoutDraftNode> nodes) {
     setState(() => nodes.add(RepeatDraft(
@@ -94,13 +92,11 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
     });
   }
 
-  void _duplicate(List<WorkoutDraftNode> nodes, int index) {
-    setState(() => nodes.insert(index + 1, nodes[index].clone()));
-  }
+  void _duplicate(List<WorkoutDraftNode> nodes, int index) =>
+      setState(() => nodes.insert(index + 1, nodes[index].clone()));
 
-  void _delete(List<WorkoutDraftNode> nodes, int index) {
-    setState(() => nodes.removeAt(index));
-  }
+  void _delete(List<WorkoutDraftNode> nodes, int index) =>
+      setState(() => nodes.removeAt(index));
 
   @override
   Widget build(BuildContext context) {
@@ -304,6 +300,16 @@ class _StepCard extends StatelessWidget {
       const SizedBox(height: 8),
       TextFormField(initialValue: step.guide, minLines: 1, maxLines: 4,
         decoration: const InputDecoration(labelText: 'Guide (optional)'), onChanged: (v) => step.guide = v),
+      SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: const Text('Voice timing'),
+        subtitle: const Text('Interval / continuous / final countdown'),
+        value: step.countdown,
+        onChanged: (v) {
+          step.countdown = v;
+          changed();
+        },
+      ),
     ]),
   ));
 }
