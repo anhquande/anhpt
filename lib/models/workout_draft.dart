@@ -30,10 +30,8 @@ class RepeatDraft extends WorkoutDraftNode {
   int repeat;
   final List<WorkoutDraftNode> steps;
 
-  RepeatDraft({
-    this.repeat = 2,
-    List<WorkoutDraftNode>? steps,
-  }) : steps = steps ?? <WorkoutDraftNode>[];
+  RepeatDraft({this.repeat = 2, List<WorkoutDraftNode>? steps})
+      : steps = steps ?? <WorkoutDraftNode>[];
 
   @override
   RepeatDraft clone() => RepeatDraft(
@@ -96,12 +94,11 @@ class WorkoutDraft {
     if (node is WorkoutStep) {
       return StepDraft(
         name: node.name,
-        duration: _duration(node.duration),
+        duration: node.duration == Duration.zero ? '' : _duration(node.duration),
         guide: node.guide ?? '',
         countdown: node.countdown,
       );
     }
-
     final repeat = node as RepeatGroup;
     return RepeatDraft(
       repeat: repeat.repeat,
