@@ -80,16 +80,14 @@ For each utterance, the client should use this order:
    stall workout progression.
 
 User-recorded coach audio is local-only. Recording and playback do not require
-an API key and recordings are not uploaded by default. The app should maintain
-a local recording index with at least: workout identifier, scope
-(`description` or `step`), cue identifier, optional structural step key,
-optional voice profile, language, device-local audio path, creation time, and
-metadata/schema version. Step keys use the step's structural index path in the
-workout definition, so repeat rounds share the recording for the same defined
-step without changing the YAML schema. Paths must be treated as device-local
-references and checked for file availability before playback; a missing or
-unreadable recording continues to the next fallback without stalling the
-workout.
+an API key and recordings are not uploaded by default. YAML v2 stores the
+workout-introduction recording in root `recording` and a step cue in that
+step's `recording`. Values are scalar safe relative paths; recording language
+is not stored. Each step has a globally unique effective ID derived from its
+name when omitted. Builder-managed recorded steps receive an explicit stable ID
+so reorder operations cannot retarget recordings. Repeat rounds share the
+recording of their source step definition. Legacy local assignments are
+migrated into YAML. Missing or unreadable recordings fall back without stalling.
 
 A recording flow must request microphone permission only when needed and
 explain why it is needed. Before assigning a recording, the user must be able
@@ -111,18 +109,25 @@ of these inputs produces a different cache entry.
 ## 8. Offline Background Music
 
 Background music is client-only and uses a dedicated `AudioPlayer`, separate
-from cue/coach audio so it never blocks timers or step transitions. Per-workout
-metadata is keyed by `workout.id` and stores optional track id, enabled state,
-base volume, and ducking mode (`off`, `gentle`, or `medium`). No YAML change is
-required.
+from cue/coach audio so it never blocks timers or step transitions. YAML v2
+`background_music` stores source, optional display name, enabled state, base
+volume, and ducking mode (`off`, `gentle`, `medium`, `high`, or `very_high`).
+Source is an `asset:` reference or an application-relative path.
 
 The local music library contains immutable bundled entries and personal tracks
-copied into application documents after user import. Track metadata (id, name,
-mood, source, bundled flag, creation time), assignments, and files remain local.
+copied into application documents after user import. Library metadata and files
+remain local, while the selected workout assignment is portable YAML.
 Deleting a personal track clears every affected workout assignment before the
 file is removed. Missing/unreadable files cause a safe no-music workout.
 
 Music starts at workout start, loops, pauses/resumes with the session, and is
 stopped/disposed on completion, early end, or screen disposal. Coach activity
 drives a short volume fade: gentle uses about 82% of base volume, medium 60%,
-and off preserves base volume. Duck/restore calls are fire-and-forget.
+high 40%, very high 20%, and off preserves base volume. Duck/restore calls are
+fire-and-forget.
+
+The Workout Detail ducking preview uses separate music and bundled coach-sample
+players, but shares the runtime ducking controller and fade curve. It is started
+only by a user action (including on Web), responds immediately to live base
+volume or ducking-mode changes, and stops both players before workout playback
+or when the card is disposed.

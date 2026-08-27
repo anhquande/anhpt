@@ -4,32 +4,77 @@ sealed class WorkoutNode {
 }
 
 class WorkoutStep extends WorkoutNode {
+  final String id;
+  final bool hasExplicitId;
   final String name;
   final Duration duration;
   final String? guide;
   final bool countdown;
+  final String? recording;
 
   const WorkoutStep({
+    required this.id,
+    this.hasExplicitId = false,
     required this.name,
     required this.duration,
     this.guide,
     this.countdown = true,
+    this.recording,
   });
 
   @override
   Map<String, dynamic> toJson() => {
         'type': 'step',
+        'id': id,
+        'hasExplicitId': hasExplicitId,
         'name': name,
         'durationMs': duration.inMilliseconds,
         'guide': guide,
         'countdown': countdown,
+        'recording': recording,
       };
 
   static WorkoutStep fromJson(Map<String, dynamic> j) => WorkoutStep(
+        id: j['id'] as String? ?? '',
+        hasExplicitId: j['hasExplicitId'] as bool? ?? false,
         name: j['name'] as String,
         duration: Duration(milliseconds: j['durationMs'] as int),
         guide: j['guide'] as String?,
         countdown: j['countdown'] as bool? ?? true,
+        recording: j['recording'] as String?,
+      );
+}
+
+class BackgroundMusicConfig {
+  final String source;
+  final String? name;
+  final bool enabled;
+  final double volume;
+  final String ducking;
+
+  const BackgroundMusicConfig({
+    required this.source,
+    this.name,
+    this.enabled = true,
+    this.volume = .35,
+    this.ducking = 'gentle',
+  });
+
+  Map<String, dynamic> toJson() => {
+        'source': source,
+        'name': name,
+        'enabled': enabled,
+        'volume': volume,
+        'ducking': ducking,
+      };
+
+  static BackgroundMusicConfig fromJson(Map<String, dynamic> json) =>
+      BackgroundMusicConfig(
+        source: json['source'] as String,
+        name: json['name'] as String?,
+        enabled: json['enabled'] as bool? ?? true,
+        volume: (json['volume'] as num?)?.toDouble() ?? .35,
+        ducking: json['ducking'] as String? ?? 'gentle',
       );
 }
 
@@ -137,6 +182,8 @@ class Workout {
   final String sound;
   final String haptic;
   final String ducking;
+  final String? recording;
+  final BackgroundMusicConfig? backgroundMusic;
   final List<WorkoutNode> steps;
   final String rawYaml;
   final bool favorite;
@@ -155,6 +202,8 @@ class Workout {
       required this.sound,
       required this.haptic,
       required this.ducking,
+      this.recording,
+      this.backgroundMusic,
       required this.steps,
       required this.rawYaml,
       required this.favorite,
@@ -202,11 +251,21 @@ class Workout {
     return result;
   }
 
-  Workout copyWith(
-          {bool? favorite, DateTime? updatedAt, DateTime? lastUsedAt}) =>
+  Workout copyWith({
+    bool? favorite,
+    DateTime? updatedAt,
+    DateTime? lastUsedAt,
+    String? recording,
+    bool clearRecording = false,
+    BackgroundMusicConfig? backgroundMusic,
+    bool clearBackgroundMusic = false,
+    List<WorkoutNode>? steps,
+    String? rawYaml,
+    int? version,
+  }) =>
       Workout(
         id: id,
-        version: version,
+        version: version ?? this.version,
         name: name,
         description: description,
         tags: tags,
@@ -215,8 +274,12 @@ class Workout {
         sound: sound,
         haptic: haptic,
         ducking: ducking,
-        steps: steps,
-        rawYaml: rawYaml,
+        recording: clearRecording ? null : recording ?? this.recording,
+        backgroundMusic: clearBackgroundMusic
+            ? null
+            : backgroundMusic ?? this.backgroundMusic,
+        steps: steps ?? this.steps,
+        rawYaml: rawYaml ?? this.rawYaml,
         favorite: favorite ?? this.favorite,
         createdAt: createdAt,
         updatedAt: updatedAt ?? this.updatedAt,
@@ -234,6 +297,8 @@ class Workout {
         'sound': sound,
         'haptic': haptic,
         'ducking': ducking,
+        'recording': recording,
+        'backgroundMusic': backgroundMusic?.toJson(),
         'steps': steps.map((e) => e.toJson()).toList(),
         'rawYaml': rawYaml,
         'favorite': favorite,
@@ -254,6 +319,11 @@ class Workout {
         sound: j['sound'] as String,
         haptic: j['haptic'] as String,
         ducking: j['ducking'] as String,
+        recording: j['recording'] as String?,
+        backgroundMusic: j['backgroundMusic'] == null
+            ? null
+            : BackgroundMusicConfig.fromJson(
+                Map<String, dynamic>.from(j['backgroundMusic'] as Map)),
         steps: (j['steps'] as List)
             .map(
                 (e) => workoutNodeFromJson(Map<String, dynamic>.from(e as Map)))

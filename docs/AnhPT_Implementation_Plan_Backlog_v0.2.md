@@ -22,6 +22,8 @@
 - Windows offline background music library and per-workout assignment, with
   looped lifecycle playback, volume control, smooth coach ducking, personal
   import/delete safety, and missing-file fallback.
+- YAML v2 recording references, globally unique effective step IDs,
+  background-music assignment, YAML v1 compatibility, and legacy migration.
 
 ## 2. Near-Term Backlog
 

@@ -5,24 +5,33 @@ sealed class WorkoutDraftNode {
 }
 
 class StepDraft extends WorkoutDraftNode {
+  String id;
+  bool hasExplicitId;
   String name;
   String duration;
   String guide;
   bool countdown;
+  String recording;
 
   StepDraft({
+    this.id = '',
+    this.hasExplicitId = false,
     this.name = 'New Step',
     this.duration = '30s',
     this.guide = '',
     this.countdown = true,
+    this.recording = '',
   });
 
   @override
   StepDraft clone() => StepDraft(
+        id: '',
+        hasExplicitId: false,
         name: name,
         duration: duration,
         guide: guide,
         countdown: countdown,
+        recording: '',
       );
 }
 
@@ -43,6 +52,7 @@ class RepeatDraft extends WorkoutDraftNode {
 class WorkoutDraft {
   String name;
   String description;
+  List<String> tags;
   String startCountdown;
   String voiceLanguage;
   String voiceMode;
@@ -54,11 +64,18 @@ class WorkoutDraft {
   String sound;
   String haptic;
   String ducking;
+  String recording;
+  String backgroundMusicSource;
+  String backgroundMusicName;
+  bool backgroundMusicEnabled;
+  double backgroundMusicVolume;
+  String backgroundMusicDucking;
   final List<WorkoutDraftNode> steps;
 
   WorkoutDraft({
     this.name = 'New Workout',
     this.description = '',
+    List<String>? tags,
     this.startCountdown = '3s',
     this.voiceLanguage = 'vi',
     this.voiceMode = 'combined',
@@ -70,12 +87,20 @@ class WorkoutDraft {
     this.sound = 'beep',
     this.haptic = 'medium',
     this.ducking = 'medium',
+    this.recording = '',
+    this.backgroundMusicSource = '',
+    this.backgroundMusicName = '',
+    this.backgroundMusicEnabled = true,
+    this.backgroundMusicVolume = .35,
+    this.backgroundMusicDucking = 'gentle',
     List<WorkoutDraftNode>? steps,
-  }) : steps = steps ?? <WorkoutDraftNode>[];
+  })  : tags = tags ?? <String>[],
+        steps = steps ?? <WorkoutDraftNode>[];
 
   factory WorkoutDraft.fromWorkout(Workout workout) => WorkoutDraft(
         name: workout.name,
         description: workout.description,
+        tags: List<String>.from(workout.tags),
         startCountdown: _duration(workout.startCountdown),
         voiceLanguage: workout.voice.language,
         voiceMode: workout.voice.mode,
@@ -87,16 +112,26 @@ class WorkoutDraft {
         sound: workout.sound,
         haptic: workout.haptic,
         ducking: workout.ducking,
+        recording: workout.recording ?? '',
+        backgroundMusicSource: workout.backgroundMusic?.source ?? '',
+        backgroundMusicName: workout.backgroundMusic?.name ?? '',
+        backgroundMusicEnabled: workout.backgroundMusic?.enabled ?? true,
+        backgroundMusicVolume: workout.backgroundMusic?.volume ?? .35,
+        backgroundMusicDucking: workout.backgroundMusic?.ducking ?? 'gentle',
         steps: workout.steps.map(_node).toList(),
       );
 
   static WorkoutDraftNode _node(WorkoutNode node) {
     if (node is WorkoutStep) {
       return StepDraft(
+        id: node.id,
+        hasExplicitId: node.hasExplicitId,
         name: node.name,
-        duration: node.duration == Duration.zero ? '' : _duration(node.duration),
+        duration:
+            node.duration == Duration.zero ? '' : _duration(node.duration),
         guide: node.guide ?? '',
         countdown: node.countdown,
+        recording: node.recording ?? '',
       );
     }
     final repeat = node as RepeatGroup;

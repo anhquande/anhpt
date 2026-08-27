@@ -30,7 +30,8 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
   void initState() {
     super.initState();
     if (widget.workoutId != null) {
-      draft = WorkoutDraft.fromWorkout(widget.controller.byId(widget.workoutId!)!);
+      draft =
+          WorkoutDraft.fromWorkout(widget.controller.byId(widget.workoutId!)!);
     } else if (widget.duplicateFromId != null) {
       final source = widget.controller.byId(widget.duplicateFromId!)!;
       draft = WorkoutDraft.fromWorkout(source);
@@ -72,7 +73,8 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
     }
   }
 
-  void _addStep(List<WorkoutDraftNode> nodes) => setState(() => nodes.add(StepDraft()));
+  void _addStep(List<WorkoutDraftNode> nodes) =>
+      setState(() => nodes.add(StepDraft()));
 
   void _addRepeat(List<WorkoutDraftNode> nodes) {
     setState(() => nodes.add(RepeatDraft(
@@ -147,6 +149,17 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
               ),
               const SizedBox(height: 10),
               TextFormField(
+                initialValue: draft.tags.join(', '),
+                decoration: const InputDecoration(
+                    labelText: 'Tags', hintText: 'core, plank, beginner'),
+                onChanged: (value) => draft.tags = value
+                    .split(',')
+                    .map((tag) => tag.trim())
+                    .where((tag) => tag.isNotEmpty)
+                    .toList(),
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
                 initialValue: draft.startCountdown,
                 decoration: const InputDecoration(labelText: 'Start countdown'),
                 onChanged: (v) => draft.startCountdown = v,
@@ -154,7 +167,8 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
               const SizedBox(height: 12),
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
-                title: const Text('Voice settings', style: TextStyle(fontWeight: FontWeight.bold)),
+                title: const Text('Voice settings',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
                 children: [
                   DropdownButtonFormField<String>(
                     initialValue: draft.voiceLanguage,
@@ -163,31 +177,41 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
                       DropdownMenuItem(value: 'vi', child: Text('Vietnamese')),
                       DropdownMenuItem(value: 'en', child: Text('English')),
                     ],
-                    onChanged: (v) => setState(() => draft.voiceLanguage = v ?? 'vi'),
+                    onChanged: (v) =>
+                        setState(() => draft.voiceLanguage = v ?? 'vi'),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     initialValue: draft.voiceMode,
                     decoration: const InputDecoration(labelText: 'Mode'),
                     items: const [
-                      DropdownMenuItem(value: 'continuous', child: Text('Continuous')),
-                      DropdownMenuItem(value: 'interval', child: Text('Interval')),
-                      DropdownMenuItem(value: 'ending', child: Text('Ending countdown')),
-                      DropdownMenuItem(value: 'combined', child: Text('Combined')),
+                      DropdownMenuItem(
+                          value: 'continuous', child: Text('Continuous')),
+                      DropdownMenuItem(
+                          value: 'interval', child: Text('Interval')),
+                      DropdownMenuItem(
+                          value: 'ending', child: Text('Ending countdown')),
+                      DropdownMenuItem(
+                          value: 'combined', child: Text('Combined')),
                     ],
-                    onChanged: (v) => setState(() => draft.voiceMode = v ?? 'combined'),
+                    onChanged: (v) =>
+                        setState(() => draft.voiceMode = v ?? 'combined'),
                   ),
                   const SizedBox(height: 8),
                   Row(children: [
-                    Expanded(child: TextFormField(
+                    Expanded(
+                        child: TextFormField(
                       initialValue: draft.announceEvery,
-                      decoration: const InputDecoration(labelText: 'Announce every'),
+                      decoration:
+                          const InputDecoration(labelText: 'Announce every'),
                       onChanged: (v) => draft.announceEvery = v,
                     )),
                     const SizedBox(width: 8),
-                    Expanded(child: TextFormField(
+                    Expanded(
+                        child: TextFormField(
                       initialValue: draft.countdownFrom,
-                      decoration: const InputDecoration(labelText: 'Countdown from'),
+                      decoration:
+                          const InputDecoration(labelText: 'Countdown from'),
                       onChanged: (v) => draft.countdownFrom = v,
                     )),
                   ]),
@@ -195,12 +219,17 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
                     contentPadding: EdgeInsets.zero,
                     title: const Text('Announce step name'),
                     value: draft.announceStepName,
-                    onChanged: (v) => setState(() => draft.announceStepName = v),
+                    onChanged: (v) =>
+                        setState(() => draft.announceStepName = v),
                   ),
                 ],
               ),
               const SizedBox(height: 18),
-              Text('Workout', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900)),
+              Text('Workout',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.w900)),
               const SizedBox(height: 10),
               _NodeList(
                 nodes: draft.steps,
@@ -213,14 +242,18 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
                 addRepeat: _addRepeat,
               ),
               Row(children: [
-                Expanded(child: OutlinedButton.icon(
+                Expanded(
+                    child: OutlinedButton.icon(
                   onPressed: () => _addStep(draft.steps),
-                  icon: const Icon(Icons.add), label: const Text('Add Step'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Step'),
                 )),
                 const SizedBox(width: 8),
-                Expanded(child: OutlinedButton.icon(
+                Expanded(
+                    child: OutlinedButton.icon(
                   onPressed: () => _addRepeat(draft.steps),
-                  icon: const Icon(Icons.repeat), label: const Text('Add Repeat'),
+                  icon: const Icon(Icons.repeat),
+                  label: const Text('Add Repeat'),
                 )),
               ]),
               const SizedBox(height: 40),
@@ -242,108 +275,170 @@ class _NodeList extends StatelessWidget {
   final void Function(List<WorkoutDraftNode>) addStep;
   final void Function(List<WorkoutDraftNode>) addRepeat;
 
-  const _NodeList({required this.nodes, required this.depth, required this.changed, required this.move,
-    required this.duplicate, required this.delete, required this.addStep, required this.addRepeat});
+  const _NodeList(
+      {required this.nodes,
+      required this.depth,
+      required this.changed,
+      required this.move,
+      required this.duplicate,
+      required this.delete,
+      required this.addStep,
+      required this.addRepeat});
 
   @override
   Widget build(BuildContext context) => Column(children: [
-    for (var i = 0; i < nodes.length; i++)
-      Padding(
-        padding: EdgeInsets.only(left: depth * 12.0, bottom: 10),
-        child: nodes[i] is StepDraft
-            ? _StepCard(
-                step: nodes[i] as StepDraft,
-                changed: changed,
-                up: () => move(nodes, i, -1), down: () => move(nodes, i, 1),
-                copy: () => duplicate(nodes, i), remove: () => delete(nodes, i),
-              )
-            : _RepeatCard(
-                group: nodes[i] as RepeatDraft,
-                children: _NodeList(
-                  nodes: (nodes[i] as RepeatDraft).steps, depth: depth + 1, changed: changed,
-                  move: move, duplicate: duplicate, delete: delete, addStep: addStep, addRepeat: addRepeat,
-                ),
-                up: () => move(nodes, i, -1), down: () => move(nodes, i, 1),
-                copy: () => duplicate(nodes, i), remove: () => delete(nodes, i),
-                addStep: () => addStep((nodes[i] as RepeatDraft).steps),
-                addRepeat: () => addRepeat((nodes[i] as RepeatDraft).steps),
-              ),
-      ),
-  ]);
+        for (var i = 0; i < nodes.length; i++)
+          Padding(
+            padding: EdgeInsets.only(left: depth * 12.0, bottom: 10),
+            child: nodes[i] is StepDraft
+                ? _StepCard(
+                    step: nodes[i] as StepDraft,
+                    changed: changed,
+                    up: () => move(nodes, i, -1),
+                    down: () => move(nodes, i, 1),
+                    copy: () => duplicate(nodes, i),
+                    remove: () => delete(nodes, i),
+                  )
+                : _RepeatCard(
+                    group: nodes[i] as RepeatDraft,
+                    children: _NodeList(
+                      nodes: (nodes[i] as RepeatDraft).steps,
+                      depth: depth + 1,
+                      changed: changed,
+                      move: move,
+                      duplicate: duplicate,
+                      delete: delete,
+                      addStep: addStep,
+                      addRepeat: addRepeat,
+                    ),
+                    up: () => move(nodes, i, -1),
+                    down: () => move(nodes, i, 1),
+                    copy: () => duplicate(nodes, i),
+                    remove: () => delete(nodes, i),
+                    addStep: () => addStep((nodes[i] as RepeatDraft).steps),
+                    addRepeat: () => addRepeat((nodes[i] as RepeatDraft).steps),
+                  ),
+          ),
+      ]);
 }
 
 class _StepCard extends StatelessWidget {
   final StepDraft step;
   final VoidCallback changed, up, down, copy, remove;
-  const _StepCard({required this.step, required this.changed, required this.up, required this.down,
-    required this.copy, required this.remove});
+  const _StepCard(
+      {required this.step,
+      required this.changed,
+      required this.up,
+      required this.down,
+      required this.copy,
+      required this.remove});
 
   @override
-  Widget build(BuildContext context) => Card(child: Padding(
-    padding: const EdgeInsets.all(12),
-    child: Column(children: [
-      Row(children: [
-        const Icon(Icons.timer_outlined), const SizedBox(width: 6),
-        const Expanded(child: Text('Step', style: TextStyle(fontWeight: FontWeight.bold))),
-        IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
-        IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
-        IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
-        IconButton(onPressed: remove, icon: const Icon(Icons.delete_outline)),
-      ]),
-      Row(children: [
-        Expanded(flex: 3, child: TextFormField(initialValue: step.name,
-          decoration: const InputDecoration(labelText: 'Name'), onChanged: (v) => step.name = v)),
-        const SizedBox(width: 8),
-        Expanded(child: TextFormField(initialValue: step.duration,
-          decoration: const InputDecoration(labelText: 'Duration'), onChanged: (v) => step.duration = v)),
-      ]),
-      const SizedBox(height: 8),
-      TextFormField(initialValue: step.guide, minLines: 1, maxLines: 4,
-        decoration: const InputDecoration(labelText: 'Guide (optional)'), onChanged: (v) => step.guide = v),
-      SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        title: const Text('Voice timing'),
-        subtitle: const Text('Interval / continuous / final countdown'),
-        value: step.countdown,
-        onChanged: (v) {
-          step.countdown = v;
-          changed();
-        },
-      ),
-    ]),
-  ));
+  Widget build(BuildContext context) => Card(
+          child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(children: [
+          Row(children: [
+            const Icon(Icons.timer_outlined),
+            const SizedBox(width: 6),
+            const Expanded(
+                child: Text('Step',
+                    style: TextStyle(fontWeight: FontWeight.bold))),
+            IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
+            IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
+            IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
+            IconButton(
+                onPressed: remove, icon: const Icon(Icons.delete_outline)),
+          ]),
+          Row(children: [
+            Expanded(
+                flex: 3,
+                child: TextFormField(
+                    initialValue: step.name,
+                    decoration: const InputDecoration(labelText: 'Name'),
+                    onChanged: (v) => step.name = v)),
+            const SizedBox(width: 8),
+            Expanded(
+                child: TextFormField(
+                    initialValue: step.duration,
+                    decoration: const InputDecoration(labelText: 'Duration'),
+                    onChanged: (v) => step.duration = v)),
+          ]),
+          const SizedBox(height: 8),
+          TextFormField(
+              initialValue: step.guide,
+              minLines: 1,
+              maxLines: 4,
+              decoration: const InputDecoration(labelText: 'Guide (optional)'),
+              onChanged: (v) => step.guide = v),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Voice timing'),
+            subtitle: const Text('Interval / continuous / final countdown'),
+            value: step.countdown,
+            onChanged: (v) {
+              step.countdown = v;
+              changed();
+            },
+          ),
+        ]),
+      ));
 }
 
 class _RepeatCard extends StatelessWidget {
   final RepeatDraft group;
   final Widget children;
   final VoidCallback up, down, copy, remove, addStep, addRepeat;
-  const _RepeatCard({required this.group, required this.children, required this.up, required this.down,
-    required this.copy, required this.remove, required this.addStep, required this.addRepeat});
+  const _RepeatCard(
+      {required this.group,
+      required this.children,
+      required this.up,
+      required this.down,
+      required this.copy,
+      required this.remove,
+      required this.addStep,
+      required this.addRepeat});
 
   @override
-  Widget build(BuildContext context) => Card(child: Padding(
-    padding: const EdgeInsets.all(12),
-    child: Column(children: [
-      Row(children: [
-        const Icon(Icons.repeat), const SizedBox(width: 6),
-        const Text('Repeat', style: TextStyle(fontWeight: FontWeight.bold)), const SizedBox(width: 10),
-        SizedBox(width: 80, child: TextFormField(
-          initialValue: '${group.repeat}', keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Times'),
-          onChanged: (v) { final n = int.tryParse(v); if (n != null) group.repeat = n; },
-        )),
-        const Spacer(),
-        IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
-        IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
-        IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
-        IconButton(onPressed: remove, icon: const Icon(Icons.delete_outline)),
-      ]),
-      const SizedBox(height: 8), children,
-      Row(children: [
-        TextButton.icon(onPressed: addStep, icon: const Icon(Icons.add), label: const Text('Step')),
-        TextButton.icon(onPressed: addRepeat, icon: const Icon(Icons.repeat), label: const Text('Repeat')),
-      ]),
-    ]),
-  ));
+  Widget build(BuildContext context) => Card(
+          child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(children: [
+          Row(children: [
+            const Icon(Icons.repeat),
+            const SizedBox(width: 6),
+            const Text('Repeat', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(width: 10),
+            SizedBox(
+                width: 80,
+                child: TextFormField(
+                  initialValue: '${group.repeat}',
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(labelText: 'Times'),
+                  onChanged: (v) {
+                    final n = int.tryParse(v);
+                    if (n != null) group.repeat = n;
+                  },
+                )),
+            const Spacer(),
+            IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
+            IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
+            IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
+            IconButton(
+                onPressed: remove, icon: const Icon(Icons.delete_outline)),
+          ]),
+          const SizedBox(height: 8),
+          children,
+          Row(children: [
+            TextButton.icon(
+                onPressed: addStep,
+                icon: const Icon(Icons.add),
+                label: const Text('Step')),
+            TextButton.icon(
+                onPressed: addRepeat,
+                icon: const Icon(Icons.repeat),
+                label: const Text('Repeat')),
+          ]),
+        ]),
+      ));
 }

@@ -7,6 +7,7 @@ import '../services/audio_feedback_service.dart';
 import '../services/background_music_service.dart';
 import '../services/voice_guide_controller.dart';
 import '../widgets/common.dart';
+import '../models/background_music.dart';
 
 class WorkoutPlayerScreen extends StatefulWidget {
   final AppController controller;
@@ -45,15 +46,14 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       workout: workout,
       engine: engine,
       audio: audio,
-      descriptionRecordingPath: widget.controller
-          .coachRecordingFor(workoutId: workout.id, scope: 'description')
-          ?.audioPath,
+      descriptionRecordingPath: workout.recording == null
+          ? null
+          : widget.controller.resolveAudioSource(workout.recording!),
       stepRecordingPaths: {
-        for (final recording in widget.controller.coachRecordings.values)
-          if (recording.workoutId == workout.id &&
-              recording.scope == 'step' &&
-              recording.stepKey != null)
-            recording.stepKey!: recording.audioPath,
+        for (final executable in workout.expand())
+          if (executable.step.recording != null)
+            executable.step.id: widget.controller
+                .resolveAudioSource(executable.step.recording!),
       },
     );
     engine.addListener(_changed);
@@ -61,8 +61,29 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   }
 
   Future<void> _initializeAndStart() async {
-    final config = widget.controller.musicConfigFor(engine.workout.id);
-    final track = widget.controller.musicTrackById(config.trackId);
+    final yamlMusic = engine.workout.backgroundMusic;
+    final config = yamlMusic == null
+        ? widget.controller.musicConfigFor(engine.workout.id)
+        : WorkoutMusicConfig(
+            workoutId: engine.workout.id,
+            trackId: 'yaml',
+            enabled: yamlMusic.enabled,
+            baseVolume: yamlMusic.volume,
+            duckingMode: yamlMusic.ducking,
+          );
+    final libraryTrack = widget.controller.musicTrackById(config.trackId);
+    final track = yamlMusic == null
+        ? libraryTrack
+        : MusicTrack(
+            id: 'yaml',
+            name: yamlMusic.name ?? 'Background music',
+            mood: '',
+            source: yamlMusic.source.startsWith('asset:')
+                ? yamlMusic.source.substring(6)
+                : widget.controller.resolveAudioSource(yamlMusic.source),
+            bundled: yamlMusic.source.startsWith('asset:'),
+            createdAt: DateTime.fromMillisecondsSinceEpoch(0),
+          );
     if (config.enabled && config.trackId != null) {
       if (track == null || !await music.start(track, config)) {
         musicNotice =

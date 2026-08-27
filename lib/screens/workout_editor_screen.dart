@@ -38,27 +38,34 @@ class _WorkoutEditorScreenState extends State<WorkoutEditorScreen> {
     if (widget.initialYaml != null) {
       text = TextEditingController(text: widget.initialYaml!);
     } else if (widget.workoutId != null) {
-      text = TextEditingController(text: widget.controller.byId(widget.workoutId!)!.rawYaml);
+      text = TextEditingController(
+          text: widget.controller.byId(widget.workoutId!)!.rawYaml);
     } else if (widget.duplicateFromId != null) {
       final w = widget.controller.byId(widget.duplicateFromId!)!;
       text = TextEditingController(
-        text: w.rawYaml.replaceFirst(RegExp(r'^name:\s*(.+)$', multiLine: true), 'name: ${w.name} Copy'),
+        text: w.rawYaml.replaceFirst(
+            RegExp(r'^name:\s*(.+)$', multiLine: true), 'name: ${w.name} Copy'),
       );
     } else if (widget.importMode) {
       text = TextEditingController();
     } else {
-      text = TextEditingController(text: sampleYaml.replaceFirst('name: Sample Plank', 'name: New Workout'));
+      text = TextEditingController(
+          text: sampleYaml.replaceFirst(
+              'name: Sample Plank', 'name: New Workout'));
     }
 
     text.addListener(() {
       debounce?.cancel();
-      debounce = Timer(const Duration(milliseconds: 350), () => widget.controller.store.saveDraft(text.text));
+      debounce = Timer(const Duration(milliseconds: 350),
+          () => widget.controller.store.saveDraft(text.text));
     });
   }
 
   Future<void> _save() async {
     try {
-      final existing = widget.workoutId == null ? null : widget.controller.byId(widget.workoutId!);
+      final existing = widget.workoutId == null
+          ? null
+          : widget.controller.byId(widget.workoutId!);
       final parsed = WorkoutParser.parse(
         text.text,
         id: existing?.id ?? WorkoutParser.generateId(),
@@ -92,9 +99,14 @@ class _WorkoutEditorScreenState extends State<WorkoutEditorScreen> {
           child: ListView(
             padding: const EdgeInsets.all(20),
             children: [
-              Text(parsed.name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+              Text(parsed.name,
+                  style: Theme.of(context)
+                      .textTheme
+                      .headlineSmall
+                      ?.copyWith(fontWeight: FontWeight.w900)),
               const SizedBox(height: 8),
-              Text('${formatDuration(parsed.totalDuration)} · ${parsed.effectiveStepCount} steps'),
+              Text(
+                  '${formatDuration(parsed.totalDuration)} · ${parsed.effectiveStepCount} steps'),
               const SizedBox(height: 18),
               WorkoutStructure(nodes: parsed.steps),
             ],
@@ -131,31 +143,51 @@ class _WorkoutEditorScreenState extends State<WorkoutEditorScreen> {
             child: Column(children: [
               if (error != null)
                 Container(
-                  width: double.infinity, padding: const EdgeInsets.all(12), margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(color: cs.errorContainer, borderRadius: BorderRadius.circular(12)),
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                      color: cs.errorContainer,
+                      borderRadius: BorderRadius.circular(12)),
                   child: Text(error!),
                 ),
-              Expanded(child: TextField(
-                controller: text, expands: true, minLines: null, maxLines: null,
+              Expanded(
+                  child: TextField(
+                controller: text,
+                expands: true,
+                minLines: null,
+                maxLines: null,
                 textAlignVertical: TextAlignVertical.top,
-                style: const TextStyle(fontFamily: 'monospace', fontSize: 15, height: 1.45),
-                decoration: const InputDecoration(hintText: 'Paste YAML here...', contentPadding: EdgeInsets.all(16)),
+                style: const TextStyle(
+                    fontFamily: 'monospace', fontSize: 15, height: 1.45),
+                decoration: const InputDecoration(
+                    hintText: 'Paste YAML here...',
+                    contentPadding: EdgeInsets.all(16)),
               )),
               const SizedBox(height: 8),
               Row(children: [
-                OutlinedButton(onPressed: () => _insert('  '), child: const Text('Tab')),
+                OutlinedButton(
+                    onPressed: () => _insert('  '), child: const Text('Tab')),
                 const SizedBox(width: 6),
-                OutlinedButton(onPressed: () => _insert('- '), child: const Text('-')),
+                OutlinedButton(
+                    onPressed: () => _insert('- '), child: const Text('-')),
                 const SizedBox(width: 6),
-                OutlinedButton(onPressed: () => _insert(': '), child: const Text(':')),
+                OutlinedButton(
+                    onPressed: () => _insert(': '), child: const Text(':')),
                 const Spacer(),
-                TextButton.icon(onPressed: _preview, icon: const Icon(Icons.visibility_outlined), label: const Text('Preview')),
+                TextButton.icon(
+                    onPressed: _preview,
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text('Preview')),
                 IconButton(
                   tooltip: 'YAML Reference',
-                  onPressed: () => showDialog<void>(context: context, builder: (_) => const AlertDialog(
-                    title: Text('YAML Reference'),
-                    content: SelectableText('version: 1\nname: Morning Plank\nstart_countdown: 5s\n\nsteps:\n  - name: Plank\n    duration: 40s\n    guide: Keep your back straight\n  - repeat: 3\n    steps:\n      - name: Nghỉ\n        duration: 20s'),
-                  )),
+                  onPressed: () => showDialog<void>(
+                      context: context,
+                      builder: (_) => const AlertDialog(
+                            title: Text('YAML Reference'),
+                            content: SelectableText(
+                                'version: 2\nname: Morning Plank\nstart_countdown: 5s\n\nsteps:\n  - name: Plank\n    duration: 40s\n    guide: Keep your back straight\n  - repeat: 3\n    steps:\n      - name: Nghỉ\n        duration: 20s'),
+                          )),
                   icon: const Icon(Icons.help_outline),
                 ),
               ]),

@@ -2,6 +2,10 @@ import 'package:anhpt/models/coach_recording.dart';
 import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/services/workout_parser.dart';
+import 'package:anhpt/screens/workout_detail_screen.dart';
+import 'package:anhpt/widgets/coach_recording_card.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -30,7 +34,7 @@ void main() {
       scope: 'step',
       stepKey: '2.0',
       language: 'vi-VN',
-      audioPath: r'C:\recordings\step.m4a',
+      audioPath: 'coach_recordings/step.m4a',
       createdAt: DateTime.utc(2026, 8, 26),
     );
 
@@ -55,13 +59,22 @@ steps:
       () async {
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
+    controller.workouts = [
+      WorkoutParser.parse('''
+version: 1
+name: Test
+steps:
+  - name: Warm up
+  - name: Plank
+''', id: 'workout-1', defaultVoiceLanguage: 'vi')
+    ];
     final recording = CoachRecording(
       workoutId: 'workout-1',
       cue: 'step_voice',
       scope: 'step',
-      stepKey: '1.0',
+      stepKey: '1',
       language: 'vi-VN',
-      audioPath: r'C:\recordings\step.m4a',
+      audioPath: 'coach_recordings/step.m4a',
       createdAt: DateTime.utc(2026, 8, 26),
     );
 
@@ -72,7 +85,7 @@ steps:
           .coachRecordingFor(
             workoutId: 'workout-1',
             scope: 'step',
-            stepKey: '1.0',
+            stepKey: '1',
           )
           ?.audioPath,
       recording.audioPath,
@@ -85,4 +98,89 @@ steps:
       isNull,
     );
   });
+
+  testWidgets('step recording opens a centered dialog with the step guide',
+      (tester) async {
+    await tester.binding.setSurfaceSize(const Size(1000, 1200));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore());
+    controller.workouts = [
+      WorkoutParser.parse('''
+version: 2
+name: Guided workout
+steps:
+  - name: Plank
+    guide: Keep your back straight and breathe evenly.
+''', id: 'workout-1', defaultVoiceLanguage: 'en')
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: WorkoutDetailScreen(
+        controller: controller,
+        workoutId: 'workout-1',
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byTooltip('Record step cue'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(find.byTooltip('Record step cue'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Dialog), findsOneWidget);
+    expect(find.text('Step recording: Plank'), findsOneWidget);
+    expect(find.text('Guide to read'), findsOneWidget);
+    expect(find.text('Keep your back straight and breathe evenly.'),
+        findsOneWidget);
+    expect(find.text('Open microphone settings'), findsNothing);
+    expect(find.textContaining('Windows does not show'), findsNothing);
+    expect(find.text('Ready to record.'), findsNothing);
+  });
+
+  for (final scope in ['description', 'step']) {
+    testWidgets('$scope recording shows an inline player when assigned',
+        (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(LocalStore());
+      final workout = WorkoutParser.parse('''
+version: 2
+name: Recorded workout
+recording: coach_recordings/intro.m4a
+steps:
+  - id: plank
+    name: Plank
+    recording: coach_recordings/plank.m4a
+''', id: 'workout-1', defaultVoiceLanguage: 'en');
+      controller.workouts = [workout];
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: CoachRecordingCard(
+            controller: controller,
+            workout: workout,
+            scope: scope,
+            stepKey: scope == 'step' ? '0' : null,
+            title:
+                scope == 'step' ? 'Step recording' : 'Introduction recording',
+            cueDescription: 'Record this cue.',
+          ),
+        ),
+      ));
+      await tester.pump();
+
+      expect(find.text('Assigned recording'), findsOneWidget);
+      expect(find.byTooltip('Play preview'), findsOneWidget);
+      expect(find.byTooltip('Stop preview'), findsOneWidget);
+      expect(find.text('Delete recording'), findsOneWidget);
+      final recordCenter = tester.getCenter(find.text('Record replacement'));
+      final deleteCenter = tester.getCenter(find.text('Delete recording'));
+      expect(recordCenter.dx, lessThan(deleteCenter.dx));
+      expect((recordCenter.dy - deleteCenter.dy).abs(), lessThan(2));
+      debugDefaultTargetPlatformOverride = null;
+    });
+  }
 }

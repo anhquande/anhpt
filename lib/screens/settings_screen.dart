@@ -1,10 +1,23 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
+import '../services/coach_recording_service.dart';
 import 'music_library_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final AppController controller;
   const SettingsScreen({super.key, required this.controller});
+
+  Future<void> _openMicrophoneSettings(BuildContext context) async {
+    try {
+      await CoachRecordingService.openSystemMicrophoneSettings();
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Could not open microphone settings: $error')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +35,23 @@ class SettingsScreen extends StatelessWidget {
                   leading: Icon(Icons.brightness_6_outlined),
                   title: Text('Appearance'),
                   subtitle: Text('System (Light/Dark follows device)'),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.mic_outlined),
+                  title: const Text('Microphone access'),
+                  subtitle: Text(!kIsWeb &&
+                          defaultTargetPlatform == TargetPlatform.windows
+                      ? 'Coach recording requires microphone access for desktop apps. Manage it in Windows Privacy settings.'
+                      : 'Enable microphone access for AnhPT in your system or browser settings.'),
+                  trailing:
+                      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+                          ? OutlinedButton.icon(
+                              onPressed: () => _openMicrophoneSettings(context),
+                              icon: const Icon(Icons.open_in_new, size: 18),
+                              label: const Text('Open settings'),
+                            )
+                          : null,
                 ),
                 const Divider(),
                 ListTile(

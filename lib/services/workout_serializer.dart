@@ -3,12 +3,23 @@ import '../models/workout_draft.dart';
 class WorkoutSerializer {
   static String toYaml(WorkoutDraft draft) {
     final b = StringBuffer()
-      ..writeln('version: 1')
+      ..writeln('version: 2')
       ..writeln()
       ..writeln('name: ${_quote(draft.name.trim())}');
 
     if (draft.description.trim().isNotEmpty) {
       b.writeln('description: ${_quote(draft.description.trim())}');
+    }
+
+    if (draft.tags.isNotEmpty) {
+      b.writeln('tags:');
+      for (final tag in draft.tags) {
+        b.writeln('  - ${_quote(tag.trim())}');
+      }
+    }
+
+    if (draft.recording.trim().isNotEmpty) {
+      b.writeln('recording: ${_quote(draft.recording.trim())}');
     }
 
     b
@@ -29,7 +40,24 @@ class WorkoutSerializer {
       ..writeln('  haptic: ${draft.haptic}')
       ..writeln()
       ..writeln('audio:')
-      ..writeln('  ducking: ${draft.ducking}')
+      ..writeln('  ducking: ${draft.ducking}');
+
+    if (draft.backgroundMusicSource.trim().isNotEmpty) {
+      b
+        ..writeln()
+        ..writeln('background_music:')
+        ..writeln('  source: ${_quote(draft.backgroundMusicSource.trim())}');
+      if (draft.backgroundMusicName.trim().isNotEmpty) {
+        b.writeln('  name: ${_quote(draft.backgroundMusicName.trim())}');
+      }
+      if (!draft.backgroundMusicEnabled) b.writeln('  enabled: false');
+      b.writeln('  volume: ${_number(draft.backgroundMusicVolume)}');
+      if (draft.backgroundMusicDucking != 'gentle') {
+        b.writeln('  ducking: ${draft.backgroundMusicDucking}');
+      }
+    }
+
+    b
       ..writeln()
       ..writeln('steps:');
 
@@ -43,6 +71,10 @@ class WorkoutSerializer {
     final pad = ' ' * indent;
     if (node is StepDraft) {
       b.writeln('$pad- name: ${_quote(node.name.trim())}');
+
+      if (node.hasExplicitId || node.recording.trim().isNotEmpty) {
+        b.writeln('$pad  id: ${_quote(node.id.trim())}');
+      }
 
       final duration = node.duration.trim();
       if (duration.isNotEmpty && duration != '0s') {
@@ -58,6 +90,9 @@ class WorkoutSerializer {
         for (final line in node.guide.trim().split('\n')) {
           b.writeln('$pad    ${line.trim()}');
         }
+      }
+      if (node.recording.trim().isNotEmpty) {
+        b.writeln('$pad  recording: ${_quote(node.recording.trim())}');
       }
       return;
     }
@@ -81,5 +116,12 @@ class WorkoutSerializer {
     if (!mustQuote) return value;
     final escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
     return '"$escaped"';
+  }
+
+  static String _number(double value) {
+    final fixed = value.toStringAsFixed(3);
+    return fixed
+        .replaceFirst(RegExp(r'0+$'), '')
+        .replaceFirst(RegExp(r'\.$'), '');
   }
 }

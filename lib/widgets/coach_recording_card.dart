@@ -9,6 +9,7 @@ import '../app/app_controller.dart';
 import '../models/coach_recording.dart';
 import '../models/workout.dart';
 import '../services/coach_recording_service.dart';
+import 'audio_preview_player.dart';
 
 class CoachRecordingCard extends StatefulWidget {
   final AppController controller;
@@ -17,6 +18,9 @@ class CoachRecordingCard extends StatefulWidget {
   final String? stepKey;
   final String title;
   final String cueDescription;
+  final String? scriptText;
+  final bool showCloseButton;
+  final bool closeAfterSave;
 
   const CoachRecordingCard({
     super.key,
@@ -25,7 +29,10 @@ class CoachRecordingCard extends StatefulWidget {
     required this.scope,
     required this.title,
     required this.cueDescription,
+    this.scriptText,
     this.stepKey,
+    this.showCloseButton = false,
+    this.closeAfterSave = false,
   });
 
   @override
@@ -49,8 +56,8 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
   Duration _previewPosition = Duration.zero;
   Duration _previewDuration = Duration.zero;
   String? _previewPath;
-  String _status =
-      'Windows does not show an app permission popup here. Desktop microphone access must be enabled in Windows Settings.';
+  String? _status;
+  bool? _microphoneAvailable;
 
   bool get _supported =>
       !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
@@ -86,18 +93,38 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
         setState(() => _previewDuration = duration);
       }
     });
+    if (_supported) unawaited(_checkMicrophoneAvailability());
   }
+
+  Future<void> _checkMicrophoneAvailability() async {
+    try {
+      final available = await _recordingService.canAttemptRecording();
+      if (mounted) setState(() => _microphoneAvailable = available);
+    } catch (_) {
+      if (mounted) setState(() => _microphoneAvailable = false);
+    }
+  }
+
+  String get _recordTooltip => switch (_microphoneAvailable) {
+        null => 'Checking microphone availability…',
+        false => 'Microphone unavailable. Enable access in Settings.',
+        true => _recording ? 'Stop recording' : 'Start recording',
+      };
 
   Future<void> _start() async {
     setState(() => _busy = true);
     try {
       if (!await _recordingService.canAttemptRecording()) {
         if (mounted) {
-          setState(() => _status =
-              'Microphone permission is unavailable. Open Windows microphone settings, enable desktop app access, then try again.');
+          setState(() {
+            _microphoneAvailable = false;
+            _status =
+                'Microphone access is unavailable. Review Microphone access in app Settings, then try again.';
+          });
         }
         return;
       }
+      await _stopPreview();
       if (_draftPath != null) {
         await _recordingService.deleteFile(_draftPath!);
       }
@@ -120,7 +147,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
         setState(() {
           _recording = false;
           _status =
-              'Recording did not start. Enable Microphone access and “Let desktop apps access your microphone” in Windows Settings, check that an input device is connected, then retry. Details: $error';
+              'Recording did not start. Check microphone access and the selected input device, then retry. Details: $error';
         });
       }
     } finally {
@@ -145,7 +172,10 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
         });
       }
       if (path == null) {
+        await _stopPreview();
         _message('No recording was created.');
+      } else {
+        await _preparePreview(path);
       }
     } catch (error) {
       await _stopRecordingFeedback();
@@ -196,6 +226,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
 
   Future<void> _preview(String path) async {
     if (!await _recordingService.exists(path)) {
+      await _stopPreview();
       _message(
           'The recording file is missing. Record a replacement or delete the assignment.');
       return;
@@ -211,9 +242,43 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
       }
       await _previewPlayer.play(DeviceFileSource(path));
     } catch (error) {
+      await _stopPreview();
       _message('Could not play this recording: $error');
     }
   }
+
+  Future<void> _togglePreview(String path) async {
+    if (_previewPath == path) {
+      if (_previewState == PlayerState.playing) {
+        await _previewPlayer.pause();
+        return;
+      }
+      if (_previewState == PlayerState.paused) {
+        await _previewPlayer.resume();
+        return;
+      }
+    }
+    await _preview(path);
+  }
+
+  Future<void> _preparePreview(String path) async {
+    try {
+      await _previewPlayer.stop();
+      await _previewPlayer.setSource(DeviceFileSource(path));
+      if (mounted) {
+        setState(() {
+          _previewPath = path;
+          _previewPosition = Duration.zero;
+        });
+      }
+    } catch (error) {
+      await _stopPreview();
+      _message('Recording was created, but its preview could not load: $error');
+    }
+  }
+
+  Future<void> _seekPreview(double milliseconds) =>
+      _previewPlayer.seek(Duration(milliseconds: milliseconds.round()));
 
   Future<void> _stopPreview() async {
     await _previewPlayer.stop();
@@ -268,6 +333,9 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
       return;
     }
     _message('Coach recording assigned to this cue.');
+    if (widget.closeAfterSave && mounted) {
+      Navigator.of(context).maybePop();
+    }
   }
 
   Future<void> _delete() async {
@@ -298,6 +366,9 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
       stepKey: widget.stepKey,
     );
     if (recording != null) {
+      if (_previewPath == recording.audioPath) {
+        await _stopPreview();
+      }
       await _recordingService.deleteFile(recording.audioPath);
     }
     if (mounted) {
@@ -311,27 +382,13 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
     if (path == null) {
       return;
     }
+    await _stopPreview();
     await _recordingService.deleteFile(path);
     if (mounted) {
       setState(() {
         _draftPath = null;
         _status = 'Draft recording discarded.';
       });
-    }
-  }
-
-  Future<void> _openMicrophoneSettings() async {
-    try {
-      await _recordingService.openWindowsMicrophoneSettings();
-      if (mounted) {
-        setState(() => _status =
-            'In Windows Settings, turn on Microphone access and “Let desktop apps access your microphone”, then return and press Record.');
-      }
-    } catch (error) {
-      if (mounted) {
-        setState(() => _status =
-            'Could not open Settings automatically. Open Windows Settings > Privacy & security > Microphone. Details: $error');
-      }
     }
   }
 
@@ -348,98 +405,148 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(widget.title,
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w800)),
+          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: Text(widget.title,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w800)),
+            ),
+            if (widget.showCloseButton)
+              IconButton(
+                tooltip: 'Close',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => Navigator.of(context).maybePop(),
+                icon: const Icon(Icons.close),
+              ),
+          ]),
           const SizedBox(height: 6),
           Text(
               '${widget.cueDescription} It stays on this device and is never uploaded.'),
-          if (!_supported) ...[
-            const SizedBox(height: 10),
-            const Text('Recording MVP is currently available on Windows.'),
-          ] else ...[
+          if (widget.scriptText?.trim().isNotEmpty == true) ...[
             const SizedBox(height: 12),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                color: Theme.of(context).colorScheme.secondaryContainer,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(_status),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Guide to read',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelLarge
+                          ?.copyWith(fontWeight: FontWeight.w800)),
+                  const SizedBox(height: 4),
+                  SelectableText(widget.scriptText!.trim()),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: _openMicrophoneSettings,
-              icon: const Icon(Icons.settings_outlined),
-              label: const Text('Open microphone settings'),
-            ),
-            const SizedBox(height: 8),
+          ],
+          if (!_supported) ...[
+            const SizedBox(height: 10),
+            const Text('Recording MVP is currently available on Windows.'),
+          ] else ...[
+            const SizedBox(height: 12),
+            if (_status != null) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(_status!),
+              ),
+              const SizedBox(height: 8),
+            ],
             if (_recording)
               _LiveRecordingIndicator(
                 level: _audioLevel,
                 elapsed: _recordingElapsed,
               ),
-            if (_previewState == PlayerState.playing) ...[
-              _PlaybackIndicator(
-                position: _previewPosition,
-                duration: _previewDuration,
+            if (_draftPath != null) ...[
+              AudioPreviewPlayer(
+                title: 'New recording ready',
+                state: _previewPath == _draftPath
+                    ? _previewState
+                    : PlayerState.stopped,
+                position: _previewPath == _draftPath
+                    ? _previewPosition
+                    : Duration.zero,
+                duration: _previewPath == _draftPath
+                    ? _previewDuration
+                    : Duration.zero,
+                onPlayPause: () => _togglePreview(_draftPath!),
+                onSeek: _seekPreview,
                 onStop: _stopPreview,
               ),
               const SizedBox(height: 8),
-            ],
-            if (_draftPath != null) ...[
-              const Text('Review the new recording before assigning it.'),
-              Wrap(spacing: 8, children: [
-                OutlinedButton.icon(
-                    onPressed: () => _preview(_draftPath!),
-                    icon: Icon(_previewPath == _draftPath &&
-                            _previewState == PlayerState.playing
-                        ? Icons.graphic_eq
-                        : Icons.play_arrow),
-                    label: Text(_previewPath == _draftPath &&
-                            _previewState == PlayerState.playing
-                        ? 'Playing'
-                        : 'Listen')),
-                FilledButton.icon(
-                    onPressed: _save,
-                    icon: const Icon(Icons.check),
-                    label: const Text('Use recording')),
-                TextButton(
-                    onPressed: _discardDraft, child: const Text('Discard')),
+              const Text(
+                  'Review the new recording, then save it or discard it.'),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(
+                  child: FilledButton.icon(
+                      onPressed: _save,
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Save & use recording')),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton(
+                      onPressed: _discardDraft, child: const Text('Discard')),
+                ),
               ]),
             ],
             if (assigned != null && _draftPath == null) ...[
-              Text('A recording is assigned to this ${widget.scope} cue.'),
-              Wrap(spacing: 8, children: [
-                OutlinedButton.icon(
-                    onPressed: () => _preview(assigned.audioPath),
-                    icon: Icon(_previewPath == assigned.audioPath &&
-                            _previewState == PlayerState.playing
-                        ? Icons.graphic_eq
-                        : Icons.play_arrow),
-                    label: Text(_previewPath == assigned.audioPath &&
-                            _previewState == PlayerState.playing
-                        ? 'Playing'
-                        : 'Listen')),
-                TextButton.icon(
-                    onPressed: _delete,
-                    icon: const Icon(Icons.delete_outline),
-                    label: const Text('Delete')),
-              ]),
+              AudioPreviewPlayer(
+                title: 'Assigned recording',
+                state: _previewPath == assigned.audioPath
+                    ? _previewState
+                    : PlayerState.stopped,
+                position: _previewPath == assigned.audioPath
+                    ? _previewPosition
+                    : Duration.zero,
+                duration: _previewPath == assigned.audioPath
+                    ? _previewDuration
+                    : Duration.zero,
+                onPlayPause: () => _togglePreview(assigned.audioPath),
+                onSeek: _seekPreview,
+                onStop: _stopPreview,
+              ),
+              const SizedBox(height: 8),
+              _AssignedRecordingActions(
+                recording: _recording,
+                busy: _busy,
+                microphoneAvailable: _microphoneAvailable,
+                recordTooltip: _recordTooltip,
+                onRecord: _recording ? _stop : _start,
+                onDelete: _delete,
+              ),
             ],
-            const SizedBox(height: 8),
-            FilledButton.tonalIcon(
-              onPressed: _busy ? null : (_recording ? _stop : _start),
-              icon: Icon(_recording ? Icons.stop : Icons.mic),
-              label: Text(_recording
-                  ? 'Stop recording'
-                  : assigned == null
-                      ? 'Record'
-                      : 'Record replacement'),
-            ),
+            if (assigned == null || _draftPath != null) ...[
+              const SizedBox(height: 8),
+              Tooltip(
+                message: _recordTooltip,
+                child: FilledButton.tonalIcon(
+                  onPressed:
+                      _busy || (!_recording && _microphoneAvailable != true)
+                          ? null
+                          : (_recording ? _stop : _start),
+                  icon: Icon(_recording ? Icons.stop : Icons.mic),
+                  label: Text(_recording
+                      ? 'Stop recording'
+                      : assigned == null
+                          ? 'Record'
+                          : 'Record replacement'),
+                ),
+              ),
+            ],
           ],
         ]),
       ),
@@ -468,54 +575,55 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
   }
 }
 
-class _PlaybackIndicator extends StatelessWidget {
-  final Duration position;
-  final Duration duration;
-  final VoidCallback onStop;
+class _AssignedRecordingActions extends StatelessWidget {
+  final bool recording;
+  final bool busy;
+  final bool? microphoneAvailable;
+  final String recordTooltip;
+  final Future<void> Function() onRecord;
+  final Future<void> Function() onDelete;
 
-  const _PlaybackIndicator({
-    required this.position,
-    required this.duration,
-    required this.onStop,
+  const _AssignedRecordingActions({
+    required this.recording,
+    required this.busy,
+    required this.microphoneAvailable,
+    required this.recordTooltip,
+    required this.onRecord,
+    required this.onDelete,
   });
-
-  String _time(Duration value) {
-    final minutes = value.inMinutes.toString().padLeft(2, '0');
-    final seconds = (value.inSeconds % 60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
 
   @override
   Widget build(BuildContext context) {
-    final progress = duration.inMilliseconds <= 0
-        ? null
-        : (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
-    final color = Theme.of(context).colorScheme.primary;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: .08),
-        border: Border.all(color: color.withValues(alpha: .3)),
-        borderRadius: BorderRadius.circular(12),
+    final recordButton = Tooltip(
+      message: recordTooltip,
+      child: FilledButton.tonalIcon(
+        onPressed: busy || (!recording && microphoneAvailable != true)
+            ? null
+            : onRecord,
+        icon: Icon(recording ? Icons.stop : Icons.mic),
+        label: Text(recording ? 'Stop recording' : 'Record replacement'),
       ),
-      child: Column(children: [
-        Row(children: [
-          Icon(Icons.graphic_eq, color: color),
-          const SizedBox(width: 8),
-          const Text('Playing preview',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const Spacer(),
-          Text('${_time(position)} / ${_time(duration)}'),
-          IconButton(
-            tooltip: 'Stop preview',
-            onPressed: onStop,
-            icon: const Icon(Icons.stop_circle_outlined),
-          ),
-        ]),
-        LinearProgressIndicator(value: progress),
-      ]),
     );
+    final deleteButton = TextButton.icon(
+      onPressed: busy || recording ? null : onDelete,
+      icon: const Icon(Icons.delete_outline),
+      label: const Text('Delete recording'),
+    );
+
+    return LayoutBuilder(builder: (context, constraints) {
+      if (constraints.maxWidth >= 440) {
+        return Row(children: [
+          recordButton,
+          const Spacer(),
+          deleteButton,
+        ]);
+      }
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [recordButton, deleteButton],
+      );
+    });
   }
 }
 

@@ -16,7 +16,7 @@ class CoachRecordingService {
   Stream<Amplitude> amplitudeStream() =>
       _recorder.onAmplitudeChanged(const Duration(milliseconds: 80));
 
-  Future<void> openWindowsMicrophoneSettings() async {
+  static Future<void> openSystemMicrophoneSettings() async {
     await Process.start(
       'explorer.exe',
       ['ms-settings:privacy-microphone'],

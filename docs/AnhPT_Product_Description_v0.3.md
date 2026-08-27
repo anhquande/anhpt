@@ -26,7 +26,10 @@ AnhPT is a voice-guided workout timer designed for hands-free exercise. The user
   corresponding device TTS text.
 - A workout can use an offline background track selected from the local music
   library. Music loops independently, follows workout pause/resume/end, and can
-  duck gently or moderately while coach audio is active.
+  duck at gentle through very-high levels while coach audio is active.
+- YAML v2 carries recording references and the selected background-music
+  configuration. Audio files remain local and are referenced by safe relative
+  paths; missing files fall back safely.
 
 ## 3. Voice Behavior
 

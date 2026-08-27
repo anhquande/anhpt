@@ -1,14 +1,14 @@
 # AnhPT YAML Schema Specification
 
-**Version:** 0.2  
-**Schema version:** 1  
-**Status:** Backward-compatible extension of the existing schema.
+**Version:** 0.3
+**Schema version:** 2
+**Status:** YAML v2 with backward-compatible YAML v1 parsing.
 
 ## 1. Root Structure
 
 | Field | Required | Default / Notes |
 |---|---:|---|
-| `version` | Yes | Must be `1`. |
+| `version` | Yes | `2` for new files; legacy `1` remains accepted. |
 | `name` | Yes | Workout name. |
 | `description` | No | Empty string. |
 | `tags` | No | Empty list. |
@@ -16,27 +16,65 @@
 | `voice` | No | Defaults applied. |
 | `feedback` | No | Defaults applied. |
 | `audio` | No | Defaults applied. |
+| `recording` | No | Safe relative path to the workout-introduction recording. |
+| `background_music` | No | Selected track and playback settings. |
 | `steps` | Yes | At least one step or repeat group. |
 
 ## 2. Step
 
 | Field | Required | Default | Meaning |
 |---|---:|---|---|
+| `id` | No | Derived from `name` | Unique effective step identifier. |
 | `name` | Yes | — | Spoken/displayed step name. |
-| `duration` | No | `0s` | Timer duration. `0s` is valid. |
+| `duration` | No | `0s` | Timer duration; `0s` is valid. |
 | `guide` | No | `null` | Additional spoken instruction, max 500 characters. |
-| `countdown` | No | `true` | When `false`, disables all timing voice for this step. |
+| `countdown` | No | `true` | When false, disables timing voice for this step. |
+| `recording` | No | `null` | Safe relative path to the step recording. |
 
-A missing `duration` is equivalent to `duration: 0s`.
+`step.id` is unique across the complete workout, including nested repeats.
+Explicit IDs contain letters, numbers, and single hyphens and are at most 40
+characters. When omitted, the effective ID is the lowercase, unaccented,
+hyphenated form of `name`. Collisions receive `-2`, `-3`, and so on. Duplicate
+explicit IDs are invalid. The Builder writes an explicit ID when a step owns a
+recording, preserves it on move, and gives a duplicate a new implicit ID without
+copying the recording.
 
-## 3. Repeat Group
+## 3. Recording References
+
+Root `recording` is the workout-introduction recording. Step `recording` is the
+recording for that step's name/guide cue. Both are scalar strings; recording has
+no language or nested metadata.
+
+References must use `asset:` or a safe path relative to application-managed
+storage. Absolute paths and `..` segments are invalid. Missing or unreadable
+recordings fall back to device TTS and must not stall execution.
+
+## 4. Background Music
+
+| Field | Required | Default / Rules |
+|---|---:|---|
+| `source` | Yes | `asset:` reference or safe relative path. |
+| `name` | No | Display name. |
+| `enabled` | No | `true`. |
+| `volume` | No | `0.35`; number from `0` to `1`. |
+| `ducking` | No | `gentle`; `off`, `gentle`, `medium`, `high`, or `very_high`. |
+
+Only the selected track is serialized; the local music library is not copied
+into every workout. Missing music never blocks workout execution.
+
+Portable export uses an `.anhpt.zip` package containing `workout.yaml` and all
+available non-bundled referenced audio files. Import validates archive paths and
+sizes, copies audio into an isolated application-managed folder, and rewrites
+the YAML references. Bundled `asset:` audio is referenced but not copied.
+
+## 5. Repeat Group
 
 | Field | Required | Rules |
 |---|---:|---|
 | `repeat` | Yes | Integer from 1 to 10,000. |
 | `steps` | Yes | Non-empty list; nesting depth maximum 10. |
 
-## 4. Voice Configuration
+## 6. Voice Configuration
 
 | Field | Values / Default |
 |---|---|
@@ -48,37 +86,34 @@ A missing `duration` is equivalent to `duration: 0s`.
 | `announce_start` | Default `true`. |
 | `announce_finish` | Default `true`. |
 
-## 5. Examples
+## 7. Example
 
 ```yaml
-version: 1
+version: 2
 name: Quick Plank
+recording: recordings/quick-plank-intro.m4a
+
+background_music:
+  source: music/focus-flow.mp3
+  name: Focus Flow
+  volume: 0.35
+
 steps:
   - name: Chuẩn bị tư thế
     guide: Đặt khuỷu tay dưới vai.
     countdown: false
 
-  - name: Plank
+  - id: plank
+    name: Plank
     duration: 20s
+    recording: recordings/plank.m4a
 ```
 
-```yaml
-steps:
-  - repeat: 3
-    steps:
-      - name: Plank
-        duration: 30s
-      - name: Nghỉ
-        duration: 15s
-        countdown: false
-```
+## 8. Execution Semantics
 
-## 6. Execution Semantics
-
-- `duration: 0s` is valid and can represent an instruction-only step.
-- `countdown: false` suppresses continuous, interval, and ending timing speech, but not step name, guide, cue sound, or visible timer.
-- For nested repeat groups, spoken repeat index refers only to the innermost repeat context.
-- Timer and protected step announcement start in parallel at step activation.
-- A step advances only when `timerFinished == true` **and** `announcementFinished == true`.
-- If duration is `0s`, `timerFinished` is true immediately; the step waits only for announcement completion.
-- If there is no protected announcement content, `announcementFinished` is considered complete immediately.
+- Missing `duration` means `0s`.
+- `countdown: false` suppresses timing speech, not name, guide, cue, or timer.
+- Nested repeats announce only the innermost repeat context.
+- Timer and protected announcement start together.
+- A step advances only when both timer and announcement are finished.
+- Missing/unreadable recording or music never stalls workout progression.

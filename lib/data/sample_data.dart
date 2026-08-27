@@ -1,4 +1,4 @@
-const sampleYaml = r"""version: 1
+const sampleYaml = r"""version: 2
 
 name: Sample Plank
 description: Bài plank mẫu với hướng dẫn tiếng Việt

@@ -11,12 +11,19 @@ import 'workout_builder_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
 
-class WorkoutDetailScreen extends StatelessWidget {
+class WorkoutDetailScreen extends StatefulWidget {
   final AppController controller;
   final String workoutId;
 
   const WorkoutDetailScreen(
       {super.key, required this.controller, required this.workoutId});
+
+  @override
+  State<WorkoutDetailScreen> createState() => _WorkoutDetailScreenState();
+}
+
+class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
+  final _musicCardKey = GlobalKey<WorkoutMusicCardState>();
 
   Future<void> _openStepRecording(
     BuildContext context,
@@ -24,24 +31,30 @@ class WorkoutDetailScreen extends StatelessWidget {
     WorkoutStep step,
     String stepKey,
   ) {
-    return showModalBottomSheet<void>(
+    return showDialog<void>(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            16,
-            16,
-            16,
-            16 + MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: CoachRecordingCard(
-            controller: controller,
-            workout: workout,
-            scope: 'step',
-            stepKey: stepKey,
-            title: 'Step recording: ${step.name}',
-            cueDescription: 'Record the spoken cue for this step.',
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: CoachRecordingCard(
+              controller: widget.controller,
+              workout: workout,
+              scope: 'step',
+              stepKey: stepKey,
+              title: 'Step recording: ${step.name}',
+              cueDescription: 'Record the spoken cue for this step.',
+              scriptText: step.guide,
+              showCloseButton: true,
+              closeAfterSave: true,
+            ),
           ),
         ),
       ),
@@ -51,19 +64,27 @@ class WorkoutDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
+      animation: widget.controller,
       builder: (_, __) {
-        final workout = controller.byId(workoutId);
+        final controller = widget.controller;
+        final workout = controller.byId(widget.workoutId);
         if (workout == null) {
           return const Scaffold(body: Center(child: Text('Workout not found')));
         }
-        final recordedStepKeys = controller.coachRecordings.values
-            .where((recording) =>
-                recording.workoutId == workout.id &&
-                recording.scope == 'step' &&
-                recording.stepKey != null)
-            .map((recording) => recording.stepKey!)
-            .toSet();
+        final recordedStepKeys = <String>{};
+        void collectRecordings(List<WorkoutNode> nodes, [String prefix = '']) {
+          for (var index = 0; index < nodes.length; index++) {
+            final key = prefix.isEmpty ? '$index' : '$prefix.$index';
+            final node = nodes[index];
+            if (node is WorkoutStep && node.recording != null) {
+              recordedStepKeys.add(key);
+            } else if (node is RepeatGroup) {
+              collectRecordings(node.steps, key);
+            }
+          }
+        }
+
+        collectRecordings(workout.steps);
         return Scaffold(
           appBar: AppBar(
             title: Text(workout.name),
@@ -100,8 +121,11 @@ class WorkoutDetailScreen extends StatelessWidget {
                   SizedBox(
                       height: 54,
                       child: FilledButton.icon(
-                        onPressed: () {
-                          controller.markUsed(workout.id);
+                        onPressed: () async {
+                          await _musicCardKey.currentState?.stopPreview();
+                          if (!context.mounted) return;
+                          await controller.markUsed(workout.id);
+                          if (!context.mounted) return;
                           Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -122,7 +146,11 @@ class WorkoutDetailScreen extends StatelessWidget {
                         'Record the spoken description for this workout.',
                   ),
                   const SizedBox(height: 18),
-                  WorkoutMusicCard(controller: controller, workout: workout),
+                  WorkoutMusicCard(
+                    key: _musicCardKey,
+                    controller: controller,
+                    workout: workout,
+                  ),
                   const SizedBox(height: 28),
                   const SectionTitle('Structure'),
                   const SizedBox(height: 10),
@@ -176,6 +204,27 @@ class WorkoutDetailScreen extends StatelessWidget {
                       },
                       icon: const Icon(Icons.copy_all_outlined),
                       label: const Text('Copy YAML'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: () async {
+                        try {
+                          final exported =
+                              await controller.exportWorkoutPackage(workout.id);
+                          if (context.mounted && exported) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                    content:
+                                        Text('Workout package exported.')));
+                          }
+                        } catch (error) {
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                content: Text('Export failed: $error')));
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.archive_outlined),
+                      label: const Text('Export package'),
                     ),
                   ]),
                   const SizedBox(height: 18),

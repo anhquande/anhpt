@@ -117,7 +117,7 @@ class VoiceGuideController {
         }
 
         final stepRecordingPath =
-            stepRecordingPaths[engine.currentExecutableStep.stepKey];
+            stepRecordingPaths[engine.currentExecutableStep.step.id];
         final recordingPlayed = stepRecordingPath != null &&
             await audio.playLocalRecordingAndWait(stepRecordingPath);
         if (!recordingPlayed && parts.isNotEmpty) {

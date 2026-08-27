@@ -3,6 +3,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../models/background_music.dart';
+import '../services/music_library_service.dart';
 
 class MusicLibraryScreen extends StatefulWidget {
   final AppController controller;
@@ -168,6 +169,7 @@ class _MusicLibraryScreenState extends State<MusicLibraryScreen> {
   Widget build(BuildContext context) => Scaffold(
       appBar: AppBar(title: const Text('Music Library')),
       floatingActionButton: FloatingActionButton.extended(
+          tooltip: MusicLibraryService.supportedFormatsLabel,
           onPressed: _importing ? null : _import,
           icon: _importing
               ? const SizedBox.square(
