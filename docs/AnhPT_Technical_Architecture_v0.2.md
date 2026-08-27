@@ -187,6 +187,13 @@ case-insensitive and removes Vietnamese diacritics; a short UI debounce avoids
 re-filtering on every keystroke. Source configuration remains separate from the
 Home-accessible browsing/install flow.
 
+Installed-workout provenance is stored internally, independently of editable
+workout YAML and display names. The durable identity is the bucket source plus
+catalog workout ID; the source display name is captured at install time so it
+remains readable if the source is later removed. The original catalog name is
+also captured for user-facing rename context. Version, checksum, and package URL
+remain internal update/security metadata rather than user-facing identity.
+
 Catalog schema v1 contains `schemaVersion`, bucket `name`, and `workouts` entries
 with stable `id`, display metadata, version, immutable `packageUrl`, and SHA-256.
 Packages may include `manifest.json` with `schemaVersion: 1` and

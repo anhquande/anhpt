@@ -212,6 +212,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     for (final workout in favorites) ...[
                       WorkoutCard(
                         workout: workout,
+                        sourceName: _sourceNameFor(workout),
+                        originalName: _originalNameFor(workout),
                         onOpen: () => _openDetail(context, workout),
                         onStart: () => _start(context, workout),
                         onFavorite: () => controller.toggleFavorite(workout.id),
@@ -227,6 +229,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     for (final workout in others) ...[
                       WorkoutCard(
                         workout: workout,
+                        sourceName: _sourceNameFor(workout),
+                        originalName: _originalNameFor(workout),
                         onOpen: () => _openDetail(context, workout),
                         onStart: () => _start(context, workout),
                         onFavorite: () => controller.toggleFavorite(workout.id),
@@ -264,6 +268,18 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
     );
+  }
+
+  String? _sourceNameFor(Workout workout) {
+    final provenance = controller.bucketProvenanceFor(workout.id);
+    return provenance == null ? null : controller.bucketSourceName(provenance);
+  }
+
+  String? _originalNameFor(Workout workout) {
+    final provenance = controller.bucketProvenanceFor(workout.id);
+    return provenance == null
+        ? null
+        : controller.bucketOriginalName(provenance);
   }
 }
 

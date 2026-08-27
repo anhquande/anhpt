@@ -12,7 +12,14 @@ import 'workout_builder_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
 
-enum _WorkoutAction { edit, duplicate, copyYaml, editYaml, exportPackage }
+enum _WorkoutAction {
+  edit,
+  duplicate,
+  copyYaml,
+  editYaml,
+  exportPackage,
+  viewSource,
+}
 
 class WorkoutDetailScreen extends StatefulWidget {
   final AppController controller;
@@ -120,6 +127,37 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
             );
           }
         }
+        return;
+      case _WorkoutAction.viewSource:
+        final provenance = widget.controller.bucketProvenanceFor(workout.id);
+        if (provenance == null) return;
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Workout source'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                    'Source: ${widget.controller.bucketSourceName(provenance)}'),
+                const SizedBox(height: 8),
+                Text('Workout ID: ${provenance.entryId}'),
+                if (widget.controller.bucketOriginalName(provenance)
+                    case final originalName?) ...[
+                  const SizedBox(height: 8),
+                  Text('Original name: $originalName'),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
         return;
     }
   }
@@ -257,6 +295,12 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         }
 
         collectRecordings(workout.steps);
+        final provenance = controller.bucketProvenanceFor(workout.id);
+        final sourceName =
+            provenance == null ? null : controller.bucketSourceName(provenance);
+        final originalName = provenance == null
+            ? null
+            : controller.bucketOriginalName(provenance);
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -284,6 +328,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                   _menuItem(_WorkoutAction.editYaml, Icons.code, 'Edit YAML'),
                   _menuItem(_WorkoutAction.exportPackage,
                       Icons.archive_outlined, 'Export package'),
+                  if (provenance != null)
+                    _menuItem(_WorkoutAction.viewSource, Icons.cloud_outlined,
+                        'View source'),
                 ],
               )
             ],
@@ -296,7 +343,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
                     sliver: SliverToBoxAdapter(
-                      child: _WorkoutSummary(workout: workout),
+                      child: _WorkoutSummary(
+                        workout: workout,
+                        sourceName: sourceName,
+                        originalName: originalName,
+                      ),
                     ),
                   ),
                   SliverPersistentHeader(
@@ -450,14 +501,30 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
 
 class _WorkoutSummary extends StatelessWidget {
   final Workout workout;
+  final String? sourceName;
+  final String? originalName;
 
-  const _WorkoutSummary({required this.workout});
+  const _WorkoutSummary({
+    required this.workout,
+    this.sourceName,
+    this.originalName,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (sourceName != null) ...[
+          _WorkoutOrigin(
+            sourceName!,
+            originalName: originalName != null &&
+                    originalName!.trim() != workout.name.trim()
+                ? originalName
+                : null,
+          ),
+          const SizedBox(height: 14),
+        ],
         if (workout.description.trim().isNotEmpty) ...[
           _WorkoutDescription(workout.description.trim()),
           const SizedBox(height: 16),
@@ -501,6 +568,32 @@ class _WorkoutSummary extends StatelessWidget {
               label: workout.voice.mode,
             ),
           ],
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkoutOrigin extends StatelessWidget {
+  final String sourceName;
+  final String? originalName;
+
+  const _WorkoutOrigin(this.sourceName, {this.originalName});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Row(
+      children: [
+        Icon(Icons.cloud_outlined, size: 17, color: color),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            originalName == null
+                ? 'From $sourceName'
+                : 'From $sourceName · Originally “$originalName”',
+            style: TextStyle(color: color),
+          ),
         ),
       ],
     );

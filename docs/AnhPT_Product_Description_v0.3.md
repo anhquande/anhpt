@@ -57,5 +57,8 @@ Settings manages only public Workout Bucket sources identified by user-supplied
 HTTPS `bucket.json` URLs. Browse supports accent-insensitive search across
 workout metadata and source names, status/source filters, sorting, and direct
 install/update actions. The last valid catalog remains available offline.
+Installed workouts retain their stable catalog source and workout ID even when
+the local display name is edited. The catalog name captured at installation is
+also retained so a renamed workout remains recognizable.
 Updates require an explicit keep/copy/replace choice. Private credentials and
 signatures are deferred; Web sources must support CORS.

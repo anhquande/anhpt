@@ -27,13 +27,22 @@ three-dot overflow menu. The redundant greeting and floating creation button
 are omitted. A local accent-insensitive search filters name,
 description, and tags. Favorites and all other workouts use counted lightweight
 sections, while compact cards prioritize title, optional one-line description,
-metadata, favorite, and a tonal Play action.
+metadata, favorite, and a tonal Play action. Bucket-installed workout cards also
+show a compact `From <source>` line, while locally created workouts omit it.
+When a bucket workout has been renamed, its card adds a compact
+`Originally “<name>”` line.
 
 Workout Overview uses one persistent top app bar that remains visible while the
 content scrolls. It shows the ellipsized workout title on the left, the primary
 `Start` action on the right, and an adjacent three-dot menu. The menu contains
 Edit, Duplicate, Copy YAML, Edit YAML, and Export package; these actions are not
 repeated in the scrolling body.
+
+For a workout installed from a bucket, Overview shows a quiet `From <source>`
+origin line. Its action menu includes `View source`, which reveals the source
+name and stable catalog workout ID. Renaming the workout does not change this
+origin metadata. If the current name differs, Overview also shows the original
+catalog name; unchanged names do not repeat it.
 
 Below the sticky header, a non-empty description uses a subtle notes icon,
 muted body color, and comfortable line height. It collapses after three lines

@@ -227,7 +227,9 @@ class WorkoutBucketEntry {
 class InstalledWorkoutProvenance {
   final String workoutId;
   final String sourceId;
+  final String? sourceName;
   final String entryId;
+  final String? originalName;
   final String version;
   final String packageUrl;
   final String sha256;
@@ -236,7 +238,9 @@ class InstalledWorkoutProvenance {
   const InstalledWorkoutProvenance({
     required this.workoutId,
     required this.sourceId,
+    this.sourceName,
     required this.entryId,
+    this.originalName,
     required this.version,
     required this.packageUrl,
     required this.sha256,
@@ -246,7 +250,9 @@ class InstalledWorkoutProvenance {
   Map<String, dynamic> toJson() => {
         'workoutId': workoutId,
         'sourceId': sourceId,
+        if (sourceName != null) 'sourceName': sourceName,
         'entryId': entryId,
+        if (originalName != null) 'originalName': originalName,
         'version': version,
         'packageUrl': packageUrl,
         'sha256': sha256,
@@ -263,7 +269,9 @@ class InstalledWorkoutProvenance {
     return InstalledWorkoutProvenance(
       workoutId: _requiredString(json, 'workoutId'),
       sourceId: _requiredString(json, 'sourceId'),
+      sourceName: _optionalString(json, 'sourceName'),
       entryId: _requiredString(json, 'entryId'),
+      originalName: _optionalString(json, 'originalName'),
       version: _requiredString(json, 'version'),
       packageUrl: packageUrl,
       sha256: sha256,

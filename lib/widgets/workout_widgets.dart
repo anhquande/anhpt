@@ -22,6 +22,8 @@ class WorkoutCard extends StatelessWidget {
   final VoidCallback onOpen;
   final VoidCallback onStart;
   final VoidCallback onFavorite;
+  final String? sourceName;
+  final String? originalName;
 
   const WorkoutCard({
     super.key,
@@ -29,6 +31,8 @@ class WorkoutCard extends StatelessWidget {
     required this.onOpen,
     required this.onStart,
     required this.onFavorite,
+    this.sourceName,
+    this.originalName,
   });
 
   @override
@@ -64,6 +68,43 @@ class WorkoutCard extends StatelessWidget {
                               color: cs.onSurfaceVariant,
                             ),
                       ),
+                    ],
+                    if (sourceName != null) ...[
+                      const SizedBox(height: 5),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.cloud_outlined,
+                            size: 14,
+                            color: cs.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 5),
+                          Expanded(
+                            child: Text(
+                              'From $sourceName',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (originalName != null &&
+                          originalName!.trim() != workout.name.trim()) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Originally “$originalName”',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 6),
                     Text(

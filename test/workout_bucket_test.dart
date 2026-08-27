@@ -125,7 +125,9 @@ void main() {
     final provenance = InstalledWorkoutProvenance(
       workoutId: 'local-id',
       sourceId: 'community',
+      sourceName: 'Community Workouts',
       entryId: 'morning-flow',
+      originalName: 'Morning Flow',
       version: '1.2.0',
       packageUrl: 'https://example.com/morning-flow.zip',
       sha256: hash,
@@ -135,6 +137,8 @@ void main() {
     final restored = InstalledWorkoutProvenance.fromJson(provenance.toJson());
 
     expect(restored.workoutId, provenance.workoutId);
+    expect(restored.sourceName, 'Community Workouts');
+    expect(restored.originalName, 'Morning Flow');
     expect(restored.entryId, provenance.entryId);
     expect(restored.installedAt, provenance.installedAt);
     expect(restored.sha256, hash);

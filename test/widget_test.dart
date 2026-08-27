@@ -29,6 +29,19 @@ tags:
 steps:
 ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s').join('\n')}
 ''', id: 'sticky', defaultVoiceLanguage: 'en'),
+      ]
+      ..installedBucketWorkouts = [
+        InstalledWorkoutProvenance(
+          workoutId: 'sticky',
+          sourceId: 'official',
+          sourceName: 'AnhPT Official',
+          entryId: 'original-sticky-workout',
+          originalName: 'Original Sticky Workout',
+          version: '1.0.0',
+          packageUrl: 'https://example.com/sticky.zip',
+          sha256: 'a' * 64,
+          installedAt: DateTime.utc(2026, 8, 28),
+        ),
       ];
 
     await tester.pumpWidget(MaterialApp(
@@ -43,6 +56,10 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Strength'), findsOneWidget);
     expect(find.text('Beginner'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
+    expect(
+      find.text('From AnhPT Official · Originally “Original Sticky Workout”'),
+      findsOneWidget,
+    );
     expect(find.text('Introduction'), findsOneWidget);
     expect(find.text('Music'), findsOneWidget);
     expect(find.text('Structure'), findsOneWidget);
@@ -74,9 +91,16 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       'Copy YAML',
       'Edit YAML',
       'Export package',
+      'View source',
     ]) {
       expect(find.text(label), findsOneWidget);
     }
+
+    await tester.tap(find.text('View source'));
+    await tester.pumpAndSettle();
+    expect(find.text('Source: AnhPT Official'), findsOneWidget);
+    expect(find.text('Workout ID: original-sticky-workout'), findsOneWidget);
+    expect(find.text('Original name: Original Sticky Workout'), findsOneWidget);
   });
 
   testWidgets('app shows onboarding on first launch', (tester) async {
@@ -109,6 +133,19 @@ name: Strength Builder
 steps:
   - name: Lift
 ''', id: 'strength', defaultVoiceLanguage: 'en'),
+      ]
+      ..installedBucketWorkouts = [
+        InstalledWorkoutProvenance(
+          workoutId: 'warmup',
+          sourceId: 'official',
+          sourceName: 'AnhPT Official',
+          entryId: 'morning-warmup',
+          originalName: 'Morning Warmup',
+          version: '1.0.0',
+          packageUrl: 'https://example.com/warmup.zip',
+          sha256: 'b' * 64,
+          installedAt: DateTime.utc(2026, 8, 28),
+        ),
       ];
 
     await tester
@@ -118,6 +155,8 @@ steps:
     expect(find.text('My Workouts'), findsOneWidget);
     expect(find.text('New workout'), findsOneWidget);
     expect(find.text('Browse workouts'), findsOneWidget);
+    expect(find.text('From AnhPT Official'), findsOneWidget);
+    expect(find.text('Originally “Morning Warmup”'), findsOneWidget);
     expect(find.text('Import package'), findsNothing);
     expect(find.text('Import YAML'), findsNothing);
     expect(find.byTooltip('More ways to add'), findsOneWidget);

@@ -625,6 +625,34 @@ class AppController extends ChangeNotifier {
         : 'updateAvailable';
   }
 
+  InstalledWorkoutProvenance? bucketProvenanceFor(String workoutId) {
+    for (final item in installedBucketWorkouts) {
+      if (item.workoutId == workoutId) return item;
+    }
+    return null;
+  }
+
+  String bucketSourceName(InstalledWorkoutProvenance provenance) {
+    final storedName = provenance.sourceName?.trim();
+    if (storedName != null && storedName.isNotEmpty) return storedName;
+    for (final source in bucketSources) {
+      if (source.id == provenance.sourceId) return source.name;
+    }
+    return provenance.sourceId;
+  }
+
+  String? bucketOriginalName(InstalledWorkoutProvenance provenance) {
+    final storedName = provenance.originalName?.trim();
+    if (storedName != null && storedName.isNotEmpty) return storedName;
+    for (final entry in bucketCatalogEntries) {
+      if (entry.sourceId == provenance.sourceId &&
+          entry.id == provenance.entryId) {
+        return entry.name;
+      }
+    }
+    return null;
+  }
+
   Future<bool> installBucketEntry(
     WorkoutBucketEntry entry, {
     BucketInstallConflictResolution? resolution,
@@ -662,10 +690,16 @@ class AppController extends ChangeNotifier {
     workouts.add(imported);
     if (existingIndex < 0 ||
         resolution == BucketInstallConflictResolution.replace) {
+      final sourceName = bucketSources
+          .where((source) => source.id == sourceId)
+          .map((source) => source.name)
+          .firstOrNull;
       installedBucketWorkouts.add(InstalledWorkoutProvenance(
         workoutId: imported.id,
         sourceId: sourceId,
+        sourceName: sourceName,
         entryId: entry.id,
+        originalName: entry.name,
         version: entry.version,
         packageUrl: entry.packageUrl,
         sha256: entry.sha256,
