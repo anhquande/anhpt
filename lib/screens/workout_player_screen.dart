@@ -8,6 +8,8 @@ import '../services/background_music_service.dart';
 import '../services/voice_guide_controller.dart';
 import '../widgets/common.dart';
 import '../models/background_music.dart';
+import '../models/workout.dart';
+import '../widgets/demonstration_media.dart';
 
 class WorkoutPlayerScreen extends StatefulWidget {
   final AppController controller;
@@ -215,6 +217,16 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     final canPause =
         engine.status == SessionStatus.running && !engine.timerFinished;
     final cs = Theme.of(context).colorScheme;
+    Exercise? exercise;
+    final exerciseId = preparing ? null : engine.currentStep.exerciseId;
+    if (exerciseId != null) {
+      for (final candidate in engine.workout.exercises) {
+        if (candidate.id == exerciseId) {
+          exercise = candidate;
+          break;
+        }
+      }
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -260,6 +272,18 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                       fontWeight: FontWeight.w900,
                     ),
               ),
+              if (!preparing && exercise?.demoMediaId != null) ...[
+                const SizedBox(height: 16),
+                DemonstrationMedia(
+                  key: ValueKey(exercise!.demoMediaId),
+                  mediaId: exercise.demoMediaId!,
+                  paused: paused,
+                  resolveAsset: () =>
+                      widget.controller.mediaAsset(exercise!.demoMediaId!),
+                  resolveUri: () =>
+                      widget.controller.resolveMediaUri(exercise!.demoMediaId!),
+                ),
+              ],
               const SizedBox(height: 12),
               FittedBox(
                 child: Text(

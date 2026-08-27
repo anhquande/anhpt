@@ -1,8 +1,17 @@
 import 'package:flutter/material.dart';
 import '../models/workout.dart';
+import '../models/media_asset.dart';
 import 'common.dart';
+import 'step_demonstration_button.dart';
+import 'step_recording_mini_player.dart';
 
 typedef StepRecordingCallback = void Function(
+  BuildContext context,
+  WorkoutStep step,
+  String stepKey,
+);
+
+typedef StepMediaCallback = void Function(
   BuildContext context,
   WorkoutStep step,
   String stepKey,
@@ -62,6 +71,12 @@ class WorkoutStructure extends StatelessWidget {
   final String pathPrefix;
   final StepRecordingCallback? onRecordStep;
   final Set<String> recordedStepKeys;
+  final StepMediaCallback? onBrowseStepMedia;
+  final String? Function(WorkoutStep step)? resolveStepRecording;
+  final String? Function(WorkoutStep step)? demoMediaIdForStep;
+  final Future<MediaAsset?> Function(String id)? resolveMediaAsset;
+  final Future<Uri?> Function(String id)? resolveMediaUri;
+  final StepMediaCallback? onRemoveStepMedia;
 
   const WorkoutStructure({
     super.key,
@@ -70,6 +85,12 @@ class WorkoutStructure extends StatelessWidget {
     this.pathPrefix = '',
     this.onRecordStep,
     this.recordedStepKeys = const {},
+    this.onBrowseStepMedia,
+    this.resolveStepRecording,
+    this.demoMediaIdForStep,
+    this.resolveMediaAsset,
+    this.resolveMediaUri,
+    this.onRemoveStepMedia,
   });
 
   @override
@@ -83,6 +104,12 @@ class WorkoutStructure extends StatelessWidget {
           stepKey: stepKey,
           onRecordStep: onRecordStep,
           recordedStepKeys: recordedStepKeys,
+          onBrowseStepMedia: onBrowseStepMedia,
+          resolveStepRecording: resolveStepRecording,
+          demoMediaIdForStep: demoMediaIdForStep,
+          resolveMediaAsset: resolveMediaAsset,
+          resolveMediaUri: resolveMediaUri,
+          onRemoveStepMedia: onRemoveStepMedia,
         );
       }),
     );
@@ -95,6 +122,12 @@ class _NodeView extends StatelessWidget {
   final String stepKey;
   final StepRecordingCallback? onRecordStep;
   final Set<String> recordedStepKeys;
+  final StepMediaCallback? onBrowseStepMedia;
+  final String? Function(WorkoutStep step)? resolveStepRecording;
+  final String? Function(WorkoutStep step)? demoMediaIdForStep;
+  final Future<MediaAsset?> Function(String id)? resolveMediaAsset;
+  final Future<Uri?> Function(String id)? resolveMediaUri;
+  final StepMediaCallback? onRemoveStepMedia;
 
   const _NodeView({
     required this.node,
@@ -102,6 +135,12 @@ class _NodeView extends StatelessWidget {
     required this.stepKey,
     required this.onRecordStep,
     required this.recordedStepKeys,
+    required this.onBrowseStepMedia,
+    required this.resolveStepRecording,
+    required this.demoMediaIdForStep,
+    required this.resolveMediaAsset,
+    required this.resolveMediaUri,
+    required this.onRemoveStepMedia,
   });
 
   @override
@@ -123,35 +162,75 @@ class _NodeView extends StatelessWidget {
             color: cs.surfaceContainerLow,
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.timer_outlined, size: 19),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  step.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
+              Row(children: [
+                Expanded(
+                  child: Text(
+                    step.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              if (onRecordStep != null)
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: recordedStepKeys.contains(stepKey)
-                      ? 'Edit step recording'
-                      : 'Record step cue',
-                  onPressed: () => onRecordStep!(context, step, stepKey),
-                  icon: Icon(
-                    recordedStepKeys.contains(stepKey)
-                        ? Icons.mic
-                        : Icons.mic_none_outlined,
-                    color: recordedStepKeys.contains(stepKey)
-                        ? cs.primary
-                        : cs.onSurfaceVariant,
+                if (onRecordStep != null && step.recording == null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: recordedStepKeys.contains(stepKey)
+                        ? 'Edit step recording'
+                        : 'Record step cue',
+                    onPressed: () => onRecordStep!(context, step, stepKey),
+                    icon: Icon(
+                      recordedStepKeys.contains(stepKey)
+                          ? Icons.mic
+                          : Icons.mic_none_outlined,
+                      color: recordedStepKeys.contains(stepKey)
+                          ? cs.primary
+                          : cs.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              Text(formatDuration(step.duration)),
+                if (onRecordStep != null &&
+                    step.recording != null &&
+                    resolveStepRecording?.call(step) != null)
+                  StepRecordingMiniPlayer(
+                    audioPath: resolveStepRecording!(step)!,
+                    onManage: () => onRecordStep?.call(context, step, stepKey),
+                  ),
+                if (onBrowseStepMedia != null &&
+                    demoMediaIdForStep?.call(step) == null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: step.exerciseId == null
+                        ? 'Browse demonstration files'
+                        : 'Replace demonstration media',
+                    onPressed: () => onBrowseStepMedia!(context, step, stepKey),
+                    icon: Icon(
+                      step.exerciseId == null
+                          ? Icons.add_photo_alternate_outlined
+                          : Icons.perm_media_outlined,
+                      color: step.exerciseId == null
+                          ? cs.onSurfaceVariant
+                          : cs.primary,
+                    ),
+                  ),
+                if (onBrowseStepMedia != null &&
+                    onRemoveStepMedia != null &&
+                    resolveMediaAsset != null &&
+                    resolveMediaUri != null &&
+                    demoMediaIdForStep?.call(step) != null)
+                  StepDemonstrationButton(
+                    mediaId: demoMediaIdForStep!(step)!,
+                    resolveAsset: resolveMediaAsset!,
+                    resolveUri: resolveMediaUri!,
+                    onReplace: () async =>
+                        onBrowseStepMedia!(context, step, stepKey),
+                    onRemove: () async =>
+                        onRemoveStepMedia!(context, step, stepKey),
+                  ),
+                if (onBrowseStepMedia != null) const SizedBox(width: 8),
+                Text(formatDuration(step.duration)),
+              ]),
             ],
           ),
         ),
@@ -200,6 +279,12 @@ class _NodeView extends StatelessWidget {
                 pathPrefix: stepKey,
                 onRecordStep: onRecordStep,
                 recordedStepKeys: recordedStepKeys,
+                onBrowseStepMedia: onBrowseStepMedia,
+                resolveStepRecording: resolveStepRecording,
+                demoMediaIdForStep: demoMediaIdForStep,
+                resolveMediaAsset: resolveMediaAsset,
+                resolveMediaUri: resolveMediaUri,
+                onRemoveStepMedia: onRemoveStepMedia,
               ),
             ],
           ),

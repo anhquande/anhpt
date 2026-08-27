@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout_draft.dart';
+import '../models/workout.dart';
+import '../models/media_asset.dart';
 import '../services/workout_parser.dart';
 import '../services/workout_serializer.dart';
+import '../widgets/coach_recording_card.dart';
+import '../widgets/step_recording_mini_player.dart';
+import '../widgets/step_demonstration_button.dart';
 import 'workout_editor_screen.dart';
 
 class WorkoutBuilderScreen extends StatefulWidget {
@@ -53,7 +58,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
     }
   }
 
-  Future<void> _save() async {
+  Future<Workout?> _persistDraft({bool close = true}) async {
     try {
       final yaml = WorkoutSerializer.toYaml(draft);
       final existing = widget.workoutId == null
@@ -67,10 +72,75 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
         createdAt: existing?.createdAt,
       );
       await widget.controller.saveWorkout(workout);
-      if (mounted) Navigator.pop(context);
+      if (close && mounted) Navigator.pop(context);
+      return workout;
     } on WorkoutValidationException catch (e) {
       setState(() => error = e.message);
+      return null;
     }
+  }
+
+  Future<void> _save() async => _persistDraft();
+
+  Future<void> _recordStep(StepDraft step, String stepKey) async {
+    if (widget.workoutId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save the workout before recording.')),
+      );
+      return;
+    }
+    final saved = await _persistDraft(close: false);
+    if (saved == null || !mounted) return;
+    final savedStep = _workoutStepAt(saved.steps, stepKey);
+    if (savedStep == null) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: CoachRecordingCard(
+              controller: widget.controller,
+              workout: saved,
+              scope: 'step',
+              stepKey: stepKey,
+              title: 'Step recording: ${savedStep.name}',
+              cueDescription: 'Record the spoken cue for this step.',
+              scriptText: savedStep.guide,
+              showCloseButton: true,
+              closeAfterSave: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    final latest = widget.controller.byId(saved.id);
+    if (latest != null && mounted) {
+      setState(() => draft = WorkoutDraft.fromWorkout(latest));
+    }
+  }
+
+  WorkoutStep? _workoutStepAt(List<WorkoutNode> nodes, String path) {
+    final indexes = path.split('.').map(int.tryParse).toList();
+    List<WorkoutNode> current = nodes;
+    for (var depth = 0; depth < indexes.length; depth++) {
+      final index = indexes[depth];
+      if (index == null || index < 0 || index >= current.length) return null;
+      final node = current[index];
+      if (depth == indexes.length - 1) {
+        return node is WorkoutStep ? node : null;
+      }
+      if (node is! RepeatGroup) return null;
+      current = node.steps;
+    }
+    return null;
   }
 
   void _addStep(List<WorkoutDraftNode> nodes) =>
@@ -99,6 +169,58 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
 
   void _delete(List<WorkoutDraftNode> nodes, int index) =>
       setState(() => nodes.removeAt(index));
+
+  Future<void> _chooseMedia(StepDraft step) async {
+    try {
+      final asset = await widget.controller.importDemoMedia();
+      if (asset == null) return;
+      final existingIndex = draft.exercises
+          .indexWhere((exercise) => exercise.id == step.exerciseId);
+      final base = step.name
+          .toLowerCase()
+          .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+          .replaceAll(RegExp(r'^-+|-+$'), '');
+      var id = existingIndex >= 0
+          ? draft.exercises[existingIndex].id
+          : 'exercise-${base.isEmpty ? asset.id.substring(7, 15) : base}';
+      var suffix = 2;
+      while (draft.exercises.any(
+          (exercise) => exercise.id == id && exercise.id != step.exerciseId)) {
+        id =
+            'exercise-${base.isEmpty ? asset.id.substring(7, 15) : base}-${suffix++}';
+      }
+      final exercise =
+          Exercise(id: id, name: step.name.trim(), demoMediaId: asset.id);
+      setState(() {
+        if (existingIndex >= 0) {
+          draft.exercises[existingIndex] = exercise;
+        } else {
+          draft.exercises.add(exercise);
+        }
+        step.exerciseId = id;
+      });
+    } catch (exception) {
+      if (mounted) setState(() => error = '$exception');
+    }
+  }
+
+  void _removeMedia(StepDraft step) {
+    setState(() {
+      final id = step.exerciseId;
+      step.exerciseId = '';
+      if (id.isNotEmpty && !_usesExercise(draft.steps, id)) {
+        draft.exercises.removeWhere((exercise) => exercise.id == id);
+      }
+    });
+  }
+
+  bool _usesExercise(List<WorkoutDraftNode> nodes, String id) {
+    for (final node in nodes) {
+      if (node is StepDraft && node.exerciseId == id) return true;
+      if (node is RepeatDraft && _usesExercise(node.steps, id)) return true;
+    }
+    return false;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -240,6 +362,18 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
                 delete: _delete,
                 addStep: _addStep,
                 addRepeat: _addRepeat,
+                exerciseFor: (id) {
+                  for (final exercise in draft.exercises) {
+                    if (exercise.id == id) return exercise;
+                  }
+                  return null;
+                },
+                chooseMedia: _chooseMedia,
+                removeMedia: _removeMedia,
+                recordStep: _recordStep,
+                resolveAsset: widget.controller.mediaAsset,
+                resolveUri: widget.controller.resolveMediaUri,
+                resolveRecording: widget.controller.resolveAudioSource,
               ),
               Row(children: [
                 Expanded(
@@ -274,6 +408,14 @@ class _NodeList extends StatelessWidget {
   final void Function(List<WorkoutDraftNode>, int) delete;
   final void Function(List<WorkoutDraftNode>) addStep;
   final void Function(List<WorkoutDraftNode>) addRepeat;
+  final Exercise? Function(String id) exerciseFor;
+  final Future<void> Function(StepDraft step) chooseMedia;
+  final void Function(StepDraft step) removeMedia;
+  final Future<void> Function(StepDraft step, String stepKey) recordStep;
+  final Future<MediaAsset?> Function(String id) resolveAsset;
+  final Future<Uri?> Function(String id) resolveUri;
+  final String Function(String source) resolveRecording;
+  final String pathPrefix;
 
   const _NodeList(
       {required this.nodes,
@@ -283,7 +425,15 @@ class _NodeList extends StatelessWidget {
       required this.duplicate,
       required this.delete,
       required this.addStep,
-      required this.addRepeat});
+      required this.addRepeat,
+      required this.exerciseFor,
+      required this.chooseMedia,
+      required this.removeMedia,
+      required this.recordStep,
+      required this.resolveAsset,
+      required this.resolveUri,
+      required this.resolveRecording,
+      this.pathPrefix = ''});
 
   @override
   Widget build(BuildContext context) => Column(children: [
@@ -298,6 +448,16 @@ class _NodeList extends StatelessWidget {
                     down: () => move(nodes, i, 1),
                     copy: () => duplicate(nodes, i),
                     remove: () => delete(nodes, i),
+                    exercise: exerciseFor((nodes[i] as StepDraft).exerciseId),
+                    chooseMedia: () => chooseMedia(nodes[i] as StepDraft),
+                    removeMedia: () => removeMedia(nodes[i] as StepDraft),
+                    record: () => recordStep(
+                      nodes[i] as StepDraft,
+                      pathPrefix.isEmpty ? '$i' : '$pathPrefix.$i',
+                    ),
+                    resolveAsset: resolveAsset,
+                    resolveUri: resolveUri,
+                    resolveRecording: resolveRecording,
                   )
                 : _RepeatCard(
                     group: nodes[i] as RepeatDraft,
@@ -310,6 +470,14 @@ class _NodeList extends StatelessWidget {
                       delete: delete,
                       addStep: addStep,
                       addRepeat: addRepeat,
+                      exerciseFor: exerciseFor,
+                      chooseMedia: chooseMedia,
+                      removeMedia: removeMedia,
+                      recordStep: recordStep,
+                      resolveAsset: resolveAsset,
+                      resolveUri: resolveUri,
+                      resolveRecording: resolveRecording,
+                      pathPrefix: pathPrefix.isEmpty ? '$i' : '$pathPrefix.$i',
                     ),
                     up: () => move(nodes, i, -1),
                     down: () => move(nodes, i, 1),
@@ -325,13 +493,27 @@ class _NodeList extends StatelessWidget {
 class _StepCard extends StatelessWidget {
   final StepDraft step;
   final VoidCallback changed, up, down, copy, remove;
+  final Exercise? exercise;
+  final Future<void> Function() chooseMedia;
+  final VoidCallback removeMedia;
+  final Future<void> Function() record;
+  final Future<MediaAsset?> Function(String id) resolveAsset;
+  final Future<Uri?> Function(String id) resolveUri;
+  final String Function(String source) resolveRecording;
   const _StepCard(
       {required this.step,
       required this.changed,
       required this.up,
       required this.down,
       required this.copy,
-      required this.remove});
+      required this.remove,
+      required this.exercise,
+      required this.chooseMedia,
+      required this.removeMedia,
+      required this.record,
+      required this.resolveAsset,
+      required this.resolveUri,
+      required this.resolveRecording});
 
   @override
   Widget build(BuildContext context) => Card(
@@ -339,8 +521,6 @@ class _StepCard extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         child: Column(children: [
           Row(children: [
-            const Icon(Icons.timer_outlined),
-            const SizedBox(width: 6),
             const Expanded(
                 child: Text('Step',
                     style: TextStyle(fontWeight: FontWeight.bold))),
@@ -371,6 +551,39 @@ class _StepCard extends StatelessWidget {
               maxLines: 4,
               decoration: const InputDecoration(labelText: 'Guide (optional)'),
               onChanged: (v) => step.guide = v),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              if (step.recording.isEmpty)
+                IconButton.filledTonal(
+                  tooltip: 'Record step cue',
+                  onPressed: () => record(),
+                  icon: const Icon(Icons.mic_none_outlined),
+                )
+              else
+                StepRecordingMiniPlayer(
+                  audioPath: resolveRecording(step.recording),
+                  onManage: () => record(),
+                ),
+              const SizedBox(width: 6),
+              if (exercise?.demoMediaId == null)
+                IconButton.filledTonal(
+                  tooltip: 'Browse demonstration files...',
+                  onPressed: () => chooseMedia(),
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                )
+              else
+                StepDemonstrationButton(
+                  key: ValueKey(exercise!.demoMediaId),
+                  mediaId: exercise!.demoMediaId!,
+                  resolveAsset: resolveAsset,
+                  resolveUri: resolveUri,
+                  onReplace: chooseMedia,
+                  onRemove: () async => removeMedia(),
+                ),
+            ],
+          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('Voice timing'),

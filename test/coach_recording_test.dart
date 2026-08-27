@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:anhpt/models/coach_recording.dart';
+import 'package:anhpt/services/coach_recording_service.dart';
 import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/services/workout_parser.dart';
@@ -10,6 +13,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('recording files use simplified cue names and numeric collisions',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('anhpt-recording-');
+    addTearDown(() => directory.delete(recursive: true));
+    final recordings =
+        Directory('${directory.path}${Platform.pathSeparator}coach_recordings');
+    await recordings.create(recursive: true);
+    final firstDraft = File('${recordings.path}${Platform.pathSeparator}1.m4a');
+    final secondDraft =
+        File('${recordings.path}${Platform.pathSeparator}2.m4a');
+    await firstDraft.writeAsBytes([1]);
+    await secondDraft.writeAsBytes([2]);
+    final service = CoachRecordingService(documentsDirectory: directory);
+
+    final first = await service.renameForCue(firstDraft.path, 'Nâng đầu gối');
+    final second = await service.renameForCue(secondDraft.path, 'Nâng đầu gối');
+
+    expect(first.replaceAll('\\', '/'), endsWith('/nang-dau-goi.m4a'));
+    expect(second.replaceAll('\\', '/'), endsWith('/nang-dau-goi-2.m4a'));
+  });
+
   test('coach recording metadata round trips', () {
     final recording = CoachRecording(
         workoutId: 'workout-1',

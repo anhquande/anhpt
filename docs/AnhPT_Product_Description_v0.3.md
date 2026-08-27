@@ -30,6 +30,9 @@ AnhPT is a voice-guided workout timer designed for hands-free exercise. The user
 - YAML v2 carries recording references and the selected background-music
   configuration. Audio files remain local and are referenced by safe relative
   paths; missing files fall back safely.
+- A step may reference a reusable Exercise with a static image, animated GIF,
+  or short muted/looping video. Identical media is stored once in a device-local
+  content-addressed Media Library and portable packages carry referenced media.
 
 ## 3. Voice Behavior
 
@@ -46,3 +49,11 @@ AnhPT is a voice-guided workout timer designed for hands-free exercise. The user
 ## 4. Platforms
 
 Current implementation targets Flutter Web and Windows for development/testing. Android can be used for device testing. iPhone-native capabilities such as Live Activity, Lock Screen controls, background audio behavior, interruption handling, and Dynamic Island integration remain future work.
+
+## 5. Workout Buckets marketplace (MVP)
+
+Settings supports public Workout Bucket sources identified by user-supplied
+HTTPS `bucket.json` URLs. Enabled sources can be refreshed, browsed, and used to
+install checksum-verified portable packages. The last valid catalog remains
+available offline. Updates require an explicit keep/copy/replace choice. Private
+credentials and signatures are deferred; Web sources must support CORS.

@@ -3,6 +3,27 @@ sealed class WorkoutNode {
   Map<String, dynamic> toJson();
 }
 
+class Exercise {
+  final String id;
+  final String name;
+  final String? demoMediaId;
+
+  const Exercise({required this.id, required this.name, this.demoMediaId});
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'demoMediaId': demoMediaId,
+      };
+
+  factory Exercise.fromJson(Map<String, dynamic> json) => Exercise(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        demoMediaId:
+            json['demoMediaId'] as String? ?? json['demoVideoId'] as String?,
+      );
+}
+
 class WorkoutStep extends WorkoutNode {
   final String id;
   final bool hasExplicitId;
@@ -11,6 +32,7 @@ class WorkoutStep extends WorkoutNode {
   final String? guide;
   final bool countdown;
   final String? recording;
+  final String? exerciseId;
 
   const WorkoutStep({
     required this.id,
@@ -20,6 +42,7 @@ class WorkoutStep extends WorkoutNode {
     this.guide,
     this.countdown = true,
     this.recording,
+    this.exerciseId,
   });
 
   @override
@@ -32,6 +55,7 @@ class WorkoutStep extends WorkoutNode {
         'guide': guide,
         'countdown': countdown,
         'recording': recording,
+        'exerciseId': exerciseId,
       };
 
   static WorkoutStep fromJson(Map<String, dynamic> j) => WorkoutStep(
@@ -42,6 +66,7 @@ class WorkoutStep extends WorkoutNode {
         guide: j['guide'] as String?,
         countdown: j['countdown'] as bool? ?? true,
         recording: j['recording'] as String?,
+        exerciseId: j['exerciseId'] as String?,
       );
 }
 
@@ -184,6 +209,7 @@ class Workout {
   final String ducking;
   final String? recording;
   final BackgroundMusicConfig? backgroundMusic;
+  final List<Exercise> exercises;
   final List<WorkoutNode> steps;
   final String rawYaml;
   final bool favorite;
@@ -204,6 +230,7 @@ class Workout {
       required this.ducking,
       this.recording,
       this.backgroundMusic,
+      this.exercises = const [],
       required this.steps,
       required this.rawYaml,
       required this.favorite,
@@ -260,6 +287,7 @@ class Workout {
     BackgroundMusicConfig? backgroundMusic,
     bool clearBackgroundMusic = false,
     List<WorkoutNode>? steps,
+    List<Exercise>? exercises,
     String? rawYaml,
     int? version,
   }) =>
@@ -278,6 +306,7 @@ class Workout {
         backgroundMusic: clearBackgroundMusic
             ? null
             : backgroundMusic ?? this.backgroundMusic,
+        exercises: exercises ?? this.exercises,
         steps: steps ?? this.steps,
         rawYaml: rawYaml ?? this.rawYaml,
         favorite: favorite ?? this.favorite,
@@ -299,6 +328,7 @@ class Workout {
         'ducking': ducking,
         'recording': recording,
         'backgroundMusic': backgroundMusic?.toJson(),
+        'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
         'steps': steps.map((e) => e.toJson()).toList(),
         'rawYaml': rawYaml,
         'favorite': favorite,
@@ -324,6 +354,10 @@ class Workout {
             ? null
             : BackgroundMusicConfig.fromJson(
                 Map<String, dynamic>.from(j['backgroundMusic'] as Map)),
+        exercises: (j['exercises'] as List? ?? const [])
+            .map((value) =>
+                Exercise.fromJson(Map<String, dynamic>.from(value as Map)))
+            .toList(),
         steps: (j['steps'] as List)
             .map(
                 (e) => workoutNodeFromJson(Map<String, dynamic>.from(e as Map)))

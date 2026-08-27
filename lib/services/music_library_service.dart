@@ -13,6 +13,10 @@ class ImportedMusicFile {
 }
 
 class MusicLibraryService {
+  final Directory? documentsDirectory;
+
+  MusicLibraryService({this.documentsDirectory});
+
   static const supportedExtensions = [
     'mp3',
     'wav',
@@ -36,19 +40,84 @@ class MusicLibraryService {
     );
     final sourcePath = result?.files.single.path;
     if (sourcePath == null) return null;
-    final root = await getApplicationDocumentsDirectory();
+    final originalFileName = sourcePath.split(RegExp(r'[\\/]')).last;
+    final target = await copyToLibrary(File(sourcePath), originalFileName);
+    return ImportedMusicFile(
+      path: target.path,
+      originalFileName: originalFileName,
+    );
+  }
+
+  Future<Directory> _musicDirectory() async {
+    final root = documentsDirectory ?? await getApplicationDocumentsDirectory();
     final directory = Directory('${root.path}${Platform.pathSeparator}music');
     await directory.create(recursive: true);
-    final extension = sourcePath.contains('.')
-        ? sourcePath.substring(sourcePath.lastIndexOf('.'))
-        : '.audio';
-    final target =
-        '${directory.path}${Platform.pathSeparator}track_${DateTime.now().microsecondsSinceEpoch}$extension';
-    await File(sourcePath).copy(target);
-    return ImportedMusicFile(
-      path: target,
-      originalFileName: sourcePath.split(RegExp(r'[\\/]')).last,
+    return directory;
+  }
+
+  Future<File> copyToLibrary(File source, String preferredFileName) async {
+    final destination = await _availableDestination(
+      preferredFileName,
+      fallbackExtension: _extension(source.path),
     );
+    return source.copy(destination.path);
+  }
+
+  Future<String> moveToLibrary(String sourcePath, String preferredName) async {
+    final source = File(sourcePath);
+    if (!await source.exists()) return sourcePath;
+    final destination = await _availableDestination(
+      preferredName,
+      fallbackExtension: _extension(source.path),
+      currentPath: source.path,
+    );
+    if (destination.path.toLowerCase() == source.path.toLowerCase()) {
+      return source.path;
+    }
+    return (await source.rename(destination.path)).path;
+  }
+
+  Future<File> _availableDestination(
+    String preferredName, {
+    required String fallbackExtension,
+    String? currentPath,
+  }) async {
+    final directory = await _musicDirectory();
+    final safe =
+        readableFileName(preferredName, fallbackExtension: fallbackExtension);
+    final dot = safe.lastIndexOf('.');
+    final stem = dot > 0 ? safe.substring(0, dot) : safe;
+    final extension = dot > 0 ? safe.substring(dot) : fallbackExtension;
+    var fileName = '$stem$extension';
+    var suffix = 2;
+    while (true) {
+      final file = File('${directory.path}${Platform.pathSeparator}$fileName');
+      if (currentPath != null &&
+          file.path.toLowerCase() == currentPath.toLowerCase()) {
+        return file;
+      }
+      if (!await file.exists()) return file;
+      fileName = '$stem-${suffix++}$extension';
+    }
+  }
+
+  static String readableFileName(String value,
+      {String fallbackExtension = '.audio'}) {
+    var leaf = value.split(RegExp(r'[\\/]')).last.trim();
+    leaf = leaf.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '-');
+    leaf = leaf.replaceAll(RegExp(r'\s+'), ' ').trim();
+    leaf = leaf.replaceAll(RegExp(r'[. ]+$'), '');
+    if (leaf.isEmpty) leaf = 'music$fallbackExtension';
+    if (!RegExp(r'\.[a-zA-Z0-9]{1,8}$').hasMatch(leaf)) {
+      leaf = '$leaf$fallbackExtension';
+    }
+    return leaf;
+  }
+
+  static String _extension(String path) {
+    final leaf = path.split(RegExp(r'[\\/]')).last;
+    final dot = leaf.lastIndexOf('.');
+    return dot > 0 ? leaf.substring(dot).toLowerCase() : '.audio';
   }
 
   Future<String> resolveDisplayName(

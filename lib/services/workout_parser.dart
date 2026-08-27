@@ -23,6 +23,7 @@ class WorkoutParser {
     'audio',
     'recording',
     'background_music',
+    'exercises',
     'steps'
   };
   static const _voiceFields = {
@@ -42,7 +43,8 @@ class WorkoutParser {
     'duration',
     'guide',
     'countdown',
-    'recording'
+    'recording',
+    'exercise_id'
   };
   static const _repeatFields = {'repeat', 'steps'};
   static const _backgroundMusicFields = {
@@ -52,6 +54,7 @@ class WorkoutParser {
     'volume',
     'ducking'
   };
+  static const _exerciseFields = {'id', 'name', 'demo_media', 'demo_video'};
 
   static Workout parse(String yamlText,
       {required String id,
@@ -89,6 +92,7 @@ class WorkoutParser {
     final ducking = _audio(root['audio']);
     final recording = _recording(root['recording'], 'recording');
     final backgroundMusic = _backgroundMusic(root['background_music']);
+    final exercises = _exercises(root['exercises']);
 
     final rawSteps = root['steps'];
     if (rawSteps is! YamlList || rawSteps.isEmpty) {
@@ -98,6 +102,20 @@ class WorkoutParser {
     final explicitIds = <String>{};
     _collectExplicitIds(rawSteps, explicitIds, 0);
     final steps = _nodes(rawSteps, 0, _StepIdAllocator(explicitIds));
+    final exerciseIds = exercises.map((exercise) => exercise.id).toSet();
+    void validateExerciseReferences(List<WorkoutNode> nodes) {
+      for (final node in nodes) {
+        if (node is WorkoutStep &&
+            node.exerciseId != null &&
+            !exerciseIds.contains(node.exerciseId)) {
+          throw WorkoutValidationException(
+              'Unknown exercise_id "${node.exerciseId}".');
+        }
+        if (node is RepeatGroup) validateExerciseReferences(node.steps);
+      }
+    }
+
+    validateExerciseReferences(steps);
     final now = DateTime.now();
     final workout = Workout(
         id: id,
@@ -112,6 +130,7 @@ class WorkoutParser {
         ducking: ducking,
         recording: recording,
         backgroundMusic: backgroundMusic,
+        exercises: exercises,
         steps: steps,
         rawYaml: yamlText,
         favorite: favorite,
@@ -273,6 +292,9 @@ class WorkoutParser {
         final countdown = _bool(map['countdown'], true, 'step.countdown');
         final explicitId = map['id'] == null ? null : _stepId(map['id']);
         final recording = _recording(map['recording'], 'step.recording');
+        final exerciseId = map['exercise_id'] == null
+            ? null
+            : _logicalId(map['exercise_id'], 'step.exercise_id');
         out.add(WorkoutStep(
             id: ids.allocate(name, explicitId),
             hasExplicitId: explicitId != null,
@@ -280,7 +302,8 @@ class WorkoutParser {
             duration: duration,
             guide: guide,
             countdown: countdown,
-            recording: recording));
+            recording: recording,
+            exerciseId: exerciseId));
       }
     }
     return out;
@@ -313,6 +336,59 @@ class WorkoutParser {
           'step.id must contain only letters, numbers and single hyphens.');
     }
     return id;
+  }
+
+  static String _logicalId(Object? value, String field) {
+    final id = _string(value, field, 80);
+    if (!RegExp(r'^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$').hasMatch(id)) {
+      throw WorkoutValidationException(
+          '$field must contain letters, numbers, hyphens or underscores.');
+    }
+    return id;
+  }
+
+  static List<Exercise> _exercises(Object? value) {
+    if (value == null) return const [];
+    if (value is! YamlList) {
+      throw const WorkoutValidationException('exercises must be a list.');
+    }
+    final result = <Exercise>[];
+    final ids = <String>{};
+    for (final item in value) {
+      final map = _map(item);
+      _unknown(map, _exerciseFields, 'exercise');
+      final id = _logicalId(map['id'], 'exercise.id');
+      if (!ids.add(id)) {
+        throw WorkoutValidationException('Duplicate exercise.id "$id".');
+      }
+      if (map['demo_media'] != null && map['demo_video'] != null) {
+        throw const WorkoutValidationException(
+            'exercise must not contain both demo_media and demo_video.');
+      }
+      final rawDemoMedia = map['demo_media'] ?? map['demo_video'];
+      final demoMedia = rawDemoMedia == null
+          ? null
+          : _mediaReference(rawDemoMedia, 'exercise.demo_media');
+      result.add(Exercise(
+        id: id,
+        name: _string(map['name'], 'exercise.name', 100),
+        demoMediaId: demoMedia,
+      ));
+    }
+    return result;
+  }
+
+  static String _mediaReference(Object? value, String field) {
+    final reference = _string(value, field, 500);
+    if (reference.startsWith('sha256:')) {
+      if (!RegExp(r'^sha256:[a-fA-F0-9]{64}$').hasMatch(reference)) {
+        throw WorkoutValidationException(
+            '$field contains an invalid SHA-256 ID.');
+      }
+      return reference.toLowerCase();
+    }
+    _validateSource(reference, field);
+    return reference.replaceAll('\\', '/');
   }
 
   static List<String> _tags(Object? value) {

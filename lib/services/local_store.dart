@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/background_music.dart';
 import '../models/coach_recording.dart';
 import '../models/workout.dart';
+import '../models/workout_bucket.dart';
 
 class LocalStore {
   static const _workouts = 'anhpt.workouts.v1';
@@ -12,6 +13,8 @@ class LocalStore {
   static const _coachRecordings = 'anhpt.coachRecordings.v1';
   static const _musicTracks = 'anhpt.musicTracks.v1';
   static const _workoutMusic = 'anhpt.workoutMusic.v1';
+  static const _bucketSources = 'anhpt.bucketSources.v1';
+  static const _installedBucketWorkouts = 'anhpt.installedBucketWorkouts.v1';
 
   Future<List<Workout>> loadWorkouts() async {
     final p = await SharedPreferences.getInstance();
@@ -113,5 +116,42 @@ class LocalStore {
     final p = await SharedPreferences.getInstance();
     await p.setString(_workoutMusic,
         jsonEncode(configs.map((key, value) => MapEntry(key, value.toJson()))));
+  }
+
+  Future<List<WorkoutBucketSource>> loadBucketSources() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_bucketSources);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List)
+        .map((value) => WorkoutBucketSource.fromJson(
+            Map<String, dynamic>.from(value as Map)))
+        .toList();
+  }
+
+  Future<void> saveBucketSources(List<WorkoutBucketSource> sources) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _bucketSources,
+      jsonEncode(sources.map((source) => source.toJson()).toList()),
+    );
+  }
+
+  Future<List<InstalledWorkoutProvenance>> loadInstalledBucketWorkouts() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_installedBucketWorkouts);
+    if (raw == null) return [];
+    return (jsonDecode(raw) as List)
+        .map((value) => InstalledWorkoutProvenance.fromJson(
+            Map<String, dynamic>.from(value as Map)))
+        .toList();
+  }
+
+  Future<void> saveInstalledBucketWorkouts(
+      List<InstalledWorkoutProvenance> installed) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _installedBucketWorkouts,
+      jsonEncode(installed.map((item) => item.toJson()).toList()),
+    );
   }
 }

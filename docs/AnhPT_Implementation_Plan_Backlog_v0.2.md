@@ -24,6 +24,9 @@
   import/delete safety, and missing-file fallback.
 - YAML v2 recording references, globally unique effective step IDs,
   background-music assignment, YAML v1 compatibility, and legacy migration.
+- SHA-256 media deduplication, optional Exercise references, file-selected
+  static image/GIF/video demonstrations, type-aware player integration, and ZIP
+  media manifests.
 
 ## 2. Near-Term Backlog
 
@@ -36,6 +39,8 @@
 | P1 | Android device QA | TTS languages, haptics, lifecycle/background behavior. |
 | P2 | Native iPhone implementation | Background audio, interruptions, Live Activity, Lock Screen, Dynamic Island. |
 | P2 | Cloud sync / sharing | Optional future capability; not required for local MVP. |
+| P1 | Exercise video capture | Camera capture, trim, compression, and platform QA; file selection comes first. |
+| P2 | Media cleanup UI | Find and remove unreferenced shared media safely. |
 
 ## 3. Required Regression Tests
 

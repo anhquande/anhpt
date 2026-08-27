@@ -1,19 +1,31 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../data/sample_data.dart';
 import '../models/coach_recording.dart';
 import '../models/background_music.dart';
 import '../models/workout.dart';
 import '../models/workout_draft.dart';
+import '../models/workout_bucket.dart';
+import '../models/media_asset.dart';
 import '../services/local_store.dart';
 import '../services/workout_parser.dart';
 import '../services/workout_serializer.dart';
 import '../services/music_library_service.dart';
 import '../services/workout_package_service.dart';
+import '../services/workout_bucket_service.dart';
+import '../services/media_repository.dart';
+import '../services/workout_yaml_file_store.dart';
+import '../services/coach_recording_service.dart';
 
 class AppController extends ChangeNotifier {
+  static const currentAppVersion = '0.8.2';
   final LocalStore store;
-  AppController(this.store);
+  final WorkoutYamlFileStore? yamlFileStore;
+  AppController(this.store, {this.yamlFileStore});
 
   bool loading = true;
   bool onboarded = false;
@@ -22,8 +34,16 @@ class AppController extends ChangeNotifier {
   Map<String, CoachRecording> coachRecordings = {};
   List<MusicTrack> musicTracks = [];
   Map<String, WorkoutMusicConfig> workoutMusic = {};
+  List<WorkoutBucketSource> bucketSources = [];
+  List<WorkoutBucketEntry> bucketCatalogEntries = [];
+  List<InstalledWorkoutProvenance> installedBucketWorkouts = [];
+  bool bucketCatalogLoading = false;
+  String? bucketCatalogError;
   final MusicLibraryService musicLibrary = MusicLibraryService();
   final WorkoutPackageService workoutPackages = WorkoutPackageService();
+  final WorkoutBucketService workoutBuckets = WorkoutBucketService();
+  final LocalMediaRepository mediaLibrary = LocalMediaRepository();
+  final CoachRecordingService recordingFiles = CoachRecordingService();
   String? _documentsPath;
 
   Future<void> initialize() async {
@@ -67,8 +87,14 @@ class AppController extends ChangeNotifier {
     ];
     await _refreshGeneratedMusicNames(personalTracks);
     workoutMusic = await store.loadWorkoutMusic();
+    bucketSources = await store.loadBucketSources();
+    installedBucketWorkouts = await store.loadInstalledBucketWorkouts();
+    _loadCachedBucketCatalogs();
 
     await _migrateLegacyAudioAssignments();
+    await _migrateReadableRecordingNames();
+    await _migrateReadableMusicPaths();
+    await _migrateDemoMediaReferences();
 
     if (workouts.isEmpty) {
       final sample = WorkoutParser.parse(
@@ -81,8 +107,268 @@ class AppController extends ChangeNotifier {
       await store.saveWorkouts(workouts);
     }
 
+    await yamlFileStore?.replaceAll(workouts);
+
     loading = false;
     notifyListeners();
+  }
+
+  Future<MediaAsset?> importDemoMedia() async {
+    if (kIsWeb) {
+      throw StateError(
+          'Local demonstration media import is not available on Web yet.');
+    }
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Choose exercise demonstration media',
+      type: FileType.custom,
+      allowedExtensions: const [
+        'mp4',
+        'mov',
+        'webm',
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'gif'
+      ],
+      withData: kIsWeb,
+    );
+    if (result == null) return null;
+    final picked = result.files.single;
+    if (picked.size > 20 * 1024 * 1024) {
+      throw StateError('Demonstration media must be 20 MB or smaller.');
+    }
+    final extension = picked.extension?.toLowerCase() ?? '';
+    final type = extension == 'gif'
+        ? 'animation'
+        : {'jpg', 'jpeg', 'png', 'webp'}.contains(extension)
+            ? 'image'
+            : 'video';
+    if (picked.bytes != null) {
+      return mediaLibrary.importBytes(picked.bytes!,
+          fileName: picked.name, type: type);
+    }
+    if (picked.path == null) {
+      throw StateError('Could not read the selected media file.');
+    }
+    return mediaLibrary.importFile(File(picked.path!), type: type);
+  }
+
+  Future<Uri?> resolveMediaUri(String mediaId) =>
+      mediaLibrary.resolveUri(mediaId);
+
+  Future<MediaAsset?> mediaAsset(String mediaId) => mediaLibrary.get(mediaId);
+
+  Future<void> _migrateDemoMediaReferences() async {
+    var changed = false;
+    final migrated = <Workout>[];
+    for (final workout in workouts) {
+      final draft = WorkoutDraft.fromWorkout(workout);
+      var workoutChanged = false;
+      for (var index = 0; index < draft.exercises.length; index++) {
+        final exercise = draft.exercises[index];
+        final reference = exercise.demoMediaId;
+        if (reference == null || !reference.startsWith('sha256:')) continue;
+        final asset = await mediaLibrary.get(reference);
+        if (asset == null) continue;
+        draft.exercises[index] = Exercise(
+          id: exercise.id,
+          name: exercise.name,
+          demoMediaId: asset.relativePath,
+        );
+        workoutChanged = true;
+      }
+      migrated.add(workoutChanged ? _parseDraft(draft, workout) : workout);
+      changed = changed || workoutChanged;
+    }
+    if (changed) {
+      workouts = migrated;
+      await store.saveWorkouts(workouts);
+    }
+  }
+
+  Future<void> _migrateReadableRecordingNames() async {
+    var changed = false;
+    final migrated = <Workout>[];
+    for (final workout in workouts) {
+      final draft = WorkoutDraft.fromWorkout(workout);
+      var workoutChanged = false;
+
+      Future<String> migrateSource(String source, String cueName) async {
+        if (source.startsWith('asset:')) return source;
+        final absolute = resolveAudioSource(source);
+        if (!await File(absolute).exists()) return source;
+        final leaf = absolute.replaceAll('\\', '/').split('/').last;
+        final dot = leaf.lastIndexOf('.');
+        final currentStem = dot > 0 ? leaf.substring(0, dot) : leaf;
+        final expected = CoachRecordingService.readableStem(cueName);
+        final alreadyManaged =
+            source.replaceAll('\\', '/').startsWith('coach_recordings/');
+        if (alreadyManaged &&
+            RegExp('^${RegExp.escape(expected)}(?:-[0-9]+)?\$')
+                .hasMatch(currentStem)) {
+          return source;
+        }
+        final renamed = await recordingFiles.renameForCue(absolute, cueName);
+        return portableAudioSource(renamed);
+      }
+
+      if (draft.recording.isNotEmpty) {
+        final renamed = await migrateSource(
+            draft.recording, '${workout.name} introduction');
+        if (renamed != draft.recording) {
+          draft.recording = renamed;
+          workoutChanged = true;
+        }
+      }
+
+      Future<void> migrateSteps(List<WorkoutDraftNode> nodes) async {
+        for (final node in nodes) {
+          if (node is StepDraft && node.recording.isNotEmpty) {
+            final renamed = await migrateSource(node.recording, node.name);
+            if (renamed != node.recording) {
+              node.recording = renamed;
+              workoutChanged = true;
+            }
+          } else if (node is RepeatDraft) {
+            await migrateSteps(node.steps);
+          }
+        }
+      }
+
+      await migrateSteps(draft.steps);
+      migrated.add(workoutChanged ? _parseDraft(draft, workout) : workout);
+      changed = changed || workoutChanged;
+    }
+    if (changed) {
+      workouts = migrated;
+      await store.saveWorkouts(workouts);
+    }
+  }
+
+  Future<void> _migrateReadableMusicPaths() async {
+    final migratedSources = <String, String>{};
+    var tracksChanged = false;
+    for (var index = 0; index < musicTracks.length; index++) {
+      final track = musicTracks[index];
+      if (track.bundled) continue;
+      final oldSource = _trackSource(track);
+      final absolute = resolveAudioSource(oldSource);
+      if (!await File(absolute).exists()) continue;
+      final moved = await musicLibrary.moveToLibrary(absolute, track.name);
+      final newSource = portableAudioSource(moved);
+      migratedSources[oldSource] = newSource;
+      if (moved == track.source) continue;
+      musicTracks[index] = MusicTrack(
+        id: track.id,
+        name: track.name,
+        mood: track.mood,
+        source: moved,
+        bundled: false,
+        createdAt: track.createdAt,
+      );
+      tracksChanged = true;
+    }
+
+    var workoutsChanged = false;
+    final migratedWorkouts = <Workout>[];
+    for (final workout in workouts) {
+      final music = workout.backgroundMusic;
+      if (music == null || music.source.startsWith('asset:')) {
+        migratedWorkouts.add(workout);
+        continue;
+      }
+      var replacement = migratedSources[music.source];
+      if (replacement == null) {
+        final absolute = resolveAudioSource(music.source);
+        if (await File(absolute).exists()) {
+          final preferred = music.name?.trim().isNotEmpty == true
+              ? music.name!
+              : absolute.replaceAll('\\', '/').split('/').last;
+          final moved = await musicLibrary.moveToLibrary(absolute, preferred);
+          replacement = portableAudioSource(moved);
+          migratedSources[music.source] = replacement;
+        }
+      }
+      if (replacement == null || replacement == music.source) {
+        migratedWorkouts.add(workout);
+        continue;
+      }
+      final draft = WorkoutDraft.fromWorkout(workout)
+        ..backgroundMusicSource = replacement;
+      migratedWorkouts.add(_parseDraft(draft, workout));
+      workoutsChanged = true;
+    }
+    if (tracksChanged) await store.saveMusicTracks(musicTracks);
+    if (workoutsChanged) {
+      workouts = migratedWorkouts;
+      await store.saveWorkouts(workouts);
+    }
+  }
+
+  Future<void> assignStepDemoMedia({
+    required String workoutId,
+    required String stepKey,
+    required MediaAsset asset,
+  }) async {
+    final workout = byId(workoutId);
+    if (workout == null) return;
+    final draft = WorkoutDraft.fromWorkout(workout);
+    final step = _draftStepAt(draft.steps, stepKey);
+    if (step == null) return;
+    final existingIndex = draft.exercises
+        .indexWhere((exercise) => exercise.id == step.exerciseId);
+    final normalizedName = step.name
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'^-+|-+$'), '');
+    final base =
+        normalizedName.isEmpty ? asset.id.substring(7, 15) : normalizedName;
+    var exerciseId = existingIndex >= 0
+        ? draft.exercises[existingIndex].id
+        : 'exercise-$base';
+    var suffix = 2;
+    while (draft.exercises.any((exercise) =>
+        exercise.id == exerciseId && exercise.id != step.exerciseId)) {
+      exerciseId = 'exercise-$base-${suffix++}';
+    }
+    final exercise = Exercise(
+      id: exerciseId,
+      name: step.name.trim(),
+      demoMediaId: asset.relativePath,
+    );
+    if (existingIndex >= 0) {
+      draft.exercises[existingIndex] = exercise;
+    } else {
+      draft.exercises.add(exercise);
+    }
+    step.exerciseId = exerciseId;
+    await saveWorkout(_parseDraft(draft, workout));
+  }
+
+  Future<void> removeStepDemoMedia({
+    required String workoutId,
+    required String stepKey,
+  }) async {
+    final workout = byId(workoutId);
+    if (workout == null) return;
+    final draft = WorkoutDraft.fromWorkout(workout);
+    final step = _draftStepAt(draft.steps, stepKey);
+    if (step == null || step.exerciseId.isEmpty) return;
+    final exerciseId = step.exerciseId;
+    step.exerciseId = '';
+    bool isUsed(List<WorkoutDraftNode> nodes) {
+      for (final node in nodes) {
+        if (node is StepDraft && node.exerciseId == exerciseId) return true;
+        if (node is RepeatDraft && isUsed(node.steps)) return true;
+      }
+      return false;
+    }
+
+    if (!isUsed(draft.steps)) {
+      draft.exercises.removeWhere((exercise) => exercise.id == exerciseId);
+    }
+    await saveWorkout(_parseDraft(draft, workout));
   }
 
   String portableAudioSource(String path) {
@@ -219,6 +505,7 @@ class AppController extends ChangeNotifier {
       workouts.add(workout);
     }
     await store.saveWorkouts(workouts);
+    await yamlFileStore?.save(workout);
     notifyListeners();
   }
 
@@ -228,23 +515,192 @@ class AppController extends ChangeNotifier {
     return workoutPackages.exportPackage(
       workout,
       resolveSource: resolveAudioSource,
+      mediaRepository: mediaLibrary,
     );
   }
 
   Future<bool> importWorkoutPackage() async {
     final workout = await workoutPackages.importPackage(
       defaultVoiceLanguage: defaultVoiceLanguage,
+      mediaRepository: mediaLibrary,
     );
     if (workout == null) return false;
     await saveWorkout(workout);
+    await _migrateReadableMusicPaths();
+    await yamlFileStore?.replaceAll(workouts);
     return true;
+  }
+
+  void _loadCachedBucketCatalogs() {
+    final entries = <WorkoutBucketEntry>[];
+    for (final source in bucketSources.where((item) => item.enabled)) {
+      final cached = source.cachedCatalogJson;
+      if (cached == null) continue;
+      try {
+        final decoded = Map<String, dynamic>.from(jsonDecode(cached) as Map);
+        entries.addAll(WorkoutBucketCatalog.fromJson(decoded)
+            .entries
+            .map((entry) => entry.copyWithSource(source.id)));
+      } catch (_) {
+        // A bad cache is ignored and replaced on the next successful refresh.
+      }
+    }
+    bucketCatalogEntries = entries;
+  }
+
+  Future<void> addBucketSource(String name, String catalogUrl) async {
+    final uri = requirePublicHttpsUri(catalogUrl, field: 'catalog URL');
+    final source = WorkoutBucketSource(
+      id: 'bucket-${DateTime.now().microsecondsSinceEpoch}',
+      name: name.trim().isEmpty ? uri.host : name.trim(),
+      catalogUrl: uri.toString(),
+    );
+    bucketSources = [...bucketSources, source];
+    await store.saveBucketSources(bucketSources);
+    notifyListeners();
+    await refreshBucketSource(source.id);
+  }
+
+  Future<void> removeBucketSource(String id) async {
+    bucketSources = bucketSources.where((source) => source.id != id).toList();
+    bucketCatalogEntries =
+        bucketCatalogEntries.where((entry) => entry.sourceId != id).toList();
+    await store.saveBucketSources(bucketSources);
+    notifyListeners();
+  }
+
+  Future<void> setBucketSourceEnabled(String id, bool enabled) async {
+    bucketSources = bucketSources
+        .map((source) =>
+            source.id == id ? source.copyWith(enabled: enabled) : source)
+        .toList();
+    await store.saveBucketSources(bucketSources);
+    _loadCachedBucketCatalogs();
+    notifyListeners();
+  }
+
+  Future<void> refreshAllBucketSources() async {
+    for (final source in bucketSources.where((item) => item.enabled).toList()) {
+      await refreshBucketSource(source.id);
+    }
+  }
+
+  Future<void> refreshBucketSource(String id) async {
+    final index = bucketSources.indexWhere((source) => source.id == id);
+    if (index < 0 || !bucketSources[index].enabled) return;
+    bucketCatalogLoading = true;
+    bucketCatalogError = null;
+    notifyListeners();
+    final source = bucketSources[index];
+    try {
+      final result = await workoutBuckets.refresh(source);
+      bucketSources[index] = source.copyWith(
+        lastRefreshedAt: DateTime.now(),
+        cachedCatalogJson: result.rawJson,
+        clearLastError: true,
+      );
+      if (result.fromCache) {
+        bucketSources[index] = bucketSources[index].copyWith(
+          lastError: 'Offline — showing the last downloaded catalog.',
+        );
+      }
+      await store.saveBucketSources(bucketSources);
+      _loadCachedBucketCatalogs();
+    } catch (error) {
+      bucketCatalogError = '$error';
+      bucketSources[index] = source.copyWith(lastError: '$error');
+      await store.saveBucketSources(bucketSources);
+    } finally {
+      bucketCatalogLoading = false;
+      notifyListeners();
+    }
+  }
+
+  String bucketInstallState(WorkoutBucketEntry entry) {
+    final installed = installedBucketWorkouts.where(
+        (item) => item.sourceId == entry.sourceId && item.entryId == entry.id);
+    if (installed.isEmpty) return 'notInstalled';
+    return installed.any((item) => item.version == entry.version)
+        ? 'installed'
+        : 'updateAvailable';
+  }
+
+  Future<bool> installBucketEntry(
+    WorkoutBucketEntry entry, {
+    BucketInstallConflictResolution? resolution,
+  }) async {
+    final sourceId = entry.sourceId;
+    if (sourceId == null) {
+      throw StateError('Catalog entry has no bucket source.');
+    }
+    if (entry.minAppVersion != null &&
+        _compareVersions(currentAppVersion, entry.minAppVersion!) < 0) {
+      throw StateError(
+          'This workout requires AnhPT ${entry.minAppVersion} or newer.');
+    }
+    final existingIndex = installedBucketWorkouts.indexWhere(
+        (item) => item.sourceId == sourceId && item.entryId == entry.id);
+    if (existingIndex >= 0 && resolution == null) {
+      throw StateError('Choose how to handle the installed workout.');
+    }
+    if (existingIndex >= 0 &&
+        resolution == BucketInstallConflictResolution.keepLocal) {
+      return false;
+    }
+    final bytes = await workoutBuckets.downloadPackage(entry);
+    final imported = await workoutPackages.importPackageBytes(
+      bytes,
+      defaultVoiceLanguage: defaultVoiceLanguage,
+      mediaRepository: mediaLibrary,
+    );
+    if (existingIndex >= 0 &&
+        resolution == BucketInstallConflictResolution.replace) {
+      final previous = installedBucketWorkouts[existingIndex];
+      workouts.removeWhere((workout) => workout.id == previous.workoutId);
+      installedBucketWorkouts.removeAt(existingIndex);
+    }
+    workouts.add(imported);
+    if (existingIndex < 0 ||
+        resolution == BucketInstallConflictResolution.replace) {
+      installedBucketWorkouts.add(InstalledWorkoutProvenance(
+        workoutId: imported.id,
+        sourceId: sourceId,
+        entryId: entry.id,
+        version: entry.version,
+        packageUrl: entry.packageUrl,
+        sha256: entry.sha256,
+        installedAt: DateTime.now(),
+      ));
+    }
+    await _migrateReadableMusicPaths();
+    await store.saveWorkouts(workouts);
+    await store.saveInstalledBucketWorkouts(installedBucketWorkouts);
+    await yamlFileStore?.replaceAll(workouts);
+    notifyListeners();
+    return true;
+  }
+
+  int _compareVersions(String left, String right) {
+    final a = left.split('.').map((part) => int.tryParse(part) ?? 0).toList();
+    final b = right.split('.').map((part) => int.tryParse(part) ?? 0).toList();
+    for (var index = 0;
+        index < (a.length > b.length ? a.length : b.length);
+        index++) {
+      final av = index < a.length ? a[index] : 0;
+      final bv = index < b.length ? b[index] : 0;
+      if (av != bv) return av.compareTo(bv);
+    }
+    return 0;
   }
 
   Future<void> deleteWorkout(String id) async {
     workouts.removeWhere((w) => w.id == id);
+    installedBucketWorkouts.removeWhere((item) => item.workoutId == id);
     workoutMusic.remove(id);
     await store.saveWorkouts(workouts);
     await store.saveWorkoutMusic(workoutMusic);
+    await store.saveInstalledBucketWorkouts(installedBucketWorkouts);
+    await yamlFileStore?.delete(id);
     notifyListeners();
   }
 
@@ -303,7 +759,16 @@ class AppController extends ChangeNotifier {
     final workout = byId(recording.workoutId);
     if (workout == null) return;
     final draft = WorkoutDraft.fromWorkout(workout);
-    final source = portableAudioSource(recording.audioPath);
+    final cueName = recording.scope == 'description'
+        ? '${workout.name} introduction'
+        : recording.stepKey == null
+            ? 'recording'
+            : _draftStepAt(draft.steps, recording.stepKey!)?.name ??
+                'recording';
+    final originalPath = recording.audioPath;
+    final readablePath =
+        await recordingFiles.renameForCue(originalPath, cueName);
+    final source = portableAudioSource(readablePath);
     if (recording.scope == 'description') {
       draft.recording = source;
     } else if (recording.stepKey != null) {
@@ -312,7 +777,14 @@ class AppController extends ChangeNotifier {
       step.recording = source;
       step.hasExplicitId = true;
     }
-    await saveWorkout(_parseDraft(draft, workout));
+    try {
+      await saveWorkout(_parseDraft(draft, workout));
+    } catch (_) {
+      if (readablePath != originalPath && await File(readablePath).exists()) {
+        await File(readablePath).rename(originalPath);
+      }
+      rethrow;
+    }
   }
 
   Future<CoachRecording?> removeCoachRecording({
@@ -429,6 +901,7 @@ class AppController extends ChangeNotifier {
       return _parseDraft(draft, workout);
     }).toList();
     await store.saveWorkouts(workouts);
+    await yamlFileStore?.replaceAll(workouts);
   }
 
   Future<void> updateMusicTrack(MusicTrack updated) async {

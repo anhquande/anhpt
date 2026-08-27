@@ -19,7 +19,41 @@ AnhPT is a Flutter application with a model/parser layer, execution engine, voic
 | `SessionEngine` | Own timing, pause/resume, step progression, and timer/announcement completion coordination. |
 | `VoiceGuideController` | Build step announcements, repeat-round phrases, guide speech, timing speech, and notify the engine when protected announcement completes. |
 | `AudioFeedbackService` | TTS, TTS completion callbacks, cue playback, language-specific phrases. |
-| `LocalStore`, `AppController` | Persist workouts/preferences and coordinate app state. |
+| `LocalStore`, `WorkoutYamlFileStore`, `AppController` | Persist workouts/preferences, maintain local YAML files, and coordinate app state. |
+| `Exercise` | Reusable movement metadata referenced optionally by a step. |
+| `MediaAsset`, `MediaRepository` | Content-addressed shared media and physical-file resolution. |
+
+### Shared exercise demonstration media
+
+Exercise images, animated GIFs, and videos use a device-local, content-addressed Media
+Library. `LocalMediaRepository` computes a SHA-256 identity for deduplication,
+stores one physical file per unique hash, writes an atomic JSON index, and
+resolves both internal IDs and readable relative paths to local URIs. Workout
+YAML uses paths such as `media/plank-c0629816.gif`; the full hash remains an
+internal integrity key and a backward-compatible reference format.
+
+`WorkoutStep.exerciseId` is optional and points to a root `Exercise`. The
+exercise owns reusable `demoMediaId`; step recordings remain contextual audio.
+The Player dispatches by MediaAsset type: static image, animated image, or
+muted/looped video. Media never becomes a `SessionEngine` completion condition.
+Missing media degrades safely to an audio/timer-only workout.
+
+Portable packages list referenced media in `manifest.json`, include available
+files under `assets/`, and verify content hashes during import.
+
+### Local workout YAML persistence
+
+On platforms with application Documents storage, every saved workout is also
+written atomically to `Documents/AnhPT/workouts/<workout-id>.yaml`. These files
+are synchronized on startup and after create, edit, import, replace, or delete
+operations. They contain the same portable YAML produced by the Builder,
+including step `recording`, `exercise_id`, and exercise `demo_media` references.
+
+The recording and demonstration binaries remain in application-managed shared
+storage; YAML contains portable relative paths or content-addressed media IDs,
+not absolute device paths. `LocalStore` continues to hold app metadata and a
+backward-compatible cached workout representation. Web keeps that cache because
+browsers do not expose a normal writable Documents directory.
 
 ## 3. Step Completion Model
 
@@ -88,6 +122,9 @@ name when omitted. Builder-managed recorded steps receive an explicit stable ID
 so reorder operations cannot retarget recordings. Repeat rounds share the
 recording of their source step definition. Legacy local assignments are
 migrated into YAML. Missing or unreadable recordings fall back without stalling.
+Local recording files are named from a simplified cue name, with numeric
+suffixes for collisions (`plank.m4a`, `plank-2.m4a`). Startup migration renames
+older timestamp/ID-based files and rewrites their relative YAML references.
 
 A recording flow must request microphone permission only when needed and
 explain why it is needed. Before assigning a recording, the user must be able
@@ -117,6 +154,9 @@ Source is an `asset:` reference or an application-relative path.
 The local music library contains immutable bundled entries and personal tracks
 copied into application documents after user import. Library metadata and files
 remain local, while the selected workout assignment is portable YAML.
+Personal files retain a safe form of the browsed filename in `Documents/music`;
+numeric suffixes resolve collisions. Generated and package-imported music names
+are migrated there and all affected library/YAML references are updated.
 Deleting a personal track clears every affected workout assignment before the
 file is removed. Missing/unreadable files cause a safe no-music workout.
 
@@ -131,3 +171,17 @@ players, but shares the runtime ducking controller and fade curve. It is started
 only by a user action (including on Web), responds immediately to live base
 volume or ducking-mode changes, and stops both players before workout playback
 or when the card is disposed.
+
+## Workout Buckets
+
+`WorkoutBucketService` fetches only public HTTPS catalogs/packages, limits
+redirects and response sizes, keeps a last-good catalog, and verifies SHA-256
+before calling the shared `WorkoutPackageService`. Package import rejects unsafe,
+duplicate, overlong, over-count, and oversized ZIP entries and stages extracted
+audio before exposing its final managed directory. Sources and installed-package
+provenance use versioned SharedPreferences records.
+
+Catalog schema v1 contains `schemaVersion`, bucket `name`, and `workouts` entries
+with stable `id`, display metadata, version, immutable `packageUrl`, and SHA-256.
+Packages may include `manifest.json` with `schemaVersion: 1` and
+`workoutFile: "workout.yaml"`; manifest-less manual packages remain compatible.

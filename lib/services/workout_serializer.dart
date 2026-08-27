@@ -57,6 +57,20 @@ class WorkoutSerializer {
       }
     }
 
+    if (draft.exercises.isNotEmpty) {
+      b
+        ..writeln()
+        ..writeln('exercises:');
+      for (final exercise in draft.exercises) {
+        b
+          ..writeln('  - id: ${_quote(exercise.id)}')
+          ..writeln('    name: ${_quote(exercise.name)}');
+        if (exercise.demoMediaId != null) {
+          b.writeln('    demo_media: ${_quote(exercise.demoMediaId!)}');
+        }
+      }
+    }
+
     b
       ..writeln()
       ..writeln('steps:');
@@ -93,6 +107,9 @@ class WorkoutSerializer {
       }
       if (node.recording.trim().isNotEmpty) {
         b.writeln('$pad  recording: ${_quote(node.recording.trim())}');
+      }
+      if (node.exerciseId.trim().isNotEmpty) {
+        b.writeln('$pad  exercise_id: ${_quote(node.exerciseId.trim())}');
       }
       return;
     }

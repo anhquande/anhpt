@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../services/coach_recording_service.dart';
+import 'bucket_sources_screen.dart';
 import 'music_library_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -35,6 +36,21 @@ class SettingsScreen extends StatelessWidget {
                   leading: Icon(Icons.brightness_6_outlined),
                   title: Text('Appearance'),
                   subtitle: Text('System (Light/Dark follows device)'),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.inventory_2_outlined),
+                  title: const Text('Workout Buckets'),
+                  subtitle:
+                      const Text('Browse and manage public workout sources'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          BucketSourcesScreen(controller: controller),
+                    ),
+                  ),
                 ),
                 const Divider(),
                 ListTile(

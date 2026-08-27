@@ -53,9 +53,17 @@ app.*.map.json
 .metadata
 
 android
+!android/
+android/*
+!android/app/
+android/app/*
+!android/app/src/
+android/app/src/*
+!android/app/src/main/
+android/app/src/main/*
+!android/app/src/main/AndroidManifest.xml
 ios
 linux
 windows
 macos
 web
-pubspec.lock

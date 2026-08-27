@@ -2,6 +2,8 @@ import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/main.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/screens/settings_screen.dart';
+import 'package:anhpt/screens/home_screen.dart';
+import 'package:anhpt/models/workout_bucket.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -32,8 +34,44 @@ void main() {
     await tester.pump();
 
     expect(find.text('Microphone access'), findsOneWidget);
+    expect(find.text('Workout Buckets'), findsOneWidget);
     expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
     expect(find.text('Open settings'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('bucket catalog supports back navigation and return to Home',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore())
+      ..bucketSources = const [
+        WorkoutBucketSource(
+          id: 'official',
+          name: 'Official',
+          catalogUrl: 'https://example.com/bucket.json',
+        ),
+      ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(controller: controller),
+    ));
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Workout Buckets'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Browse catalog'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workout Catalog'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Workout Buckets'), findsOneWidget);
+
+    await tester.tap(find.text('Browse catalog'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Return to Home'));
+    await tester.pumpAndSettle();
+    expect(find.text('My Workouts'), findsOneWidget);
+    expect(find.text('Workout Catalog'), findsNothing);
   });
 }

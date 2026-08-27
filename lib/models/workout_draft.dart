@@ -12,6 +12,7 @@ class StepDraft extends WorkoutDraftNode {
   String guide;
   bool countdown;
   String recording;
+  String exerciseId;
 
   StepDraft({
     this.id = '',
@@ -21,6 +22,7 @@ class StepDraft extends WorkoutDraftNode {
     this.guide = '',
     this.countdown = true,
     this.recording = '',
+    this.exerciseId = '',
   });
 
   @override
@@ -32,6 +34,7 @@ class StepDraft extends WorkoutDraftNode {
         guide: guide,
         countdown: countdown,
         recording: '',
+        exerciseId: exerciseId,
       );
 }
 
@@ -71,6 +74,7 @@ class WorkoutDraft {
   double backgroundMusicVolume;
   String backgroundMusicDucking;
   final List<WorkoutDraftNode> steps;
+  final List<Exercise> exercises;
 
   WorkoutDraft({
     this.name = 'New Workout',
@@ -94,8 +98,10 @@ class WorkoutDraft {
     this.backgroundMusicVolume = .35,
     this.backgroundMusicDucking = 'gentle',
     List<WorkoutDraftNode>? steps,
+    List<Exercise>? exercises,
   })  : tags = tags ?? <String>[],
-        steps = steps ?? <WorkoutDraftNode>[];
+        steps = steps ?? <WorkoutDraftNode>[],
+        exercises = exercises ?? <Exercise>[];
 
   factory WorkoutDraft.fromWorkout(Workout workout) => WorkoutDraft(
         name: workout.name,
@@ -119,6 +125,7 @@ class WorkoutDraft {
         backgroundMusicVolume: workout.backgroundMusic?.volume ?? .35,
         backgroundMusicDucking: workout.backgroundMusic?.ducking ?? 'gentle',
         steps: workout.steps.map(_node).toList(),
+        exercises: List<Exercise>.from(workout.exercises),
       );
 
   static WorkoutDraftNode _node(WorkoutNode node) {
@@ -132,6 +139,7 @@ class WorkoutDraft {
         guide: node.guide ?? '',
         countdown: node.countdown,
         recording: node.recording ?? '',
+        exerciseId: node.exerciseId ?? '',
       );
     }
     final repeat = node as RepeatGroup;

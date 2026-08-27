@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:anhpt/app/app_controller.dart';
@@ -15,6 +16,25 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('browsed music keeps a readable file name with numeric collisions',
+      () async {
+    final directory = await Directory.systemTemp.createTemp('anhpt-music-');
+    addTearDown(() => directory.delete(recursive: true));
+    final sourceOne = File('${directory.path}/source-one.mp3');
+    final sourceTwo = File('${directory.path}/source-two.mp3');
+    await sourceOne.writeAsBytes([1]);
+    await sourceTwo.writeAsBytes([2]);
+    final service = MusicLibraryService(documentsDirectory: directory);
+
+    final first = await service.copyToLibrary(sourceOne, 'Morning Flow.mp3');
+    final second = await service.copyToLibrary(sourceTwo, 'Morning Flow.mp3');
+
+    expect(
+        first.path.replaceAll('\\', '/'), endsWith('/music/Morning Flow.mp3'));
+    expect(second.path.replaceAll('\\', '/'),
+        endsWith('/music/Morning Flow-2.mp3'));
+  });
+
   test('MP3 ID3 title wins over generated storage filename', () {
     final title = utf8.encode('Morning Flow');
     final payload = <int>[3, ...title];

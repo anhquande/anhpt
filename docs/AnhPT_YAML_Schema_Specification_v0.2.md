@@ -18,6 +18,7 @@
 | `audio` | No | Defaults applied. |
 | `recording` | No | Safe relative path to the workout-introduction recording. |
 | `background_music` | No | Selected track and playback settings. |
+| `exercises` | No | Reusable exercise definitions referenced by steps. |
 | `steps` | Yes | At least one step or repeat group. |
 
 ## 2. Step
@@ -30,6 +31,34 @@
 | `guide` | No | `null` | Additional spoken instruction, max 500 characters. |
 | `countdown` | No | `true` | When false, disables timing voice for this step. |
 | `recording` | No | `null` | Safe relative path to the step recording. |
+| `exercise_id` | No | `null` | ID of an entry in root `exercises`. |
+
+### Exercises and demonstration media
+
+`exercises` is optional, so existing YAML v1/v2 workouts remain valid. Exercise
+IDs are unique within the workout. A step may omit `exercise_id` for
+instructions, rest, or steps without reusable movement media.
+
+```yaml
+exercises:
+  - id: exercise_high_plank
+    name: High Plank
+    demo_media: media/high-plank-8f2c7a00.gif
+```
+
+`demo_media` normally uses a safe, readable relative path such as
+`media/high-plank-8f2c7a00.gif`. It may resolve to a static image, animated GIF,
+or video. The short hash suffix prevents name collisions while keeping the file
+recognizable and editable. Full `sha256:` IDs and legacy `demo_video` remain
+accepted for backward compatibility; when the referenced local asset is
+available, the app normalizes them to readable `demo_media` paths when saved.
+
+On platforms with application Documents storage, Builder saves mirror this
+serialized document to `Documents/AnhPT/workouts/<workout-id>.yaml`. Therefore
+recording assignments and demonstration references are visible in the local
+YAML immediately after an edit. Media and recording binary data are not embedded
+in YAML; package export remains the portable way to transfer the referenced
+files together with the workout.
 
 `step.id` is unique across the complete workout, including nested repeats.
 Explicit IDs contain letters, numbers, and single hyphens and are at most 40
@@ -49,6 +78,11 @@ References must use `asset:` or a safe path relative to application-managed
 storage. Absolute paths and `..` segments are invalid. Missing or unreadable
 recordings fall back to device TTS and must not stall execution.
 
+Builder-created recordings use a simplified form of the workout or step name,
+for example `coach_recordings/nang-dau-goi.m4a`. If that name already exists,
+the app appends `-2`, `-3`, and so on. Existing generated timestamp names are
+renamed and their YAML references updated during local migration.
+
 ## 4. Background Music
 
 | Field | Required | Default / Rules |
@@ -61,6 +95,11 @@ recordings fall back to device TTS and must not stall execution.
 
 Only the selected track is serialized; the local music library is not copied
 into every workout. Missing music never blocks workout execution.
+
+Browsed music keeps a filesystem-safe form of its original filename, for
+example `music/Morning Flow.mp3`. Name collisions receive numeric suffixes such
+as `Morning Flow-2.mp3`. Older generated `track_<timestamp>` and imported paths
+are migrated to readable names, and their YAML `source` values are rewritten.
 
 Portable export uses an `.anhpt.zip` package containing `workout.yaml` and all
 available non-bundled referenced audio files. Import validates archive paths and
@@ -117,3 +156,11 @@ steps:
 - Timer and protected announcement start together.
 - A step advances only when both timer and announcement are finished.
 - Missing/unreadable recording or music never stalls workout progression.
+
+## 9. Marketplace package metadata
+
+Marketplace downloads use the same `.anhpt.zip` and YAML validation path as
+manual import. A package may add a root `manifest.json` with `schemaVersion: 1`
+and optional `workoutFile` (default `workout.yaml`). Package identity, version,
+URL, and SHA-256 live in the bucket catalog rather than workout YAML. Existing
+manifest-less packages remain valid.

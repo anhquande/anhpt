@@ -22,6 +22,55 @@ creates a new workout and isolated managed copies of its audio.
 | Move up/down | Reorder within the current group. |
 | Duplicate | Clone the step including guide/countdown settings. |
 | Delete | Remove the step. |
+| Demonstration media | Choose, replace, or unlink a reusable image, animation, or video. |
+
+### Exercise demonstration media MVP
+
+The Step card may attach a JPG, JPEG, PNG, WebP, GIF, MP4, MOV, or WebM file up
+to 20 MB. AnhPT creates
+an internal Exercise when necessary and stores identical selected content once
+in the shared Media Library. Unlink removes only the reference.
+
+Overview and Builder show the same adjacent per-step icon actions: microphone
+for coach recording and folder/media for browsing or replacing demonstration
+files. The media action is an icon button with an explanatory tooltip, not a
+text button. No redundant empty-state heading or format-description copy is
+shown. A new unsaved workout must be saved before step recording can start.
+Step rows do not show a leading timer icon: the explicit duration field/value
+already communicates timing, so the step name remains the primary visual cue.
+
+When a step recording is assigned, both Overview and Builder show a compact
+inline audio player in the step's right-side action area. Its management dialog
+provides delete and record-again actions. Delete removes the local file and YAML
+assignment, after which device TTS resumes as the fallback.
+
+The collapsed mini player shows only Play/Pause. Pointer hover reveals one
+`Manage recording` action with an audio-settings icon; it opens the full
+recording dialog where delete and record-again controls live. Leaving the player
+hides the management action. On touch devices, tapping the mini player reveals
+the action temporarily so the same capability remains accessible without hover.
+When a recording exists, this Play/Manage cluster replaces the standalone
+`Edit step recording` microphone and remains in the step's right-side action
+area immediately beside the demonstration-media button; no duplicate player is
+shown below the step.
+
+When no demonstration is attached, the existing Browse icon remains beside the
+audio controls. Once attached, Browse is replaced by a rounded 32×32 visual
+thumbnail centered in a 40×40 accessible tap target, followed by 8 px spacing
+before the duration/control to its right. It remains in the Browse action's
+position; no large thumbnail or attached-state heading is shown
+below the step. Tapping the thumbnail opens a large preview dialog with Close,
+Delete demonstration, and Replace demonstration actions. Delete only unlinks
+the shared media; it does not remove the physical shared asset.
+
+The empty-state Browse action uses `add_photo_alternate_outlined` to communicate
+adding visual demonstration media. Replace inside the preview dialog retains a
+folder icon to distinguish replacing a file from the initial add action.
+
+During a workout, a static image remains visible, an animated GIF animates, and
+a video is muted and looped independently of the timer and voice guide. Video
+pauses/resumes with the session. Missing or unsupported media is non-blocking.
+Camera capture, trimming, and compression are later phases.
 
 Builder-generated YAML should remain concise. In particular, `duration` may be omitted when it is `0s`, and `countdown` may be omitted when it is `true`.
 
@@ -157,3 +206,14 @@ the selected track together with a short bundled coach-voice sample, applies the
 currently displayed base volume and ducking mode, and restores the base volume
 when the sample completes, is stopped, or fails. The test remains available for
 a selected track even when workout music is disabled.
+
+## Workout Buckets
+
+- Settings links to a focused source manager.
+- A source can be added by name and public HTTPS catalog URL, enabled/disabled,
+  refreshed, or removed without deleting installed workouts.
+- The catalog shows package metadata and installed/update state.
+- Updating asks to keep the local workout, install as a copy, or replace it.
+- Loading, cached-offline, empty, validation, download, and checksum failures are
+  explicit and do not alter existing workouts.
+# AnhPT UX/UI Specification

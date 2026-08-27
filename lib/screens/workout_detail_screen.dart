@@ -61,6 +61,30 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     );
   }
 
+  Future<void> _browseStepMedia(String stepKey) async {
+    try {
+      final asset = await widget.controller.importDemoMedia();
+      if (asset == null) return;
+      await widget.controller.assignStepDemoMedia(
+        workoutId: widget.workoutId,
+        stepKey: stepKey,
+        asset: asset,
+      );
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not attach demonstration: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeStepMedia(String stepKey) =>
+      widget.controller.removeStepDemoMedia(
+        workoutId: widget.workoutId,
+        stepKey: stepKey,
+      );
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -159,6 +183,23 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                     recordedStepKeys: recordedStepKeys,
                     onRecordStep: (context, step, stepKey) =>
                         _openStepRecording(context, workout, step, stepKey),
+                    onBrowseStepMedia: (_, __, stepKey) =>
+                        _browseStepMedia(stepKey),
+                    onRemoveStepMedia: (_, __, stepKey) =>
+                        _removeStepMedia(stepKey),
+                    demoMediaIdForStep: (step) {
+                      for (final exercise in workout.exercises) {
+                        if (exercise.id == step.exerciseId) {
+                          return exercise.demoMediaId;
+                        }
+                      }
+                      return null;
+                    },
+                    resolveMediaAsset: controller.mediaAsset,
+                    resolveMediaUri: controller.resolveMediaUri,
+                    resolveStepRecording: (step) => step.recording == null
+                        ? null
+                        : controller.resolveAudioSource(step.recording!),
                   ),
                   const SizedBox(height: 22),
                   Wrap(spacing: 8, runSpacing: 8, children: [

@@ -4,10 +4,14 @@ import 'app/app_controller.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/local_store.dart';
+import 'services/workout_yaml_file_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final controller = AppController(LocalStore());
+  final controller = AppController(
+    LocalStore(),
+    yamlFileStore: WorkoutYamlFileStore(),
+  );
   await controller.initialize();
   runApp(AnhPtApp(controller: controller));
 }
