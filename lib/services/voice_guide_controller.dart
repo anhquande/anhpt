@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../core/session_engine.dart';
 import '../models/workout.dart';
 import 'audio_feedback_service.dart';
@@ -16,6 +18,8 @@ class VoiceGuideController {
   bool _finished = false;
   bool _processing = false;
   bool _pending = false;
+  int _generation = 0;
+  bool _disposed = false;
 
   VoiceGuideController({
     required this.workout,
@@ -30,6 +34,7 @@ class VoiceGuideController {
   }
 
   Future<void> onEngineChanged() async {
+    if (_disposed) return;
     if (_processing) {
       _pending = true;
       return;
@@ -47,15 +52,18 @@ class VoiceGuideController {
   }
 
   Future<void> _processCurrentState() async {
+    if (_disposed) return;
     final status = engine.status;
+    final previousStatus = _lastStatus;
+    _lastStatus = status;
 
-    if (_lastStatus == SessionStatus.running &&
+    if (previousStatus == SessionStatus.running &&
         status == SessionStatus.paused) {
       await audio.stopSpeech();
       await audio.speak(audio.pausedPhrase(), interrupt: true);
     }
 
-    if (_lastStatus == SessionStatus.paused &&
+    if (previousStatus == SessionStatus.paused &&
         status == SessionStatus.running) {
       await audio.speak(
         audio.resumePhrase(engine.currentStep.name),
@@ -66,10 +74,12 @@ class VoiceGuideController {
     // A new step starts its timer immediately. In parallel we speak
     // the step name + guide. The engine advances only after both
     // the timer and this announcement have finished.
-    if ((status == SessionStatus.running || status == SessionStatus.paused) &&
-        _lastStepIndex != engine.stepIndex) {
+    if (status == SessionStatus.running && _lastStepIndex != engine.stepIndex) {
       _lastStepIndex = engine.stepIndex;
       _lastSpokenSecond = null;
+      final announcementGeneration = _generation;
+      final announcementStepIndex = engine.stepIndex;
+      final announcementStepId = engine.currentExecutableStep.step.id;
 
       try {
         if (!_started) {
@@ -92,8 +102,23 @@ class VoiceGuideController {
           }
         }
 
+        if (!_isCurrentAnnouncement(
+          announcementGeneration,
+          announcementStepIndex,
+          announcementStepId,
+        )) {
+          return;
+        }
+
         await audio.stopSpeech();
         await audio.playCue(workout.sound);
+        if (!_isCurrentAnnouncement(
+          announcementGeneration,
+          announcementStepIndex,
+          announcementStepId,
+        )) {
+          return;
+        }
 
         final step = engine.currentStep;
         final repeat = engine.currentRepeat;
@@ -120,6 +145,13 @@ class VoiceGuideController {
             stepRecordingPaths[engine.currentExecutableStep.step.id];
         final recordingPlayed = stepRecordingPath != null &&
             await audio.playLocalRecordingAndWait(stepRecordingPath);
+        if (!_isCurrentAnnouncement(
+          announcementGeneration,
+          announcementStepIndex,
+          announcementStepId,
+        )) {
+          return;
+        }
         if (!recordingPlayed && parts.isNotEmpty) {
           await audio.speakAndWait(
             parts.join('. '),
@@ -131,7 +163,13 @@ class VoiceGuideController {
         // ignore: avoid_print
         print('Step announcement failed: $e');
       } finally {
-        engine.completeAnnouncement();
+        if (_isCurrentAnnouncement(
+          announcementGeneration,
+          announcementStepIndex,
+          announcementStepId,
+        )) {
+          engine.completeAnnouncement();
+        }
       }
       return;
     }
@@ -154,8 +192,39 @@ class VoiceGuideController {
     if (status == SessionStatus.incomplete) {
       await audio.stopSpeech();
     }
+  }
 
-    _lastStatus = status;
+  bool _isCurrentAnnouncement(
+    int generation,
+    int stepIndex,
+    String stepId,
+  ) {
+    return !_disposed &&
+        generation == _generation &&
+        (engine.status == SessionStatus.running ||
+            engine.status == SessionStatus.paused) &&
+        engine.stepIndex == stepIndex &&
+        engine.currentExecutableStep.step.id == stepId;
+  }
+
+  /// Invalidates awaited callbacks immediately. A paused step is replayed on
+  /// resume so its announcement can never be inherited from stale work.
+  Future<void> cancelCurrentWork({bool replayCurrentStep = false}) async {
+    if (_disposed) return;
+    _generation++;
+    if (replayCurrentStep) {
+      _lastStepIndex = -1;
+      _lastSpokenSecond = null;
+    }
+    await audio.cancelCurrentAudio();
+  }
+
+  void dispose() {
+    if (_disposed) return;
+    _disposed = true;
+    _generation++;
+    _pending = false;
+    unawaited(audio.cancelCurrentAudio());
   }
 
   Future<void> _handleTimingVoice() async {

@@ -34,6 +34,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   String? musicNotice;
   String musicStatus = 'Music off';
   SessionStatus? _musicStatus;
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -97,12 +98,15 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
           ? 'Music off: no track selected'
           : 'Music off: disabled';
     }
+    if (_disposed) return;
     try {
       await voiceGuide.initialize();
+      if (_disposed) return;
       audioReady = true;
     } catch (e) {
       debugPrint('Audio initialization failed: $e');
     }
+    if (_disposed) return;
     engine.start();
     _musicStatus = engine.status;
     if (musicNotice != null && mounted) {
@@ -121,6 +125,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     if (_musicStatus != status) {
       if (status == SessionStatus.paused) {
         unawaited(music.pause());
+        unawaited(voiceGuide.cancelCurrentWork(replayCurrentStep: true));
       }
       if (_musicStatus == SessionStatus.paused &&
           status == SessionStatus.running) {
@@ -129,6 +134,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       if (status == SessionStatus.completed ||
           status == SessionStatus.incomplete) {
         unawaited(music.stop());
+        unawaited(voiceGuide.cancelCurrentWork());
       }
       _musicStatus = status;
     }
@@ -315,8 +321,10 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
 
   @override
   void dispose() {
+    _disposed = true;
     engine.removeListener(_changed);
     engine.dispose();
+    voiceGuide.dispose();
     unawaited(audio.dispose());
     unawaited(music.dispose());
     super.dispose();
