@@ -164,6 +164,34 @@ steps:
     expect(find.text('Ready to record.'), findsNothing);
   });
 
+  testWidgets('assigned introduction uses the shared recording mini player',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore());
+    controller.workouts = [
+      WorkoutParser.parse('''
+version: 2
+name: Recorded introduction
+recording: coach_recordings/introduction.m4a
+steps:
+  - name: Plank
+''', id: 'workout-intro', defaultVoiceLanguage: 'en'),
+    ];
+
+    await tester.pumpWidget(MaterialApp(
+      home: WorkoutDetailScreen(
+        controller: controller,
+        workoutId: 'workout-intro',
+      ),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Introduction'));
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('Play recording'), findsOneWidget);
+    expect(find.byTooltip('Record workout introduction'), findsNothing);
+  });
+
   for (final scope in ['description', 'step']) {
     testWidgets('$scope recording shows an inline player when assigned',
         (tester) async {

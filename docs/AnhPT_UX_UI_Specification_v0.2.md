@@ -11,6 +11,32 @@ Workout Detail offers portable package export. Home offers package import. The
 package contains YAML plus available local recording/music files; importing it
 creates a new workout and isolated managed copies of its audio.
 
+Workout Overview uses one persistent top app bar that remains visible while the
+content scrolls. It shows the ellipsized workout title on the left, the primary
+`Start` action on the right, and an adjacent three-dot menu. The menu contains
+Edit, Duplicate, Copy YAML, Edit YAML, and Export package; these actions are not
+repeated in the scrolling body.
+
+Below the sticky header, a non-empty description uses a subtle notes icon,
+muted body color, and comfortable line height. It collapses after three lines
+with More/Less controls. Tags appear as compact, borderless secondary-color
+chips and are hidden as a group when empty. Duration, step count, language, and
+voice mode are presented as lightweight icon/text metadata rather than chips,
+so technical facts do not compete visually with tags.
+
+Overview content is divided into `Introduction`, `Music`, and `Structure` tabs;
+`Structure` is selected initially. The description, tags, and metadata remain a
+shared summary above the tabs. The tab bar pins below the persistent app bar
+when the summary scrolls away, while each tab preserves its own scroll position.
+Horizontal swipe navigation is disabled so it cannot conflict with the Music
+volume slider.
+
+The Introduction tab uses the same compact recording pattern as a Structure
+step. An unassigned cue shows a microphone action; an assigned cue replaces it
+with the shared Play/Pause mini player whose Manage action appears on hover or
+touch. Recording, replacement, and deletion remain in the full dialog opened
+from that compact control.
+
 ## 2. Builder Step Card
 
 | Control | Behavior |
