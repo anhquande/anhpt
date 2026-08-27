@@ -36,30 +36,67 @@ class WorkoutCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(14),
-        leading: IconButton(
-          onPressed: onFavorite,
-          icon: Icon(
-            workout.favorite ? Icons.star_rounded : Icons.star_border_rounded,
-            color: workout.favorite ? cs.primary : cs.onSurfaceVariant,
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 13, 10, 13),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      workout.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (workout.description.trim().isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        workout.description.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      '${formatDuration(workout.totalDuration)}  ·  '
+                      '${workout.effectiveStepCount} steps  ·  '
+                      '${workout.voice.language.toUpperCase()}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: cs.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip:
+                    workout.favorite ? 'Remove favorite' : 'Add to favorites',
+                visualDensity: VisualDensity.compact,
+                onPressed: onFavorite,
+                icon: Icon(
+                  workout.favorite
+                      ? Icons.star_rounded
+                      : Icons.star_border_rounded,
+                  color: workout.favorite ? cs.primary : cs.onSurfaceVariant,
+                ),
+              ),
+              IconButton.filledTonal(
+                tooltip: 'Start ${workout.name}',
+                onPressed: onStart,
+                icon: const Icon(Icons.play_arrow_rounded),
+              ),
+            ],
           ),
         ),
-        title: Text(
-          workout.name,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
-        subtitle: Text(
-          '${formatDuration(workout.totalDuration)} · '
-          '${workout.effectiveStepCount} steps · '
-          '${workout.voice.language.toUpperCase()}',
-        ),
-        trailing: FilledButton.icon(
-          onPressed: onStart,
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Start'),
-        ),
-        onTap: onOpen,
       ),
     );
   }

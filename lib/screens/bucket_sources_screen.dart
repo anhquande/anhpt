@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
-import 'bucket_catalog_screen.dart';
 
 class BucketSourcesScreen extends StatelessWidget {
   final AppController controller;
@@ -15,7 +14,7 @@ class BucketSourcesScreen extends StatelessWidget {
     final submitted = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Add workout bucket'),
+        title: const Text('Add workout source'),
         content: Form(
           key: formKey,
           child: SizedBox(
@@ -79,7 +78,7 @@ class BucketSourcesScreen extends StatelessWidget {
     } catch (error) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not add bucket: $error')),
+          SnackBar(content: Text('Could not add source: $error')),
         );
       }
     }
@@ -90,7 +89,7 @@ class BucketSourcesScreen extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Remove bucket?'),
+        title: const Text('Remove source?'),
         content: Text(
           'Remove $name from your sources? Workouts already installed remain available.',
         ),
@@ -113,7 +112,7 @@ class BucketSourcesScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workout Buckets'),
+        title: const Text('Workout sources'),
         actions: [
           IconButton(
             tooltip: 'Refresh all enabled sources',
@@ -140,21 +139,6 @@ class BucketSourcesScreen extends StatelessWidget {
                 Text(
                   'Public HTTPS catalogs. Cached results stay available when a source is offline.',
                   style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: controller.bucketSources.isEmpty
-                      ? null
-                      : () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => BucketCatalogScreen(
-                                controller: controller,
-                              ),
-                            ),
-                          ),
-                  icon: const Icon(Icons.storefront_outlined),
-                  label: const Text('Browse catalog'),
                 ),
                 const SizedBox(height: 16),
                 if (controller.bucketCatalogLoading)

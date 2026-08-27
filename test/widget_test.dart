@@ -91,6 +91,54 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Get Started'), findsOneWidget);
   });
 
+  testWidgets('Home is compact and searches local workouts without accents',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore())
+      ..workouts = [
+        WorkoutParser.parse('''
+version: 2
+name: Khởi động nhanh
+tags: [Mobility]
+steps:
+  - name: Move
+''', id: 'warmup', defaultVoiceLanguage: 'vi'),
+        WorkoutParser.parse('''
+version: 2
+name: Strength Builder
+steps:
+  - name: Lift
+''', id: 'strength', defaultVoiceLanguage: 'en'),
+      ];
+
+    await tester
+        .pumpWidget(MaterialApp(home: HomeScreen(controller: controller)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('My Workouts'), findsOneWidget);
+    expect(find.text('New workout'), findsOneWidget);
+    expect(find.text('Browse workouts'), findsOneWidget);
+    expect(find.text('Import package'), findsNothing);
+    expect(find.text('Import YAML'), findsNothing);
+    expect(find.byTooltip('More ways to add'), findsOneWidget);
+    expect(find.byTooltip('Import workouts'), findsNothing);
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(find.text('Ready to move?'), findsNothing);
+
+    await tester.tap(find.byTooltip('More ways to add'));
+    await tester.pumpAndSettle();
+    expect(find.text('Import package'), findsOneWidget);
+    expect(find.text('Import YAML'), findsOneWidget);
+
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'khoi dong');
+    await tester.pump();
+    expect(find.text('Khởi động nhanh'), findsOneWidget);
+    expect(find.text('Strength Builder'), findsNothing);
+  });
+
   testWidgets('settings owns Windows microphone permission guidance',
       (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
@@ -103,13 +151,13 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     await tester.pump();
 
     expect(find.text('Microphone access'), findsOneWidget);
-    expect(find.text('Workout Buckets'), findsOneWidget);
+    expect(find.text('Workout sources'), findsOneWidget);
     expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
     expect(find.text('Open settings'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('bucket catalog supports back navigation and return to Home',
+  testWidgets('Home opens Browse Workouts with accent-insensitive search',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
@@ -119,28 +167,45 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
           name: 'Official',
           catalogUrl: 'https://example.com/bucket.json',
         ),
+      ]
+      ..bucketCatalogEntries = [
+        WorkoutBucketEntry(
+          sourceId: 'official',
+          id: 'warmup',
+          name: 'Khởi động buổi sáng',
+          description: 'Nhẹ nhàng bắt đầu ngày mới.',
+          version: '1.0.0',
+          packageUrl: 'https://example.com/warmup.zip',
+          sha256: List.filled(64, '0').join(),
+          tags: const ['Beginner', 'Mobility'],
+        ),
+        WorkoutBucketEntry(
+          sourceId: 'official',
+          id: 'strength',
+          name: 'Strength Builder',
+          version: '1.0.0',
+          packageUrl: 'https://example.com/strength.zip',
+          sha256: List.filled(64, '1').join(),
+        ),
       ];
 
     await tester.pumpWidget(MaterialApp(
       home: HomeScreen(controller: controller),
     ));
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Workout Buckets'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Browse catalog'));
+    await tester.tap(find.text('Browse workouts'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Workout Catalog'), findsOneWidget);
-    await tester.tap(find.byType(BackButton));
-    await tester.pumpAndSettle();
-    expect(find.text('Workout Buckets'), findsOneWidget);
+    expect(find.text('Browse Workouts'), findsOneWidget);
+    expect(find.text('Khởi động buổi sáng'), findsOneWidget);
+    expect(find.text('Strength Builder'), findsOneWidget);
 
-    await tester.tap(find.text('Browse catalog'));
+    await tester.enterText(find.byType(TextField), 'khoi dong');
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Khởi động buổi sáng'), findsOneWidget);
+    expect(find.text('Strength Builder'), findsNothing);
+
+    await tester.tap(find.byTooltip('Manage workout sources'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Return to Home'));
-    await tester.pumpAndSettle();
-    expect(find.text('My Workouts'), findsOneWidget);
-    expect(find.text('Workout Catalog'), findsNothing);
+    expect(find.text('Workout sources'), findsOneWidget);
   });
 }

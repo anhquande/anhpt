@@ -52,8 +52,10 @@ Current implementation targets Flutter Web and Windows for development/testing. 
 
 ## 5. Workout Buckets marketplace (MVP)
 
-Settings supports public Workout Bucket sources identified by user-supplied
-HTTPS `bucket.json` URLs. Enabled sources can be refreshed, browsed, and used to
-install checksum-verified portable packages. The last valid catalog remains
-available offline. Updates require an explicit keep/copy/replace choice. Private
-credentials and signatures are deferred; Web sources must support CORS.
+Home exposes `Browse workouts` for discovering and installing catalog content;
+Settings manages only public Workout Bucket sources identified by user-supplied
+HTTPS `bucket.json` URLs. Browse supports accent-insensitive search across
+workout metadata and source names, status/source filters, sorting, and direct
+install/update actions. The last valid catalog remains available offline.
+Updates require an explicit keep/copy/replace choice. Private credentials and
+signatures are deferred; Web sources must support CORS.

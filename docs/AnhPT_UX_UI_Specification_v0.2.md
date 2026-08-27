@@ -11,6 +11,24 @@ Workout Detail offers portable package export. Home offers package import. The
 package contains YAML plus available local recording/music files; importing it
 creates a new workout and isolated managed copies of its audio.
 
+Home exposes `Browse workouts` beside the primary creation journey; installing
+catalog content never requires navigating through Settings. `Browse Workouts`
+keeps a search field pinned below its app bar and searches workout name,
+description, tags, author, and source with case- and Vietnamese-accent-
+insensitive matching after a short debounce. Status/source filters, name sort,
+result count, direct Install/Update states, and an Open action after successful
+installation support larger catalogs. Settings contains only `Workout sources`
+for technical source management.
+
+Home uses a restrained `My Workouts` app bar with only Settings visible.
+`New workout` and `Browse workouts` remain visible as the frequent actions.
+The less frequent `Import package` and `Import YAML` actions live in an adjacent
+three-dot overflow menu. The redundant greeting and floating creation button
+are omitted. A local accent-insensitive search filters name,
+description, and tags. Favorites and all other workouts use counted lightweight
+sections, while compact cards prioritize title, optional one-line description,
+metadata, favorite, and a tonal Play action.
+
 Workout Overview uses one persistent top app bar that remains visible while the
 content scrolls. It shows the ellipsized workout title on the left, the primary
 `Start` action on the right, and an adjacent three-dot menu. The menu contains

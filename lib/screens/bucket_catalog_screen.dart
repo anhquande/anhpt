@@ -1,7 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout_bucket.dart';
+import 'bucket_sources_screen.dart';
+import 'workout_detail_screen.dart';
+
+enum _CatalogStatus { all, notInstalled, installed, updates }
+
+enum _CatalogSort { recommended, nameAscending, nameDescending }
 
 class BucketCatalogScreen extends StatefulWidget {
   final AppController controller;
@@ -14,18 +22,71 @@ class BucketCatalogScreen extends StatefulWidget {
 
 class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
   String _query = '';
+  String? _sourceId;
+  _CatalogStatus _status = _CatalogStatus.all;
+  _CatalogSort _sort = _CatalogSort.recommended;
   String? _installingId;
+  final _searchController = TextEditingController();
+  Timer? _searchDebounce;
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _searchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+      if (mounted) setState(() => _query = value);
+    });
+  }
 
   Future<void> _install(
     WorkoutBucketEntry entry, {
     BucketInstallConflictResolution? resolution,
   }) async {
+    final existingWorkoutIds =
+        widget.controller.workouts.map((workout) => workout.id).toSet();
     setState(() => _installingId = entry.id);
     try {
-      await widget.controller.installBucketEntry(entry, resolution: resolution);
-      if (mounted) {
+      final installed = await widget.controller
+          .installBucketEntry(entry, resolution: resolution);
+      if (mounted && installed) {
+        String? workoutId;
+        for (final workout in widget.controller.workouts) {
+          if (!existingWorkoutIds.contains(workout.id)) {
+            workoutId = workout.id;
+            break;
+          }
+        }
+        if (workoutId == null) {
+          for (final item in widget.controller.installedBucketWorkouts) {
+            if (item.sourceId == entry.sourceId && item.entryId == entry.id) {
+              workoutId = item.workoutId;
+              break;
+            }
+          }
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${entry.name} installed.')),
+          SnackBar(
+            content: Text('${entry.name} installed.'),
+            action: workoutId == null
+                ? null
+                : SnackBarAction(
+                    label: 'Open',
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => WorkoutDetailScreen(
+                          controller: widget.controller,
+                          workoutId: workoutId!,
+                        ),
+                      ),
+                    ),
+                  ),
+          ),
         );
       }
     } catch (error) {
@@ -136,17 +197,21 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workout Catalog'),
+        title: const Text('Browse Workouts'),
         leading: BackButton(
           onPressed: () => Navigator.maybePop(context),
         ),
         actions: [
           IconButton(
-            tooltip: 'Return to Home',
-            onPressed: () => Navigator.of(context).popUntil(
-              (route) => route.isFirst,
+            tooltip: 'Manage workout sources',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) =>
+                    BucketSourcesScreen(controller: widget.controller),
+              ),
             ),
-            icon: const Icon(Icons.home_outlined),
+            icon: const Icon(Icons.tune_outlined),
           ),
           IconButton(
             tooltip: 'Refresh catalog',
@@ -156,29 +221,107 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
             icon: const Icon(Icons.refresh),
           ),
         ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(68),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _searchChanged,
+              decoration: InputDecoration(
+                filled: true,
+                prefixIcon: const Icon(Icons.search),
+                hintText: 'Search workouts, tags, or sources',
+                suffixIcon: _searchController.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        onPressed: () {
+                          _searchDebounce?.cancel();
+                          _searchController.clear();
+                          setState(() => _query = '');
+                        },
+                        icon: const Icon(Icons.close),
+                      ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
       body: AnimatedBuilder(
         animation: widget.controller,
         builder: (context, _) {
-          final entries = widget.controller.bucketCatalogEntries.where((entry) {
-            final needle = _query.trim().toLowerCase();
-            if (needle.isEmpty) return true;
-            return entry.name.toLowerCase().contains(needle) ||
-                entry.description.toLowerCase().contains(needle) ||
-                entry.tags.any((tag) => tag.toLowerCase().contains(needle));
-          }).toList();
+          final entries = _filteredEntries();
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 900),
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  TextField(
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Search workouts or tags',
-                    ),
-                    onChanged: (value) => setState(() => _query = value),
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      DropdownButton<_CatalogStatus>(
+                        value: _status,
+                        underline: const SizedBox.shrink(),
+                        onChanged: (value) => setState(() => _status = value!),
+                        items: const [
+                          DropdownMenuItem(
+                              value: _CatalogStatus.all,
+                              child: Text('All workouts')),
+                          DropdownMenuItem(
+                              value: _CatalogStatus.notInstalled,
+                              child: Text('Not installed')),
+                          DropdownMenuItem(
+                              value: _CatalogStatus.installed,
+                              child: Text('Installed')),
+                          DropdownMenuItem(
+                              value: _CatalogStatus.updates,
+                              child: Text('Updates available')),
+                        ],
+                      ),
+                      if (widget.controller.bucketSources.length > 1)
+                        DropdownButton<String?>(
+                          value: _sourceId,
+                          underline: const SizedBox.shrink(),
+                          onChanged: (value) =>
+                              setState(() => _sourceId = value),
+                          items: [
+                            const DropdownMenuItem(
+                                value: null, child: Text('All sources')),
+                            for (final source
+                                in widget.controller.bucketSources)
+                              DropdownMenuItem(
+                                  value: source.id, child: Text(source.name)),
+                          ],
+                        ),
+                      DropdownButton<_CatalogSort>(
+                        value: _sort,
+                        underline: const SizedBox.shrink(),
+                        onChanged: (value) => setState(() => _sort = value!),
+                        items: const [
+                          DropdownMenuItem(
+                              value: _CatalogSort.recommended,
+                              child: Text('Recommended')),
+                          DropdownMenuItem(
+                              value: _CatalogSort.nameAscending,
+                              child: Text('Name A–Z')),
+                          DropdownMenuItem(
+                              value: _CatalogSort.nameDescending,
+                              child: Text('Name Z–A')),
+                        ],
+                      ),
+                      Text(
+                        '${entries.length} workout${entries.length == 1 ? '' : 's'}',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   if (widget.controller.bucketCatalogLoading)
@@ -194,11 +337,41 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                     ),
                   if (!widget.controller.bucketCatalogLoading &&
                       entries.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: Text(
-                        'No workouts found in enabled bucket sources.',
-                        textAlign: TextAlign.center,
+                    Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Column(
+                        children: [
+                          Text(
+                            widget.controller.bucketSources.isEmpty
+                                ? 'Add a workout source to start discovering workouts.'
+                                : 'No workouts match your search and filters.',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          if (widget.controller.bucketSources.isEmpty)
+                            OutlinedButton(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BucketSourcesScreen(
+                                      controller: widget.controller),
+                                ),
+                              ),
+                              child: const Text('Manage sources'),
+                            )
+                          else
+                            TextButton(
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _query = '';
+                                  _sourceId = null;
+                                  _status = _CatalogStatus.all;
+                                });
+                              },
+                              child: const Text('Clear search and filters'),
+                            ),
+                        ],
                       ),
                     ),
                   for (final entry in entries) _entryCard(context, entry),
@@ -223,12 +396,35 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        title: Text(entry.name),
+        title: Text(entry.name,
+            style: const TextStyle(fontWeight: FontWeight.w700)),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 6),
-          child: Text('${entry.description}\nVersion ${entry.version}'),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (entry.description.isNotEmpty) Text(entry.description),
+              const SizedBox(height: 6),
+              Text('${_sourceName(entry.sourceId)} · Version ${entry.version}'),
+              if (entry.tags.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final tag in entry.tags)
+                      Chip(
+                        label: Text(tag),
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide.none,
+                      ),
+                  ],
+                ),
+              ],
+            ],
+          ),
         ),
-        isThreeLine: true,
         onTap: () => _showDetails(entry),
         trailing: installing
             ? const SizedBox.square(
@@ -245,6 +441,57 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
               ),
       ),
     );
+  }
+
+  List<WorkoutBucketEntry> _filteredEntries() {
+    final needle = _normalize(_query.trim());
+    final entries = widget.controller.bucketCatalogEntries.where((entry) {
+      final state = widget.controller.bucketInstallState(entry);
+      final matchesStatus = switch (_status) {
+        _CatalogStatus.all => true,
+        _CatalogStatus.notInstalled => state == 'notInstalled',
+        _CatalogStatus.installed => state == 'installed',
+        _CatalogStatus.updates => state == 'updateAvailable',
+      };
+      if (!matchesStatus ||
+          (_sourceId != null && entry.sourceId != _sourceId)) {
+        return false;
+      }
+      if (needle.isEmpty) return true;
+      final searchable = [
+        entry.name,
+        entry.description,
+        entry.author ?? '',
+        _sourceName(entry.sourceId),
+        ...entry.tags,
+      ].map(_normalize).join(' ');
+      return searchable.contains(needle);
+    }).toList();
+    if (_sort == _CatalogSort.nameAscending) {
+      entries.sort((a, b) => _normalize(a.name).compareTo(_normalize(b.name)));
+    } else if (_sort == _CatalogSort.nameDescending) {
+      entries.sort((a, b) => _normalize(b.name).compareTo(_normalize(a.name)));
+    }
+    return entries;
+  }
+
+  String _sourceName(String? sourceId) {
+    for (final source in widget.controller.bucketSources) {
+      if (source.id == sourceId) return source.name;
+    }
+    return 'Unknown source';
+  }
+
+  static String _normalize(String value) {
+    var normalized = value.toLowerCase();
+    const source =
+        'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ';
+    const target =
+        'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyyd';
+    for (var index = 0; index < source.length; index++) {
+      normalized = normalized.replaceAll(source[index], target[index]);
+    }
+    return normalized.replaceAll(RegExp(r'\s+'), ' ').trim();
   }
 
   String _formatBytes(int bytes) {

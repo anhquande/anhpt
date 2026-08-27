@@ -40,9 +40,8 @@ class SettingsScreen extends StatelessWidget {
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.inventory_2_outlined),
-                  title: const Text('Workout Buckets'),
-                  subtitle:
-                      const Text('Browse and manage public workout sources'),
+                  title: const Text('Workout sources'),
+                  subtitle: const Text('Manage public catalog sources'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
                     context,
