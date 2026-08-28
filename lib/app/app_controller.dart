@@ -47,7 +47,7 @@ class AppController extends ChangeNotifier {
   String? _documentsPath;
 
   Future<void> initialize() async {
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+    if (!kIsWeb) {
       try {
         _documentsPath = (await getApplicationDocumentsDirectory()).path;
       } catch (_) {
@@ -290,6 +290,28 @@ class AppController extends ChangeNotifier {
           migratedSources[music.source] = replacement;
         }
       }
+
+      final effectiveSource = replacement ?? music.source;
+      final alreadyInLibrary = musicTracks.any(
+        (track) => _trackSource(track) == effectiveSource,
+      );
+      final effectiveAbsolute = resolveAudioSource(effectiveSource);
+      if (!alreadyInLibrary && await File(effectiveAbsolute).exists()) {
+        final preferredName = music.name?.trim();
+        final displayName = preferredName != null && preferredName.isNotEmpty
+            ? preferredName
+            : await musicLibrary.resolveDisplayName(effectiveAbsolute);
+        musicTracks.add(MusicTrack(
+          id: 'personal-${DateTime.now().microsecondsSinceEpoch}',
+          name: displayName,
+          mood: 'Imported',
+          source: effectiveAbsolute,
+          bundled: false,
+          createdAt: DateTime.now(),
+        ));
+        tracksChanged = true;
+      }
+
       if (replacement == null || replacement == music.source) {
         migratedWorkouts.add(workout);
         continue;

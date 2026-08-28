@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/main.dart';
 import 'package:anhpt/services/local_store.dart';
@@ -10,10 +12,29 @@ import 'package:anhpt/screens/workout_player_screen.dart';
 import 'package:anhpt/screens/workout_builder_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
+
+  setUp(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, (call) async {
+      if (call.method == 'getApplicationDocumentsDirectory') {
+        return Directory.systemTemp.path;
+      }
+      return null;
+    });
+  });
+
+  tearDown(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(pathProviderChannel, null);
+  });
+
   test('completion device action is platform safe', () {
     expect(
       completionDeviceActionFor(TargetPlatform.windows, isWeb: false),
