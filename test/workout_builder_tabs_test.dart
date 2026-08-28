@@ -21,6 +21,12 @@ void main() {
     expect(find.text('Music'), findsOneWidget);
     expect(find.text('Structure'), findsOneWidget);
 
+    await tester.tap(find.text('Voice settings'));
+    await tester.pumpAndSettle();
+    expect(find.text('Announce every'), findsOneWidget);
+    expect(find.text('Countdown from'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
     await tester.tap(find.text('Music'));
     await tester.pumpAndSettle();
     expect(find.text('Background music'), findsOneWidget);
@@ -29,5 +35,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Add Step'), findsOneWidget);
     expect(find.text('Add Repeat'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 }
