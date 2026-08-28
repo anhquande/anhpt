@@ -1,14 +1,28 @@
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../app/app_controller.dart';
+import '../models/media_asset.dart';
 
-Future<DemoMediaSource?> chooseDemoMediaSource(BuildContext context) async {
+enum DemoMediaSource {
+  cameraPhoto,
+  cameraVideo,
+  device,
+}
+
+Future<MediaAsset?> pickDemoMedia(
+  BuildContext context,
+  AppController controller,
+) async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-    return DemoMediaSource.device;
+    return controller.importDemoMedia();
   }
 
-  return showModalBottomSheet<DemoMediaSource>(
+  final source = await showModalBottomSheet<DemoMediaSource>(
     context: context,
     showDragHandle: true,
     builder: (context) => SafeArea(
@@ -43,4 +57,61 @@ Future<DemoMediaSource?> chooseDemoMediaSource(BuildContext context) async {
       ),
     ),
   );
+  if (source == null) return null;
+
+  final picker = ImagePicker();
+  switch (source) {
+    case DemoMediaSource.cameraPhoto:
+      final picked = await picker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+      );
+      if (picked == null) return null;
+      return _importFile(controller, File(picked.path), type: 'image');
+    case DemoMediaSource.cameraVideo:
+      final picked = await picker.pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(minutes: 2),
+      );
+      if (picked == null) return null;
+      return _importFile(controller, File(picked.path), type: 'video');
+    case DemoMediaSource.device:
+      final result = await FilePicker.platform.pickFiles(
+        dialogTitle: 'Choose exercise demonstration media',
+        type: FileType.custom,
+        allowedExtensions: const [
+          'mp4',
+          'mov',
+          'webm',
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'gif',
+        ],
+      );
+      if (result == null) return null;
+      final picked = result.files.single;
+      if (picked.path == null) {
+        throw StateError('Could not read the selected media file.');
+      }
+      final extension = picked.extension?.toLowerCase() ?? '';
+      final type = extension == 'gif'
+          ? 'animation'
+          : {'jpg', 'jpeg', 'png', 'webp'}.contains(extension)
+              ? 'image'
+              : 'video';
+      return _importFile(controller, File(picked.path!), type: type);
+  }
+}
+
+Future<MediaAsset> _importFile(
+  AppController controller,
+  File file, {
+  required String type,
+}) async {
+  if (await file.length() > 20 * 1024 * 1024) {
+    throw StateError('Demonstration media must be 20 MB or smaller.');
+  }
+  return controller.mediaLibrary.importFile(file, type: type);
 }
