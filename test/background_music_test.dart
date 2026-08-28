@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/models/background_music.dart';
+import 'package:anhpt/services/audio_feedback_service.dart';
 import 'package:anhpt/services/background_music_service.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/services/music_library_service.dart';
@@ -11,6 +12,7 @@ import 'package:anhpt/services/workout_parser.dart';
 import 'package:anhpt/screens/music_library_screen.dart';
 import 'package:anhpt/widgets/audio_preview_player.dart';
 import 'package:anhpt/widgets/workout_music_card.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -143,6 +145,17 @@ void main() {
     expect(BackgroundMusicService.duckFactor('medium'), .6);
     expect(BackgroundMusicService.duckFactor('high'), .4);
     expect(BackgroundMusicService.duckFactor('very_high'), .2);
+  });
+
+  test('Android audio players mix instead of taking exclusive focus', () {
+    expect(
+      BackgroundMusicService.mixingAudioContext().android.audioFocus,
+      AndroidAudioFocus.none,
+    );
+    expect(
+      AudioFeedbackService.mixingAudioContext().android.audioFocus,
+      AndroidAudioFocus.none,
+    );
   });
 
   test('shared ducking controller follows live volume and mode changes',

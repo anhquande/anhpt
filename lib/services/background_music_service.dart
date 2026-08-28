@@ -21,6 +21,10 @@ class BackgroundMusicService {
         _ => .82,
       };
 
+  static AudioContext mixingAudioContext() => AudioContextConfig(
+        focus: AudioContextConfigFocus.mixWithOthers,
+      ).build();
+
   Future<bool> start(MusicTrack track, WorkoutMusicConfig config) async {
     lastError = null;
     if (!config.enabled || config.trackId == null) {
@@ -37,6 +41,10 @@ class BackgroundMusicService {
       fade: false,
     );
     try {
+      // Android must not own audio focus for the background player. Coach TTS
+      // and recordings play on top while AnhPT performs ducking explicitly via
+      // setVolume(). Without this, Android can pause the music completely.
+      await _player.setAudioContext(mixingAudioContext());
       await _player.setReleaseMode(ReleaseMode.loop);
       await _player.setPlayerMode(PlayerMode.mediaPlayer);
       await _player.setVolume(_duckingController.targetVolume);
