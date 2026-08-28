@@ -31,6 +31,9 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     with SingleTickerProviderStateMixin {
   late WorkoutDraft draft;
   late final TabController _tabController;
+  final _introductionScrollController = ScrollController(keepScrollOffset: false);
+  final _musicScrollController = ScrollController(keepScrollOffset: false);
+  final _structureScrollController = ScrollController(keepScrollOffset: false);
   int _selectedTab = 0;
   String? error;
 
@@ -65,6 +68,9 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _introductionScrollController.dispose();
+    _musicScrollController.dispose();
+    _structureScrollController.dispose();
     super.dispose();
   }
 
@@ -233,7 +239,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   }
 
   Widget _introductionTab(BuildContext context) => ListView(
-        key: const PageStorageKey('builder-introduction-tab'),
+        controller: _introductionScrollController,
         padding: const EdgeInsets.all(18),
         children: [
           TextFormField(
@@ -306,7 +312,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           ),
           const SizedBox(height: 12),
           ExpansionTile(
-            key: const PageStorageKey('builder-voice-settings'),
+            maintainState: true,
             tilePadding: EdgeInsets.zero,
             title: const Text('Voice settings',
                 style: TextStyle(fontWeight: FontWeight.bold)),
@@ -368,7 +374,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
       );
 
   Widget _musicTab(BuildContext context) => ListView(
-        key: const PageStorageKey('builder-music-tab'),
+        controller: _musicScrollController,
         padding: const EdgeInsets.all(18),
         children: [
           Card(
@@ -441,7 +447,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
       );
 
   Widget _structureTab(BuildContext context) => ListView(
-        key: const PageStorageKey('builder-structure-tab'),
+        controller: _structureScrollController,
         padding: const EdgeInsets.all(18),
         children: [
           _NodeList(
