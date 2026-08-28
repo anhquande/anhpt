@@ -21,7 +21,7 @@ class BackgroundMusicService {
         _ => .82,
       };
 
-  static AudioContext mixingAudioContext() => const AudioContextConfig(
+  static AudioContext mixingAudioContext() => AudioContextConfig(
         focus: AudioContextConfigFocus.mixWithOthers,
       ).build();
 
