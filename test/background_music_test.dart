@@ -167,17 +167,26 @@ void main() {
       duckingMode: 'gentle',
     );
 
+    Future<void> waitForVolume(double expected) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 1));
+      while (DateTime.now().isBefore(deadline)) {
+        if (volumes.isNotEmpty && (volumes.last - expected).abs() <= .001) {
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      }
+      expect(volumes, isNotEmpty);
+      expect(volumes.last, closeTo(expected, .001));
+    }
+
     controller.setCoachActive(true);
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    expect(volumes.last, closeTo(.41, .001));
+    await waitForVolume(.41);
 
     controller.update(baseVolume: .8, duckingMode: 'medium');
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    expect(volumes.last, closeTo(.48, .001));
+    await waitForVolume(.48);
 
     controller.setCoachActive(false);
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    expect(volumes.last, closeTo(.8, .001));
+    await waitForVolume(.8);
     controller.cancel();
   });
 
