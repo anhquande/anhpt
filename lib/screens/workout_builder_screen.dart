@@ -530,14 +530,16 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                   ),
                 ),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _introductionTab(context),
-                    _musicTab(context),
-                    _structureTab(context),
-                  ],
+                child: AnimatedBuilder(
+                  animation: _tabController,
+                  builder: (context, _) => IndexedStack(
+                    index: _tabController.index,
+                    children: [
+                      _introductionTab(context),
+                      _musicTab(context),
+                      _structureTab(context),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -588,6 +590,7 @@ class _NodeList extends StatelessWidget {
   Widget build(BuildContext context) => Column(children: [
         for (var i = 0; i < nodes.length; i++)
           Padding(
+            key: ObjectKey(nodes[i]),
             padding: EdgeInsets.only(left: depth * 12.0, bottom: 10),
             child: nodes[i] is StepDraft
                 ? _StepCard(
