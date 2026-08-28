@@ -5,6 +5,7 @@ import '../app/app_controller.dart';
 import '../models/workout.dart';
 import '../widgets/coach_recording_card.dart';
 import '../widgets/common.dart';
+import '../widgets/demo_media_source_sheet.dart';
 import '../widgets/workout_widgets.dart';
 import '../widgets/workout_music_card.dart';
 import '../widgets/step_recording_mini_player.dart';
@@ -279,7 +280,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
 
   Future<void> _browseStepMedia(String stepKey) async {
     try {
-      final asset = await widget.controller.importDemoMedia();
+      final asset = await pickDemoMedia(context, widget.controller);
       if (asset == null) return;
       await widget.controller.assignStepDemoMedia(
         workoutId: widget.workoutId,

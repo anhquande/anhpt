@@ -7,6 +7,7 @@ import '../models/media_asset.dart';
 import '../services/workout_parser.dart';
 import '../services/workout_serializer.dart';
 import '../widgets/coach_recording_card.dart';
+import '../widgets/demo_media_source_sheet.dart';
 import '../widgets/step_recording_mini_player.dart';
 import '../widgets/step_demonstration_button.dart';
 import 'workout_editor_screen.dart';
@@ -188,7 +189,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
 
   Future<void> _chooseMedia(StepDraft step) async {
     try {
-      final asset = await widget.controller.importDemoMedia();
+      final asset = await pickDemoMedia(context, widget.controller);
       if (asset == null) return;
       final existingIndex = draft.exercises
           .indexWhere((exercise) => exercise.id == step.exerciseId);
@@ -727,7 +728,7 @@ class _StepCard extends StatelessWidget {
               const SizedBox(width: 6),
               if (exercise?.demoMediaId == null)
                 IconButton.filledTonal(
-                  tooltip: 'Browse demonstration files...',
+                  tooltip: 'Add demonstration media',
                   onPressed: () => chooseMedia(),
                   icon: const Icon(Icons.add_photo_alternate_outlined),
                 )
