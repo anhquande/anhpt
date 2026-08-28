@@ -37,6 +37,14 @@ void main() {
 
     await tester.tap(find.text('Structure'));
     await tester.pumpAndSettle();
+
+    // The default Step/Repeat editor is taller than the test viewport, so the
+    // action buttons at the bottom are lazily built only after scrolling.
+    final structureList = find.byType(ListView);
+    expect(structureList, findsOneWidget);
+    await tester.drag(structureList, const Offset(0, -1200));
+    await tester.pumpAndSettle();
+
     expect(find.text('Add Step'), findsOneWidget);
     expect(find.text('Add Repeat'), findsOneWidget);
   });
