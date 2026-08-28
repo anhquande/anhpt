@@ -14,7 +14,14 @@ class LocalStore {
   static const _musicTracks = 'anhpt.musicTracks.v1';
   static const _workoutMusic = 'anhpt.workoutMusic.v1';
   static const _bucketSources = 'anhpt.bucketSources.v1';
+  static const _defaultBucketSourceSeeded =
+      'anhpt.defaultBucketSourceSeeded.v1';
   static const _installedBucketWorkouts = 'anhpt.installedBucketWorkouts.v1';
+
+  static const defaultBucketSourceId = 'official';
+  static const defaultBucketSourceName = 'AnhPT Official';
+  static const defaultBucketSourceUrl =
+      'https://raw.githubusercontent.com/anhquande/anhpt-official-buckets/refs/heads/main/main/bucket.json';
 
   Future<List<Workout>> loadWorkouts() async {
     final p = await SharedPreferences.getInstance();
@@ -121,11 +128,37 @@ class LocalStore {
   Future<List<WorkoutBucketSource>> loadBucketSources() async {
     final preferences = await SharedPreferences.getInstance();
     final raw = preferences.getString(_bucketSources);
-    if (raw == null) return [];
-    return (jsonDecode(raw) as List)
-        .map((value) => WorkoutBucketSource.fromJson(
-            Map<String, dynamic>.from(value as Map)))
-        .toList();
+    final sources = raw == null
+        ? <WorkoutBucketSource>[]
+        : (jsonDecode(raw) as List)
+            .map((value) => WorkoutBucketSource.fromJson(
+                Map<String, dynamic>.from(value as Map)))
+            .toList();
+
+    final alreadySeeded =
+        preferences.getBool(_defaultBucketSourceSeeded) ?? false;
+    if (alreadySeeded) return sources;
+
+    final hasOfficialSource = sources.any(
+      (source) => source.catalogUrl == defaultBucketSourceUrl,
+    );
+    final seededSources = hasOfficialSource
+        ? sources
+        : [
+            const WorkoutBucketSource(
+              id: defaultBucketSourceId,
+              name: defaultBucketSourceName,
+              catalogUrl: defaultBucketSourceUrl,
+            ),
+            ...sources,
+          ];
+
+    await preferences.setString(
+      _bucketSources,
+      jsonEncode(seededSources.map((source) => source.toJson()).toList()),
+    );
+    await preferences.setBool(_defaultBucketSourceSeeded, true);
+    return seededSources;
   }
 
   Future<void> saveBucketSources(List<WorkoutBucketSource> sources) async {
