@@ -28,9 +28,18 @@ class AudioFeedbackService {
   })  : _tts = tts ?? FlutterTts(),
         _player = player ?? (initializePlayer ? AudioPlayer() : null);
 
+  static AudioContext mixingAudioContext() => const AudioContextConfig(
+        focus: AudioContextConfigFocus.mixWithOthers,
+      ).build();
+
   Future<void> configure(Workout workout) async {
     if (_disposed) throw StateError('Audio feedback service is disposed.');
     _language = workout.voice.language;
+
+    // Coach recordings/cues must mix with the already-playing workout music.
+    // AnhPT performs its own ducking, so Android audio focus must not pause the
+    // background player when coach audio starts.
+    await _player?.setAudioContext(mixingAudioContext());
 
     // Do not use awaitSpeakCompletion(true) here. On desktop platforms it can
     // behave differently from mobile. Instead we resolve our own completer
