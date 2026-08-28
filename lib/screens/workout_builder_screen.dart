@@ -305,6 +305,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           ),
           const SizedBox(height: 12),
           ExpansionTile(
+            key: const PageStorageKey('builder-voice-settings'),
             tilePadding: EdgeInsets.zero,
             title: const Text('Voice settings',
                 style: TextStyle(fontWeight: FontWeight.bold)),
