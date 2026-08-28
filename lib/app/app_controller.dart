@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import '../data/sample_data.dart';
 import '../models/coach_recording.dart';
@@ -118,6 +119,20 @@ class AppController extends ChangeNotifier {
       throw StateError(
           'Local demonstration media import is not available on Web yet.');
     }
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      final picked = await ImagePicker().pickVideo(
+        source: ImageSource.camera,
+        maxDuration: const Duration(minutes: 2),
+      );
+      if (picked == null) return null;
+      final file = File(picked.path);
+      if (await file.length() > 20 * 1024 * 1024) {
+        throw StateError('Demonstration media must be 20 MB or smaller.');
+      }
+      return mediaLibrary.importFile(file, type: 'video');
+    }
+
     final result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Choose exercise demonstration media',
       type: FileType.custom,
