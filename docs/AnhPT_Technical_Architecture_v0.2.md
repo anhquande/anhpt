@@ -204,6 +204,18 @@ Completion device actions remain UI/platform concerns and do not enter
 invokes `shutdown.exe /s /t 0 /f`; Android uses `SystemNavigator.pop`. Incomplete
 sessions, Web, and iOS do not perform a device-exit action.
 
+The optional `screen_off_after_start` duration is scheduled in the Player and
+never enters `SessionEngine` state. On Windows, `DeviceActionService` invokes
+`WM_SYSCOMMAND` / `SC_MONITORPOWER` through the `win32` package. The timer starts
+as the Player opens and is cancelled when the Player is disposed or the session
+reaches a terminal state. Unsupported targets leave the setting persisted but
+perform no action.
+
+The monitor command targets the current foreground window. It must never use
+`HWND_BROADCAST`, because broadcasting a system command also reaches Windows
+shell processes and can be misinterpreted as a machine power action on some
+systems.
+
 Catalog schema v1 contains `schemaVersion`, bucket `name`, and `workouts` entries
 with stable `id`, display metadata, version, immutable `packageUrl`, and SHA-256.
 Packages may include `manifest.json` with `schemaVersion: 1` and

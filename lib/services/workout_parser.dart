@@ -22,6 +22,7 @@ class WorkoutParser {
     'feedback',
     'audio',
     'completion_action',
+    'screen_off_after_start',
     'recording',
     'background_music',
     'exercises',
@@ -97,6 +98,15 @@ class WorkoutParser {
         'completion_action must be none or shutdown_or_exit.',
       );
     }
+    final screenOffAfterStart = root['screen_off_after_start'] == null
+        ? null
+        : DurationParser.parseAllowZero(root['screen_off_after_start'],
+            field: 'screen_off_after_start');
+    if (screenOffAfterStart != null && screenOffAfterStart <= Duration.zero) {
+      throw const WorkoutValidationException(
+        'screen_off_after_start must be greater than 0s.',
+      );
+    }
     final recording = _recording(root['recording'], 'recording');
     final backgroundMusic = _backgroundMusic(root['background_music']);
     final exercises = _exercises(root['exercises']);
@@ -136,6 +146,7 @@ class WorkoutParser {
         haptic: haptic,
         ducking: ducking,
         completionAction: completionAction,
+        screenOffAfterStart: screenOffAfterStart,
         recording: recording,
         backgroundMusic: backgroundMusic,
         exercises: exercises,

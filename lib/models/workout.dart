@@ -208,6 +208,7 @@ class Workout {
   final String haptic;
   final String ducking;
   final String completionAction;
+  final Duration? screenOffAfterStart;
   final String? recording;
   final BackgroundMusicConfig? backgroundMusic;
   final List<Exercise> exercises;
@@ -230,6 +231,7 @@ class Workout {
       required this.haptic,
       required this.ducking,
       this.completionAction = 'none',
+      this.screenOffAfterStart,
       this.recording,
       this.backgroundMusic,
       this.exercises = const [],
@@ -292,6 +294,8 @@ class Workout {
     List<Exercise>? exercises,
     String? rawYaml,
     int? version,
+    Duration? screenOffAfterStart,
+    bool clearScreenOffAfterStart = false,
   }) =>
       Workout(
         id: id,
@@ -305,6 +309,9 @@ class Workout {
         haptic: haptic,
         ducking: ducking,
         completionAction: completionAction,
+        screenOffAfterStart: clearScreenOffAfterStart
+            ? null
+            : screenOffAfterStart ?? this.screenOffAfterStart,
         recording: clearRecording ? null : recording ?? this.recording,
         backgroundMusic: clearBackgroundMusic
             ? null
@@ -330,6 +337,7 @@ class Workout {
         'haptic': haptic,
         'ducking': ducking,
         'completionAction': completionAction,
+        'screenOffAfterStartMs': screenOffAfterStart?.inMilliseconds,
         'recording': recording,
         'backgroundMusic': backgroundMusic?.toJson(),
         'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
@@ -354,6 +362,9 @@ class Workout {
         haptic: j['haptic'] as String,
         ducking: j['ducking'] as String,
         completionAction: j['completionAction'] as String? ?? 'none',
+        screenOffAfterStart: j['screenOffAfterStartMs'] == null
+            ? null
+            : Duration(milliseconds: j['screenOffAfterStartMs'] as int),
         recording: j['recording'] as String?,
         backgroundMusic: j['backgroundMusic'] == null
             ? null

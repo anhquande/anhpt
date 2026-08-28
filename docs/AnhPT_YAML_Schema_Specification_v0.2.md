@@ -19,6 +19,7 @@
 | `recording` | No | Safe relative path to the workout-introduction recording. |
 | `background_music` | No | Selected track and playback settings. |
 | `completion_action` | No | `none`; may be `shutdown_or_exit`. |
+| `screen_off_after_start` | No | Disabled when omitted; positive duration such as `10s`. |
 | `exercises` | No | Reusable exercise definitions referenced by steps. |
 | `steps` | Yes | At least one step or repeat group. |
 
@@ -167,7 +168,20 @@ effect for incomplete workouts, Web, or iOS. Because forced Windows shutdown
 may discard unsaved work in other applications, Builder presents an explicit
 warning beside this option.
 
-## 10. Marketplace package metadata
+## 10. Screen-off Action
+
+`screen_off_after_start` is optional. When present, AnhPT schedules a display
+power-off request from the moment the workout Player opens after Start. The
+current Builder and Overview controls use `10s`. Windows turns off the monitor
+through the native `SC_MONITORPOWER` system command; normal mouse or keyboard
+activity can wake it again. The workout timer and audio continue running.
+
+The field remains portable on Android, iOS, and Web, but those targets ignore
+the action because ordinary applications cannot safely lock or power off the
+device display without privileged device-management capabilities. The timer is
+cancelled if the Player closes or the workout finishes before the delay.
+
+## 11. Marketplace package metadata
 
 Marketplace downloads use the same `.anhpt.zip` and YAML validation path as
 manual import. A package may add a root `manifest.json` with `schemaVersion: 1`

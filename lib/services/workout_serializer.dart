@@ -26,6 +26,10 @@ class WorkoutSerializer {
       b.writeln('completion_action: ${draft.completionAction}');
     }
 
+    if (draft.screenOffAfterStart.trim().isNotEmpty) {
+      b.writeln('screen_off_after_start: ${draft.screenOffAfterStart.trim()}');
+    }
+
     b
       ..writeln()
       ..writeln('start_countdown: ${draft.startCountdown.trim()}')

@@ -389,6 +389,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                           workout.id,
                           enabled: enabled,
                         ),
+                        onScreenOffAfterStartChanged: (enabled) =>
+                            controller.setWorkoutScreenOffAfterStart(
+                          workout.id,
+                          enabled: enabled,
+                        ),
                       ),
                     ),
                   ),
@@ -516,12 +521,14 @@ class _WorkoutSummary extends StatelessWidget {
   final String? sourceName;
   final String? originalName;
   final Future<void> Function(bool enabled) onCompletionActionChanged;
+  final Future<void> Function(bool enabled) onScreenOffAfterStartChanged;
 
   const _WorkoutSummary({
     required this.workout,
     this.sourceName,
     this.originalName,
     required this.onCompletionActionChanged,
+    required this.onScreenOffAfterStartChanged,
   });
 
   @override
@@ -576,6 +583,24 @@ class _WorkoutSummary extends StatelessWidget {
             ),
             value: workout.completionAction == 'shutdown_or_exit',
             onChanged: onCompletionActionChanged,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          margin: EdgeInsets.zero,
+          child: SwitchListTile(
+            secondary: const Icon(Icons.screen_lock_landscape_outlined),
+            title: const Text(
+              'Screen during workout',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              workout.screenOffAfterStart != null
+                  ? 'Turn off the Windows display 10 seconds after Start'
+                  : 'Leave the display unchanged after Start',
+            ),
+            value: workout.screenOffAfterStart != null,
+            onChanged: onScreenOffAfterStartChanged,
           ),
         ),
         const SizedBox(height: 16),

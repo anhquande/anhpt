@@ -68,6 +68,7 @@ class WorkoutDraft {
   String haptic;
   String ducking;
   String completionAction;
+  String screenOffAfterStart;
   String recording;
   String backgroundMusicSource;
   String backgroundMusicName;
@@ -93,6 +94,7 @@ class WorkoutDraft {
     this.haptic = 'medium',
     this.ducking = 'medium',
     this.completionAction = 'none',
+    this.screenOffAfterStart = '',
     this.recording = '',
     this.backgroundMusicSource = '',
     this.backgroundMusicName = '',
@@ -121,6 +123,9 @@ class WorkoutDraft {
         haptic: workout.haptic,
         ducking: workout.ducking,
         completionAction: workout.completionAction,
+        screenOffAfterStart: workout.screenOffAfterStart == null
+            ? ''
+            : _duration(workout.screenOffAfterStart!),
         recording: workout.recording ?? '',
         backgroundMusicSource: workout.backgroundMusic?.source ?? '',
         backgroundMusicName: workout.backgroundMusic?.name ?? '',

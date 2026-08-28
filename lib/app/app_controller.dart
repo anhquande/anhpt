@@ -520,6 +520,17 @@ class AppController extends ChangeNotifier {
     await saveWorkout(_parseDraft(draft, workout));
   }
 
+  Future<void> setWorkoutScreenOffAfterStart(
+    String workoutId, {
+    required bool enabled,
+  }) async {
+    final workout = byId(workoutId);
+    if (workout == null) return;
+    final draft = WorkoutDraft.fromWorkout(workout)
+      ..screenOffAfterStart = enabled ? '10s' : '';
+    await saveWorkout(_parseDraft(draft, workout));
+  }
+
   Future<bool> exportWorkoutPackage(String workoutId) async {
     final workout = byId(workoutId);
     if (workout == null) return false;

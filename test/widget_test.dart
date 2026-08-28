@@ -43,12 +43,16 @@ void main() {
 
     expect(find.text('After workout: Shut down or exit'), findsOneWidget);
     expect(find.text('Voice settings'), findsOneWidget);
-    expect(find.textContaining('Off —'), findsOneWidget);
+    expect(
+      find.text('Off — the completion screen stays open normally.'),
+      findsOneWidget,
+    );
+    expect(find.text('Turn off screen after starting'), findsOneWidget);
   });
 
   testWidgets('workout overview has a sticky title, Start, and action menu',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(700, 500));
+    await tester.binding.setSurfaceSize(const Size(700, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
@@ -101,6 +105,21 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(controller.byId('sticky')!.completionAction, 'shutdown_or_exit');
     expect(
       find.text('Shut down Windows or exit Android when complete'),
+      findsOneWidget,
+    );
+    expect(find.text('Screen during workout'), findsOneWidget);
+    expect(
+        find.text('Leave the display unchanged after Start'), findsOneWidget);
+    await tester.tap(
+      find.widgetWithText(SwitchListTile, 'Screen during workout'),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      controller.byId('sticky')!.screenOffAfterStart,
+      const Duration(seconds: 10),
+    );
+    expect(
+      find.text('Turn off the Windows display 10 seconds after Start'),
       findsOneWidget,
     );
     expect(find.text('Introduction'), findsOneWidget);

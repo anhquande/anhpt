@@ -36,6 +36,41 @@ steps:
     );
   });
 
+  test('screen-off delay parses, persists, and is omitted by default', () {
+    final enabled = parse('''
+version: 2
+name: Sleep workout
+screen_off_after_start: 10s
+steps:
+  - name: Breathe
+''');
+    expect(enabled.screenOffAfterStart, const Duration(seconds: 10));
+    final yaml = WorkoutSerializer.toYaml(WorkoutDraft.fromWorkout(enabled));
+    expect(yaml, contains('screen_off_after_start: 10s'));
+
+    final normal = parse('''
+version: 2
+name: Normal workout
+steps:
+  - name: Move
+''');
+    expect(normal.screenOffAfterStart, isNull);
+    expect(
+      WorkoutSerializer.toYaml(WorkoutDraft.fromWorkout(normal)),
+      isNot(contains('screen_off_after_start:')),
+    );
+    expect(
+      () => parse('''
+version: 2
+name: Invalid delay
+screen_off_after_start: 0s
+steps:
+  - name: Move
+'''),
+      throwsA(isA<WorkoutValidationException>()),
+    );
+  });
+
   test('schema v2 parses recordings, music and unique effective step ids', () {
     final workout = parse('''
 version: 2

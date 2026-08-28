@@ -54,6 +54,12 @@ than inside Voice settings. Workout Overview also always shows an `After
 workout` switch; changing it persists immediately to the workout YAML so
 Builder, YAML editor, and Overview remain synchronized.
 
+An always-visible `Screen during workout` switch appears in both Overview and
+Builder. Enabling it writes `screen_off_after_start: 10s`; its supporting copy
+states that automatic display power-off currently applies to Windows. The
+Player does not show another confirmation, and leaving the Player before the
+delay cancels the pending action.
+
 For a workout installed from a bucket, Overview shows a quiet `From <source>`
 origin line. Its action menu includes `View source`, which reveals the source
 name and stable catalog workout ID. Renaming the workout does not change this

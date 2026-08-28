@@ -8,6 +8,7 @@ import '../app/app_controller.dart';
 import '../core/session_engine.dart';
 import '../services/audio_feedback_service.dart';
 import '../services/background_music_service.dart';
+import '../services/device_action_service.dart';
 import '../services/voice_guide_controller.dart';
 import '../widgets/common.dart';
 import '../models/background_music.dart';
@@ -47,6 +48,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   late final AudioFeedbackService audio;
   late final BackgroundMusicService music;
   late final VoiceGuideController voiceGuide;
+  final DeviceActionService deviceActions = DeviceActionService();
+  Timer? _screenOffTimer;
 
   bool summaryShown = false;
   bool audioReady = false;
@@ -77,7 +80,16 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       },
     );
     engine.addListener(_changed);
+    _scheduleScreenOff();
     _initializeAndStart();
+  }
+
+  void _scheduleScreenOff() {
+    final delay = engine.workout.screenOffAfterStart;
+    if (delay == null) return;
+    _screenOffTimer = Timer(delay, () {
+      if (!_disposed) unawaited(deviceActions.turnOffDisplay());
+    });
   }
 
   Future<void> _initializeAndStart() async {
@@ -152,6 +164,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       }
       if (status == SessionStatus.completed ||
           status == SessionStatus.incomplete) {
+        _screenOffTimer?.cancel();
         unawaited(music.stop());
         unawaited(voiceGuide.cancelCurrentWork());
       }
@@ -398,6 +411,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   @override
   void dispose() {
     _disposed = true;
+    _screenOffTimer?.cancel();
     engine.removeListener(_changed);
     engine.dispose();
     voiceGuide.dispose();

@@ -69,5 +69,11 @@ Workouts may opt into `shutdown_or_exit` completion behavior in YAML or Builder.
 After successful completion, Windows shuts down immediately without another
 prompt and Android exits the app. iOS follows the system-managed app lifecycle
 and does not attempt a programmatic exit.
+
+Sleep-oriented workouts may also opt into `screen_off_after_start: 10s` in
+YAML, Builder, or Overview. On Windows this turns off the monitor ten seconds
+after Start while workout timing, voice, and background audio continue. The
+option is retained but not executed on Android, iOS, and Web, where ordinary
+apps do not have a safe unprivileged screen-lock API.
 Updates require an explicit keep/copy/replace choice. Private credentials and
 signatures are deferred; Web sources must support CORS.

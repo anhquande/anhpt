@@ -308,6 +308,26 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.screen_lock_landscape_outlined),
+                  title: const Text(
+                    'Turn off screen after starting',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    draft.screenOffAfterStart.isNotEmpty
+                        ? 'Enabled — Windows turns off the display 10 seconds after Start.'
+                        : 'Off — the display remains unchanged.',
+                  ),
+                  value: draft.screenOffAfterStart.isNotEmpty,
+                  onChanged: (value) => setState(() {
+                    draft.screenOffAfterStart = value ? '10s' : '';
+                  }),
+                ),
+              ),
+              const SizedBox(height: 12),
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 title: const Text('Voice settings',
