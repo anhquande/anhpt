@@ -1,5 +1,8 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app_controller.dart';
 import '../core/session_engine.dart';
@@ -10,6 +13,20 @@ import '../widgets/common.dart';
 import '../models/background_music.dart';
 import '../models/workout.dart';
 import '../widgets/demonstration_media.dart';
+
+enum CompletionDeviceAction { shutdownWindows, exitAndroid }
+
+CompletionDeviceAction? completionDeviceActionFor(
+  TargetPlatform platform, {
+  required bool isWeb,
+}) {
+  if (isWeb) return null;
+  return switch (platform) {
+    TargetPlatform.windows => CompletionDeviceAction.shutdownWindows,
+    TargetPlatform.android => CompletionDeviceAction.exitAndroid,
+    _ => null,
+  };
+}
 
 class WorkoutPlayerScreen extends StatefulWidget {
   final AppController controller;
@@ -154,6 +171,14 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
 
   Future<void> _summary() async {
     final complete = engine.status == SessionStatus.completed;
+    if (complete && engine.workout.completionAction == 'shutdown_or_exit') {
+      final action =
+          completionDeviceActionFor(defaultTargetPlatform, isWeb: kIsWeb);
+      if (action != null) {
+        await _performCompletionDeviceAction(action);
+        return;
+      }
+    }
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -186,6 +211,33 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _performCompletionDeviceAction(
+    CompletionDeviceAction action,
+  ) async {
+    if (action == CompletionDeviceAction.shutdownWindows) {
+      try {
+        await Process.start('shutdown.exe', [
+          '/s',
+          '/t',
+          '0',
+          '/f',
+          '/d',
+          'p:0:0',
+          '/c',
+          'AnhPT workout completed',
+        ]);
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not start Windows shutdown: $error')),
+          );
+        }
+      }
+      return;
+    }
+    await SystemNavigator.pop();
   }
 
   Future<void> _end() async {

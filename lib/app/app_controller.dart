@@ -509,6 +509,17 @@ class AppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setWorkoutCompletionAction(
+    String workoutId, {
+    required bool enabled,
+  }) async {
+    final workout = byId(workoutId);
+    if (workout == null) return;
+    final draft = WorkoutDraft.fromWorkout(workout)
+      ..completionAction = enabled ? 'shutdown_or_exit' : 'none';
+    await saveWorkout(_parseDraft(draft, workout));
+  }
+
   Future<bool> exportWorkoutPackage(String workoutId) async {
     final workout = byId(workoutId);
     if (workout == null) return false;
@@ -676,7 +687,7 @@ class AppController extends ChangeNotifier {
       return false;
     }
     final bytes = await workoutBuckets.downloadPackage(entry);
-    final imported = await workoutPackages.importPackageBytes(
+    var imported = await workoutPackages.importPackageBytes(
       bytes,
       defaultVoiceLanguage: defaultVoiceLanguage,
       mediaRepository: mediaLibrary,
@@ -687,25 +698,30 @@ class AppController extends ChangeNotifier {
       workouts.removeWhere((workout) => workout.id == previous.workoutId);
       installedBucketWorkouts.removeAt(existingIndex);
     }
-    workouts.add(imported);
-    if (existingIndex < 0 ||
-        resolution == BucketInstallConflictResolution.replace) {
-      final sourceName = bucketSources
-          .where((source) => source.id == sourceId)
-          .map((source) => source.name)
-          .firstOrNull;
-      installedBucketWorkouts.add(InstalledWorkoutProvenance(
-        workoutId: imported.id,
-        sourceId: sourceId,
-        sourceName: sourceName,
-        entryId: entry.id,
-        originalName: entry.name,
-        version: entry.version,
-        packageUrl: entry.packageUrl,
-        sha256: entry.sha256,
-        installedAt: DateTime.now(),
-      ));
+    final uniqueName = uniqueLocalWorkoutName(
+      imported.name,
+      workouts.map((workout) => workout.name),
+    );
+    if (uniqueName != imported.name) {
+      final draft = WorkoutDraft.fromWorkout(imported)..name = uniqueName;
+      imported = _parseDraft(draft, imported);
     }
+    workouts.add(imported);
+    final sourceName = bucketSources
+        .where((source) => source.id == sourceId)
+        .map((source) => source.name)
+        .firstOrNull;
+    installedBucketWorkouts.add(InstalledWorkoutProvenance(
+      workoutId: imported.id,
+      sourceId: sourceId,
+      sourceName: sourceName,
+      entryId: entry.id,
+      originalName: entry.name,
+      version: entry.version,
+      packageUrl: entry.packageUrl,
+      sha256: entry.sha256,
+      installedAt: DateTime.now(),
+    ));
     await _migrateReadableMusicPaths();
     await store.saveWorkouts(workouts);
     await store.saveInstalledBucketWorkouts(installedBucketWorkouts);

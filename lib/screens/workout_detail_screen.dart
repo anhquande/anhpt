@@ -19,6 +19,7 @@ enum _WorkoutAction {
   editYaml,
   exportPackage,
   viewSource,
+  delete,
 }
 
 class WorkoutDetailScreen extends StatefulWidget {
@@ -159,21 +160,50 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
           ),
         );
         return;
+      case _WorkoutAction.delete:
+        final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            title: Text('Delete “${workout.name}”?'),
+            content: const Text(
+              'This workout will be removed from this device. This cannot be undone.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        );
+        if (confirmed != true) return;
+        await widget.controller.deleteWorkout(workout.id);
+        if (mounted) Navigator.pop(context);
+        return;
     }
   }
 
   PopupMenuItem<_WorkoutAction> _menuItem(
     _WorkoutAction value,
     IconData icon,
-    String label,
-  ) =>
+    String label, {
+    Color? color,
+  }) =>
       PopupMenuItem(
         value: value,
         child: Row(
           children: [
-            Icon(icon, size: 20),
+            Icon(icon, size: 20, color: color),
             const SizedBox(width: 12),
-            Text(label),
+            Text(label, style: TextStyle(color: color)),
           ],
         ),
       );
@@ -331,6 +361,13 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                   if (provenance != null)
                     _menuItem(_WorkoutAction.viewSource, Icons.cloud_outlined,
                         'View source'),
+                  const PopupMenuDivider(),
+                  _menuItem(
+                    _WorkoutAction.delete,
+                    Icons.delete_outline,
+                    'Delete workout',
+                    color: Theme.of(context).colorScheme.error,
+                  ),
                 ],
               )
             ],
@@ -347,6 +384,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                         workout: workout,
                         sourceName: sourceName,
                         originalName: originalName,
+                        onCompletionActionChanged: (enabled) =>
+                            controller.setWorkoutCompletionAction(
+                          workout.id,
+                          enabled: enabled,
+                        ),
                       ),
                     ),
                   ),
@@ -456,36 +498,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                               ? null
                               : controller.resolveAudioSource(step.recording!),
                         ),
-                        const SizedBox(height: 18),
-                        TextButton.icon(
-                          onPressed: () async {
-                            final ok = await showDialog<bool>(
-                              context: context,
-                              builder: (_) => AlertDialog(
-                                title: Text('Delete "${workout.name}"?'),
-                                content: const Text('This cannot be undone.'),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, false),
-                                    child: const Text('Cancel'),
-                                  ),
-                                  FilledButton(
-                                    onPressed: () =>
-                                        Navigator.pop(context, true),
-                                    child: const Text('Delete'),
-                                  ),
-                                ],
-                              ),
-                            );
-                            if (ok == true) {
-                              await controller.deleteWorkout(workout.id);
-                              if (context.mounted) Navigator.pop(context);
-                            }
-                          },
-                          icon: const Icon(Icons.delete_outline),
-                          label: const Text('Delete Workout'),
-                        ),
                       ],
                     ),
                   ],
@@ -503,11 +515,13 @@ class _WorkoutSummary extends StatelessWidget {
   final Workout workout;
   final String? sourceName;
   final String? originalName;
+  final Future<void> Function(bool enabled) onCompletionActionChanged;
 
   const _WorkoutSummary({
     required this.workout,
     this.sourceName,
     this.originalName,
+    required this.onCompletionActionChanged,
   });
 
   @override
@@ -547,6 +561,24 @@ class _WorkoutSummary extends StatelessWidget {
           ),
           const SizedBox(height: 16),
         ],
+        Card(
+          margin: EdgeInsets.zero,
+          child: SwitchListTile(
+            secondary: const Icon(Icons.power_settings_new),
+            title: const Text(
+              'After workout',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            subtitle: Text(
+              workout.completionAction == 'shutdown_or_exit'
+                  ? 'Shut down Windows or exit Android when complete'
+                  : 'Stay open after completion',
+            ),
+            value: workout.completionAction == 'shutdown_or_exit',
+            onChanged: onCompletionActionChanged,
+          ),
+        ),
+        const SizedBox(height: 16),
         Wrap(
           spacing: 18,
           runSpacing: 10,

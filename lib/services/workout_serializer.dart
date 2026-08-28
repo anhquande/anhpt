@@ -22,6 +22,10 @@ class WorkoutSerializer {
       b.writeln('recording: ${_quote(draft.recording.trim())}');
     }
 
+    if (draft.completionAction != 'none') {
+      b.writeln('completion_action: ${draft.completionAction}');
+    }
+
     b
       ..writeln()
       ..writeln('start_countdown: ${draft.startCountdown.trim()}')

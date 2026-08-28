@@ -18,6 +18,7 @@
 | `audio` | No | Defaults applied. |
 | `recording` | No | Safe relative path to the workout-introduction recording. |
 | `background_music` | No | Selected track and playback settings. |
+| `completion_action` | No | `none`; may be `shutdown_or_exit`. |
 | `exercises` | No | Reusable exercise definitions referenced by steps. |
 | `steps` | Yes | At least one step or repeat group. |
 
@@ -157,7 +158,16 @@ steps:
 - A step advances only when both timer and announcement are finished.
 - Missing/unreadable recording or music never stalls workout progression.
 
-## 9. Marketplace package metadata
+## 9. Completion Action
+
+`completion_action` is optional and defaults to `none`. With
+`shutdown_or_exit`, a successfully completed workout shuts down Windows
+immediately with force-close semantics or exits AnhPT on Android. It has no
+effect for incomplete workouts, Web, or iOS. Because forced Windows shutdown
+may discard unsaved work in other applications, Builder presents an explicit
+warning beside this option.
+
+## 10. Marketplace package metadata
 
 Marketplace downloads use the same `.anhpt.zip` and YAML validation path as
 manual import. A package may add a root `manifest.json` with `schemaVersion: 1`

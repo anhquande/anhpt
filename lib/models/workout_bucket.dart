@@ -126,6 +126,17 @@ class WorkoutBucketCatalog {
 
 enum BucketInstallConflictResolution { keepLocal, installCopy, replace }
 
+String uniqueLocalWorkoutName(String desiredName, Iterable<String> existing) {
+  final base = desiredName.trim();
+  final used = existing.map((name) => name.trim().toLowerCase()).toSet();
+  if (!used.contains(base.toLowerCase())) return base;
+  var suffix = 2;
+  while (used.contains('$base $suffix'.toLowerCase())) {
+    suffix++;
+  }
+  return '$base $suffix';
+}
+
 class WorkoutBucketEntry {
   final String? sourceId;
   final String id;

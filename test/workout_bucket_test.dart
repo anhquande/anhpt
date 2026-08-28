@@ -2,6 +2,21 @@ import 'package:anhpt/models/workout_bucket.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('local workout variants get the first available numeric suffix', () {
+    expect(uniqueLocalWorkoutName('Daily Plank', const []), 'Daily Plank');
+    expect(
+      uniqueLocalWorkoutName(
+        'Daily Plank',
+        const ['daily plank', 'Daily Plank 2', 'Other Workout'],
+      ),
+      'Daily Plank 3',
+    );
+    expect(
+      uniqueLocalWorkoutName('  Daily Plank  ', const ['Daily Plank']),
+      'Daily Plank 2',
+    );
+  });
+
   const hash =
       '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 

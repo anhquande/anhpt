@@ -11,6 +11,31 @@ void main() {
         defaultVoiceLanguage: 'vi',
       );
 
+  test('completion action parses and round trips only when enabled', () {
+    final enabled = parse('''
+version: 2
+name: Sleep meditation
+completion_action: shutdown_or_exit
+steps:
+  - name: Breathe
+''');
+    expect(enabled.completionAction, 'shutdown_or_exit');
+    final yaml = WorkoutSerializer.toYaml(WorkoutDraft.fromWorkout(enabled));
+    expect(yaml, contains('completion_action: shutdown_or_exit'));
+
+    final normal = parse('''
+version: 2
+name: Normal workout
+steps:
+  - name: Move
+''');
+    expect(normal.completionAction, 'none');
+    expect(
+      WorkoutSerializer.toYaml(WorkoutDraft.fromWorkout(normal)),
+      isNot(contains('completion_action:')),
+    );
+  });
+
   test('schema v2 parses recordings, music and unique effective step ids', () {
     final workout = parse('''
 version: 2

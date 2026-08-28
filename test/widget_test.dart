@@ -6,12 +6,46 @@ import 'package:anhpt/screens/home_screen.dart';
 import 'package:anhpt/models/workout_bucket.dart';
 import 'package:anhpt/services/workout_parser.dart';
 import 'package:anhpt/screens/workout_detail_screen.dart';
+import 'package:anhpt/screens/workout_player_screen.dart';
+import 'package:anhpt/screens/workout_builder_screen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('completion device action is platform safe', () {
+    expect(
+      completionDeviceActionFor(TargetPlatform.windows, isWeb: false),
+      CompletionDeviceAction.shutdownWindows,
+    );
+    expect(
+      completionDeviceActionFor(TargetPlatform.android, isWeb: false),
+      CompletionDeviceAction.exitAndroid,
+    );
+    expect(
+      completionDeviceActionFor(TargetPlatform.iOS, isWeb: false),
+      isNull,
+    );
+    expect(
+      completionDeviceActionFor(TargetPlatform.windows, isWeb: true),
+      isNull,
+    );
+  });
+
+  testWidgets('Builder keeps the after-workout action visible', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore());
+    await tester.pumpWidget(
+      MaterialApp(home: WorkoutBuilderScreen(controller: controller)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('After workout: Shut down or exit'), findsOneWidget);
+    expect(find.text('Voice settings'), findsOneWidget);
+    expect(find.textContaining('Off —'), findsOneWidget);
+  });
+
   testWidgets('workout overview has a sticky title, Start, and action menu',
       (tester) async {
     await tester.binding.setSurfaceSize(const Size(700, 500));
@@ -60,6 +94,15 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       find.text('From AnhPT Official · Originally “Original Sticky Workout”'),
       findsOneWidget,
     );
+    expect(find.text('After workout'), findsOneWidget);
+    expect(find.text('Stay open after completion'), findsOneWidget);
+    await tester.tap(find.widgetWithText(SwitchListTile, 'After workout'));
+    await tester.pumpAndSettle();
+    expect(controller.byId('sticky')!.completionAction, 'shutdown_or_exit');
+    expect(
+      find.text('Shut down Windows or exit Android when complete'),
+      findsOneWidget,
+    );
     expect(find.text('Introduction'), findsOneWidget);
     expect(find.text('Music'), findsOneWidget);
     expect(find.text('Structure'), findsOneWidget);
@@ -68,8 +111,10 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     await tester.pumpAndSettle();
     expect(find.text('Less'), findsOneWidget);
 
-    await tester.drag(find.byKey(const PageStorageKey('structure-tab')),
-        const Offset(0, -900));
+    await tester.drag(
+      find.byType(NestedScrollView),
+      const Offset(0, -900),
+    );
     await tester.pumpAndSettle();
     expect(find.text('Sticky workout title'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
@@ -92,9 +137,21 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       'Edit YAML',
       'Export package',
       'View source',
+      'Delete workout',
     ]) {
       expect(find.text(label), findsOneWidget);
     }
+
+    await tester.tap(find.text('Delete workout'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete “Sticky workout title”?'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+    expect(controller.byId('sticky'), isNotNull);
+
+    await tester.tap(find.byTooltip('Workout actions'));
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('View source'));
     await tester.pumpAndSettle();
@@ -226,6 +283,19 @@ steps:
           packageUrl: 'https://example.com/strength.zip',
           sha256: List.filled(64, '1').join(),
         ),
+      ]
+      ..installedBucketWorkouts = [
+        InstalledWorkoutProvenance(
+          workoutId: 'local-warmup-variant',
+          sourceId: 'official',
+          sourceName: 'Official',
+          entryId: 'warmup',
+          originalName: 'Khởi động buổi sáng',
+          version: '1.0.0',
+          packageUrl: 'https://example.com/warmup.zip',
+          sha256: List.filled(64, '0').join(),
+          installedAt: DateTime.utc(2026, 8, 28),
+        ),
       ];
 
     await tester.pumpWidget(MaterialApp(
@@ -237,6 +307,8 @@ steps:
     expect(find.text('Browse Workouts'), findsOneWidget);
     expect(find.text('Khởi động buổi sáng'), findsOneWidget);
     expect(find.text('Strength Builder'), findsOneWidget);
+    expect(find.text('Add another'), findsOneWidget);
+    expect(find.text('Install'), findsOneWidget);
 
     await tester.enterText(find.byType(TextField), 'khoi dong');
     await tester.pump(const Duration(milliseconds: 300));

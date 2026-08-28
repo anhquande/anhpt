@@ -21,6 +21,7 @@ class WorkoutParser {
     'voice',
     'feedback',
     'audio',
+    'completion_action',
     'recording',
     'background_music',
     'exercises',
@@ -90,6 +91,12 @@ class WorkoutParser {
     final voice = _voice(root['voice'], defaultVoiceLanguage);
     final (sound, haptic) = _feedback(root['feedback']);
     final ducking = _audio(root['audio']);
+    final completionAction = (root['completion_action'] ?? 'none').toString();
+    if (!{'none', 'shutdown_or_exit'}.contains(completionAction)) {
+      throw const WorkoutValidationException(
+        'completion_action must be none or shutdown_or_exit.',
+      );
+    }
     final recording = _recording(root['recording'], 'recording');
     final backgroundMusic = _backgroundMusic(root['background_music']);
     final exercises = _exercises(root['exercises']);
@@ -128,6 +135,7 @@ class WorkoutParser {
         sound: sound,
         haptic: haptic,
         ducking: ducking,
+        completionAction: completionAction,
         recording: recording,
         backgroundMusic: backgroundMusic,
         exercises: exercises,

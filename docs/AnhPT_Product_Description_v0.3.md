@@ -60,5 +60,14 @@ install/update actions. The last valid catalog remains available offline.
 Installed workouts retain their stable catalog source and workout ID even when
 the local display name is edited. The catalog name captured at installation is
 also retained so a renamed workout remains recognizable.
+An installed catalog workout can be added again to create multiple independent
+local variants. Each variant receives its own local ID while retaining the same
+catalog origin. Variant names remain unique: repeated installs use the first
+available numeric suffix (`Name 2`, `Name 3`, and so on).
+
+Workouts may opt into `shutdown_or_exit` completion behavior in YAML or Builder.
+After successful completion, Windows shuts down immediately without another
+prompt and Android exits the app. iOS follows the system-managed app lifecycle
+and does not attempt a programmatic exit.
 Updates require an explicit keep/copy/replace choice. Private credentials and
 signatures are deferred; Web sources must support CORS.

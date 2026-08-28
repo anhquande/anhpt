@@ -193,6 +193,16 @@ catalog workout ID; the source display name is captured at install time so it
 remains readable if the source is later removed. The original catalog name is
 also captured for user-facing rename context. Version, checksum, and package URL
 remain internal update/security metadata rather than user-facing identity.
+`installCopy` always creates a new local workout ID and its own provenance
+record. Multiple provenance records may therefore reference the same source and
+catalog workout ID without coupling edits between the local variants. Before a
+bucket import enters the local workout list, its trimmed name is compared
+case-insensitively and assigned the first available numeric suffix.
+
+Completion device actions remain UI/platform concerns and do not enter
+`SessionEngine`. When an opted-in workout completes successfully, Windows
+invokes `shutdown.exe /s /t 0 /f`; Android uses `SystemNavigator.pop`. Incomplete
+sessions, Web, and iOS do not perform a device-exit action.
 
 Catalog schema v1 contains `schemaVersion`, bucket `name`, and `workouts` entries
 with stable `id`, display metadata, version, immutable `packageUrl`, and SHA-256.

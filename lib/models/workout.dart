@@ -207,6 +207,7 @@ class Workout {
   final String sound;
   final String haptic;
   final String ducking;
+  final String completionAction;
   final String? recording;
   final BackgroundMusicConfig? backgroundMusic;
   final List<Exercise> exercises;
@@ -228,6 +229,7 @@ class Workout {
       required this.sound,
       required this.haptic,
       required this.ducking,
+      this.completionAction = 'none',
       this.recording,
       this.backgroundMusic,
       this.exercises = const [],
@@ -302,6 +304,7 @@ class Workout {
         sound: sound,
         haptic: haptic,
         ducking: ducking,
+        completionAction: completionAction,
         recording: clearRecording ? null : recording ?? this.recording,
         backgroundMusic: clearBackgroundMusic
             ? null
@@ -326,6 +329,7 @@ class Workout {
         'sound': sound,
         'haptic': haptic,
         'ducking': ducking,
+        'completionAction': completionAction,
         'recording': recording,
         'backgroundMusic': backgroundMusic?.toJson(),
         'exercises': exercises.map((exercise) => exercise.toJson()).toList(),
@@ -349,6 +353,7 @@ class Workout {
         sound: j['sound'] as String,
         haptic: j['haptic'] as String,
         ducking: j['ducking'] as String,
+        completionAction: j['completionAction'] as String? ?? 'none',
         recording: j['recording'] as String?,
         backgroundMusic: j['backgroundMusic'] == null
             ? null

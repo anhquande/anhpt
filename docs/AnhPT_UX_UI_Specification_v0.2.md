@@ -19,6 +19,11 @@ insensitive matching after a short debounce. Status/source filters, name sort,
 result count, direct Install/Update states, and an Open action after successful
 installation support larger catalogs. Settings contains only `Workout sources`
 for technical source management.
+Browse Workouts follows the Home visual system: a standard-height app bar, the
+same inset search field, a counted section header with compact filter/sort icon
+menus, and lightweight cards with matching padding, typography, one-line
+descriptions, muted metadata, and tonal actions. Tags are compact inline
+metadata rather than large chips.
 
 Home uses a restrained `My Workouts` app bar with only Settings visible.
 `New workout` and `Browse workouts` remain visible as the frequent actions.
@@ -36,7 +41,18 @@ Workout Overview uses one persistent top app bar that remains visible while the
 content scrolls. It shows the ellipsized workout title on the left, the primary
 `Start` action on the right, and an adjacent three-dot menu. The menu contains
 Edit, Duplicate, Copy YAML, Edit YAML, and Export package; these actions are not
-repeated in the scrolling body.
+repeated in the scrolling body. A separated destructive `Delete workout` action
+opens a confirmation dialog before removing the local workout. Deleting one
+bucket variant removes only that local variant and its provenance record.
+
+Builder offers an optional `Shut down or exit when complete` toggle with a
+forced-shutdown warning. For opted-in workouts, successful completion shuts
+Windows down immediately without another prompt or exits Android. Incomplete
+sessions, Web, and iOS keep the normal completion flow.
+The control appears as an always-visible `After workout` card in Builder rather
+than inside Voice settings. Workout Overview also always shows an `After
+workout` switch; changing it persists immediately to the workout YAML so
+Builder, YAML editor, and Overview remain synchronized.
 
 For a workout installed from a bucket, Overview shows a quiet `From <source>`
 origin line. Its action menu includes `View source`, which reveals the source
@@ -266,6 +282,9 @@ a selected track even when workout music is disabled.
 - A source can be added by name and public HTTPS catalog URL, enabled/disabled,
   refreshed, or removed without deleting installed workouts.
 - The catalog shows package metadata and installed/update state.
+- An installed entry exposes `Add another`, creating an independent local
+  variant with the same source attribution. Duplicate local names receive the
+  first available suffix, such as `Workout 2`, `Workout 3`, and `Workout 4`.
 - Updating asks to keep the local workout, install as a copy, or replace it.
 - Loading, cached-offline, empty, validation, download, and checksum failures are
   explicit and do not alter existing workouts.

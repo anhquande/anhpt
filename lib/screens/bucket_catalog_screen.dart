@@ -176,18 +176,26 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
             onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Close'),
           ),
-          if (state != 'installed')
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(dialogContext);
-                if (state == 'updateAvailable') {
-                  _showUpdateChoices(entry);
-                } else {
-                  _install(entry);
-                }
-              },
-              child: Text(state == 'updateAvailable' ? 'Update' : 'Install'),
-            ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              if (state == 'updateAvailable') {
+                _showUpdateChoices(entry);
+              } else if (state == 'installed') {
+                _install(
+                  entry,
+                  resolution: BucketInstallConflictResolution.installCopy,
+                );
+              } else {
+                _install(entry);
+              }
+            },
+            child: Text(switch (state) {
+              'updateAvailable' => 'Update',
+              'installed' => 'Add another',
+              _ => 'Install',
+            }),
+          ),
         ],
       ),
     );
@@ -197,7 +205,10 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Browse Workouts'),
+        title: const Text(
+          'Browse Workouts',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         leading: BackButton(
           onPressed: () => Navigator.maybePop(context),
         ),
@@ -221,36 +232,6 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
             icon: const Icon(Icons.refresh),
           ),
         ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(68),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _searchChanged,
-              decoration: InputDecoration(
-                filled: true,
-                prefixIcon: const Icon(Icons.search),
-                hintText: 'Search workouts, tags, or sources',
-                suffixIcon: _searchController.text.isEmpty
-                    ? null
-                    : IconButton(
-                        tooltip: 'Clear search',
-                        onPressed: () {
-                          _searchDebounce?.cancel();
-                          _searchController.clear();
-                          setState(() => _query = '');
-                        },
-                        icon: const Icon(Icons.close),
-                      ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-        ),
       ),
       body: AnimatedBuilder(
         animation: widget.controller,
@@ -260,70 +241,104 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 900),
               child: ListView(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                 children: [
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  TextField(
+                    controller: _searchController,
+                    onChanged: _searchChanged,
+                    decoration: InputDecoration(
+                      filled: true,
+                      prefixIcon: const Icon(Icons.search),
+                      hintText: 'Search workouts, tags, or sources',
+                      suffixIcon: _searchController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              tooltip: 'Clear search',
+                              onPressed: () {
+                                _searchDebounce?.cancel();
+                                _searchController.clear();
+                                setState(() => _query = '');
+                              },
+                              icon: const Icon(Icons.close),
+                            ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
                     children: [
-                      DropdownButton<_CatalogStatus>(
-                        value: _status,
-                        underline: const SizedBox.shrink(),
-                        onChanged: (value) => setState(() => _status = value!),
-                        items: const [
-                          DropdownMenuItem(
+                      Expanded(
+                        child: Text(
+                          '${entries.length} workout${entries.length == 1 ? '' : 's'}',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                      PopupMenuButton<_CatalogStatus>(
+                        tooltip: 'Filter workouts',
+                        initialValue: _status,
+                        onSelected: (value) => setState(() => _status = value),
+                        icon: Icon(_status == _CatalogStatus.all
+                            ? Icons.filter_list_outlined
+                            : Icons.filter_list),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
                               value: _CatalogStatus.all,
                               child: Text('All workouts')),
-                          DropdownMenuItem(
+                          PopupMenuItem(
                               value: _CatalogStatus.notInstalled,
                               child: Text('Not installed')),
-                          DropdownMenuItem(
+                          PopupMenuItem(
                               value: _CatalogStatus.installed,
                               child: Text('Installed')),
-                          DropdownMenuItem(
+                          PopupMenuItem(
                               value: _CatalogStatus.updates,
                               child: Text('Updates available')),
                         ],
                       ),
                       if (widget.controller.bucketSources.length > 1)
-                        DropdownButton<String?>(
-                          value: _sourceId,
-                          underline: const SizedBox.shrink(),
-                          onChanged: (value) =>
+                        PopupMenuButton<String?>(
+                          tooltip: 'Filter by source',
+                          initialValue: _sourceId,
+                          onSelected: (value) =>
                               setState(() => _sourceId = value),
-                          items: [
-                            const DropdownMenuItem(
+                          icon: Icon(_sourceId == null
+                              ? Icons.cloud_outlined
+                              : Icons.cloud),
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
                                 value: null, child: Text('All sources')),
                             for (final source
                                 in widget.controller.bucketSources)
-                              DropdownMenuItem(
+                              PopupMenuItem(
                                   value: source.id, child: Text(source.name)),
                           ],
                         ),
-                      DropdownButton<_CatalogSort>(
-                        value: _sort,
-                        underline: const SizedBox.shrink(),
-                        onChanged: (value) => setState(() => _sort = value!),
-                        items: const [
-                          DropdownMenuItem(
+                      PopupMenuButton<_CatalogSort>(
+                        tooltip: 'Sort workouts',
+                        initialValue: _sort,
+                        onSelected: (value) => setState(() => _sort = value),
+                        icon: const Icon(Icons.sort),
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
                               value: _CatalogSort.recommended,
                               child: Text('Recommended')),
-                          DropdownMenuItem(
+                          PopupMenuItem(
                               value: _CatalogSort.nameAscending,
                               child: Text('Name A–Z')),
-                          DropdownMenuItem(
+                          PopupMenuItem(
                               value: _CatalogSort.nameDescending,
                               child: Text('Name Z–A')),
                         ],
                       ),
-                      Text(
-                        '${entries.length} workout${entries.length == 1 ? '' : 's'}',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 10),
                   if (widget.controller.bucketCatalogLoading)
                     const LinearProgressIndicator(),
                   if (widget.controller.bucketCatalogError != null)
@@ -388,57 +403,83 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
     final state = widget.controller.bucketInstallState(entry);
     final installing = _installingId == entry.id;
     final label = switch (state) {
-      'installed' => 'Installed',
+      'installed' => 'Add another',
       'updateAvailable' => 'Update',
       _ => 'Install',
     };
+    final colors = Theme.of(context).colorScheme;
     return Card(
+      clipBehavior: Clip.antiAlias,
       margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        title: Text(entry.name,
-            style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+      child: InkWell(
+        onTap: () => _showDetails(entry),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 13, 10, 13),
+          child: Row(
             children: [
-              if (entry.description.isNotEmpty) Text(entry.description),
-              const SizedBox(height: 6),
-              Text('${_sourceName(entry.sourceId)} · Version ${entry.version}'),
-              if (entry.tags.isNotEmpty) ...[
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    for (final tag in entry.tags)
-                      Chip(
-                        label: Text(tag),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide.none,
+                    Text(
+                      entry.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    if (entry.description.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        entry.description,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
                       ),
+                    ],
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_sourceName(entry.sourceId)}  ·  Version ${entry.version}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colors.onSurfaceVariant,
+                          ),
+                    ),
+                    if (entry.tags.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        entry.tags.join('  ·  '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colors.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
                   ],
                 ),
-              ],
+              ),
+              const SizedBox(width: 12),
+              if (installing)
+                const SizedBox.square(
+                  dimension: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                FilledButton.tonal(
+                  onPressed: () => switch (state) {
+                    'installed' => _install(
+                        entry,
+                        resolution: BucketInstallConflictResolution.installCopy,
+                      ),
+                    'updateAvailable' => _showUpdateChoices(entry),
+                    _ => _install(entry),
+                  },
+                  child: Text(label),
+                ),
             ],
           ),
         ),
-        onTap: () => _showDetails(entry),
-        trailing: installing
-            ? const SizedBox.square(
-                dimension: 24,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : FilledButton.tonal(
-                onPressed: state == 'installed'
-                    ? null
-                    : () => state == 'updateAvailable'
-                        ? _showUpdateChoices(entry)
-                        : _install(entry),
-                child: Text(label),
-              ),
       ),
     );
   }

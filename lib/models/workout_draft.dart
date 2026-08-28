@@ -67,6 +67,7 @@ class WorkoutDraft {
   String sound;
   String haptic;
   String ducking;
+  String completionAction;
   String recording;
   String backgroundMusicSource;
   String backgroundMusicName;
@@ -91,6 +92,7 @@ class WorkoutDraft {
     this.sound = 'beep',
     this.haptic = 'medium',
     this.ducking = 'medium',
+    this.completionAction = 'none',
     this.recording = '',
     this.backgroundMusicSource = '',
     this.backgroundMusicName = '',
@@ -118,6 +120,7 @@ class WorkoutDraft {
         sound: workout.sound,
         haptic: workout.haptic,
         ducking: workout.ducking,
+        completionAction: workout.completionAction,
         recording: workout.recording ?? '',
         backgroundMusicSource: workout.backgroundMusic?.source ?? '',
         backgroundMusicName: workout.backgroundMusic?.name ?? '',

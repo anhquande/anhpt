@@ -287,6 +287,27 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen> {
                 onChanged: (v) => draft.startCountdown = v,
               ),
               const SizedBox(height: 12),
+              Card(
+                margin: EdgeInsets.zero,
+                child: SwitchListTile(
+                  secondary: const Icon(Icons.power_settings_new),
+                  title: const Text(
+                    'After workout: Shut down or exit',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    draft.completionAction == 'shutdown_or_exit'
+                        ? 'Enabled — Windows shuts down immediately and may discard unsaved work.'
+                        : 'Off — the completion screen stays open normally.',
+                  ),
+                  value: draft.completionAction == 'shutdown_or_exit',
+                  onChanged: (value) => setState(() {
+                    draft.completionAction =
+                        value ? 'shutdown_or_exit' : 'none';
+                  }),
+                ),
+              ),
+              const SizedBox(height: 12),
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 title: const Text('Voice settings',
