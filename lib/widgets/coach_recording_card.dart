@@ -60,7 +60,10 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
   bool? _microphoneAvailable;
 
   bool get _supported =>
-      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.windows ||
+          defaultTargetPlatform == TargetPlatform.android);
+
   CoachRecording? get _assigned => widget.controller.coachRecordingFor(
         workoutId: widget.workout.id,
         scope: widget.scope,
@@ -119,7 +122,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
           setState(() {
             _microphoneAvailable = false;
             _status =
-                'Microphone access is unavailable. Review Microphone access in app Settings, then try again.';
+                'Microphone access is unavailable. Enable microphone permission for AnhPT in system settings, then try again.';
           });
         }
         return;
@@ -130,7 +133,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
       }
       await _recordingService.start(widget.workout.id);
       if (!await _recordingService.isRecording()) {
-        throw StateError('Windows did not start microphone capture.');
+        throw StateError('The device did not start microphone capture.');
       }
       if (mounted) {
         setState(() {
@@ -147,7 +150,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
         setState(() {
           _recording = false;
           _status =
-              'Recording did not start. Check microphone access and the selected input device, then retry. Details: $error';
+              'Recording did not start. Check microphone permission and the selected input device, then retry. Details: $error';
         });
       }
     } finally {
@@ -167,7 +170,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
           _recording = false;
           _draftPath = path;
           _status = path == null
-              ? 'No audio file was created. Check Windows microphone access and try again.'
+              ? 'No audio file was created. Check microphone permission and try again.'
               : 'Recording stopped. Listen to it before assigning it.';
         });
       }
@@ -194,17 +197,12 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
     _audioLevel = 0;
     _amplitudeSubscription = _recordingService.amplitudeStream().listen(
       (amplitude) {
-        if (!mounted) {
-          return;
-        }
-        // dBFS is normally negative. Map -60 dB..0 dB into 0..1.
+        if (!mounted) return;
         final level = ((amplitude.current + 60) / 60).clamp(0.0, 1.0);
         setState(() => _audioLevel = level);
       },
       onError: (_) {
-        if (mounted) {
-          setState(() => _audioLevel = 0);
-        }
+        if (mounted) setState(() => _audioLevel = 0);
       },
     );
     _recordingTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -219,9 +217,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
     _recordingTimer = null;
     await _amplitudeSubscription?.cancel();
     _amplitudeSubscription = null;
-    if (mounted) {
-      setState(() => _audioLevel = 0);
-    }
+    if (mounted) setState(() => _audioLevel = 0);
   }
 
   Future<void> _preview(String path) async {
@@ -292,12 +288,8 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
 
   Future<void> _save() async {
     final path = _draftPath;
-    if (path == null) {
-      return;
-    }
+    if (path == null) return;
     final previous = _assigned;
-    // Transfer ownership before awaiting persistence. Otherwise a fast modal
-    // close can dispose this card and delete the newly assigned draft file.
     if (mounted) {
       setState(() {
         _draftPath = null;
@@ -357,18 +349,14 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
         ],
       ),
     );
-    if (confirmed != true) {
-      return;
-    }
+    if (confirmed != true) return;
     final recording = await widget.controller.removeCoachRecording(
       workoutId: widget.workout.id,
       scope: widget.scope,
       stepKey: widget.stepKey,
     );
     if (recording != null) {
-      if (_previewPath == recording.audioPath) {
-        await _stopPreview();
-      }
+      if (_previewPath == recording.audioPath) await _stopPreview();
       await _recordingService.deleteFile(recording.audioPath);
     }
     if (mounted) {
@@ -379,9 +367,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
 
   Future<void> _discardDraft() async {
     final path = _draftPath;
-    if (path == null) {
-      return;
-    }
+    if (path == null) return;
     await _stopPreview();
     await _recordingService.deleteFile(path);
     if (mounted) {
@@ -449,7 +435,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
           ],
           if (!_supported) ...[
             const SizedBox(height: 10),
-            const Text('Recording MVP is currently available on Windows.'),
+            const Text('Recording is currently available on Windows and Android.'),
           ] else ...[
             const SizedBox(height: 12),
             if (_status != null) ...[
@@ -563,9 +549,7 @@ class _CoachRecordingCardState extends State<CoachRecordingCard> {
     unawaited(_playerStateSubscription?.cancel() ?? Future<void>.value());
     unawaited(_playerPositionSubscription?.cancel() ?? Future<void>.value());
     unawaited(_playerDurationSubscription?.cancel() ?? Future<void>.value());
-    if (_recording) {
-      unawaited(_recordingService.stop());
-    }
+    if (_recording) unawaited(_recordingService.stop());
     if (_draftPath != null) {
       unawaited(_recordingService.deleteFile(_draftPath!));
     }

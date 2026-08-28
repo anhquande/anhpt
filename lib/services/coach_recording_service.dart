@@ -20,9 +20,9 @@ class CoachRecordingService {
     return recordings;
   }
 
-  /// On Windows the record plugin currently reports `true` and does not show
-  /// a consent dialog. Capture can still fail when desktop microphone access
-  /// is disabled in Windows Privacy settings.
+  /// Requests/checks microphone permission on mobile platforms. On Windows the
+  /// plugin may report permission as available even when desktop privacy
+  /// settings later prevent capture, so start failures are still surfaced.
   Future<bool> canAttemptRecording() => _audioRecorder.hasPermission();
 
   Future<bool> isRecording() => _audioRecorder.isRecording();
@@ -31,6 +31,7 @@ class CoachRecordingService {
       _audioRecorder.onAmplitudeChanged(const Duration(milliseconds: 80));
 
   static Future<void> openSystemMicrophoneSettings() async {
+    if (!Platform.isWindows) return;
     await Process.start(
       'explorer.exe',
       ['ms-settings:privacy-microphone'],
@@ -43,8 +44,10 @@ class CoachRecordingService {
     final safeId = workoutId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
     final path =
         '${recordings.path}${Platform.pathSeparator}${safeId}_${DateTime.now().millisecondsSinceEpoch}.m4a';
-    await _audioRecorder.start(const RecordConfig(encoder: AudioEncoder.aacLc),
-        path: path);
+    await _audioRecorder.start(
+      const RecordConfig(encoder: AudioEncoder.aacLc),
+      path: path,
+    );
     return path;
   }
 
