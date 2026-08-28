@@ -31,6 +31,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     with SingleTickerProviderStateMixin {
   late WorkoutDraft draft;
   late final TabController _tabController;
+  int _selectedTab = 0;
   String? error;
 
   @override
@@ -507,6 +508,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
         ],
         bottom: TabBar(
           controller: _tabController,
+          onTap: (index) => setState(() => _selectedTab = index),
           tabs: const [
             Tab(text: 'Introduction'),
             Tab(text: 'Music'),
@@ -531,16 +533,13 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                   ),
                 ),
               Expanded(
-                child: AnimatedBuilder(
-                  animation: _tabController,
-                  builder: (context, _) => IndexedStack(
-                    index: _tabController.index,
-                    children: [
-                      _introductionTab(context),
-                      _musicTab(context),
-                      _structureTab(context),
-                    ],
-                  ),
+                child: IndexedStack(
+                  index: _selectedTab,
+                  children: [
+                    _introductionTab(context),
+                    _musicTab(context),
+                    _structureTab(context),
+                  ],
                 ),
               ),
             ],
