@@ -28,7 +28,7 @@ class AudioFeedbackService {
   })  : _tts = tts ?? FlutterTts(),
         _player = player ?? (initializePlayer ? AudioPlayer() : null);
 
-  static AudioContext mixingAudioContext() => const AudioContextConfig(
+  static AudioContext mixingAudioContext() => AudioContextConfig(
         focus: AudioContextConfigFocus.mixWithOthers,
       ).build();
 
@@ -95,7 +95,6 @@ class AudioFeedbackService {
     await _tts.stop();
   }
 
-  /// Invalidates all current callbacks synchronously, then stops the backends.
   Future<void> cancelCurrentAudio() async {
     _invalidateSpeech();
     _invalidateRecording();
@@ -105,12 +104,9 @@ class AudioFeedbackService {
     ]);
   }
 
-  /// Fire-and-forget speech. Use this for timer announcements/countdowns.
   Future<void> speak(String text, {bool interrupt = false}) async {
     if (_disposed || !_ready || text.trim().isEmpty) return;
-    if (interrupt) {
-      await stopSpeech();
-    }
+    if (interrupt) await stopSpeech();
     final operationId = _beginSpeechOperation();
     onCoachAudioChanged?.call(true);
     try {
@@ -121,33 +117,22 @@ class AudioFeedbackService {
     }
   }
 
-  /// Speaks [text] and waits until the engine reports completion.
-  /// This is used for step name + guide so the step timer starts afterwards.
   Future<void> speakAndWait(
     String text, {
     bool interrupt = false,
     Duration timeout = const Duration(seconds: 60),
   }) async {
     if (_disposed || !_ready || text.trim().isEmpty) return;
-
-    if (interrupt) {
-      await stopSpeech();
-    }
-
+    if (interrupt) await stopSpeech();
     _invalidateSpeech();
     final operationId = _beginSpeechOperation();
     final completer = Completer<void>();
     _speechCompleter = completer;
-
     try {
       onCoachAudioChanged?.call(true);
       await _tts.speak(text);
-      await completer.future.timeout(
-        timeout,
-        onTimeout: () {
-          _finishWaitingSpeech(operationId);
-        },
-      );
+      await completer.future.timeout(timeout,
+          onTimeout: () => _finishWaitingSpeech(operationId));
     } catch (_) {
       _finishWaitingSpeech(operationId);
       rethrow;
