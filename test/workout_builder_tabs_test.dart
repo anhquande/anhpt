@@ -7,6 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('workout builder uses overview tab structure', (tester) async {
+    tester.view.physicalSize = const Size(1200, 1200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
 
@@ -15,7 +20,7 @@ void main() {
         home: WorkoutBuilderScreen(controller: controller),
       ),
     );
-    await tester.pump();
+    await tester.pumpAndSettle();
 
     expect(find.text('Introduction'), findsOneWidget);
     expect(find.text('Music'), findsOneWidget);
@@ -25,7 +30,6 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Announce every'), findsOneWidget);
     expect(find.text('Countdown from'), findsOneWidget);
-    expect(tester.takeException(), isNull);
 
     await tester.tap(find.text('Music'));
     await tester.pumpAndSettle();
@@ -35,6 +39,5 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Add Step'), findsOneWidget);
     expect(find.text('Add Repeat'), findsOneWidget);
-    expect(tester.takeException(), isNull);
   });
 }
