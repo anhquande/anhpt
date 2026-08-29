@@ -63,40 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _start(BuildContext context, Workout w) async {
     await _loadProfiles();
     if (!mounted) return;
-    var participant = _activeProfile;
-    if (_profiles.length > 1) {
-      participant = await showDialog<LocalProfile>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Who is working out?'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final profile in _profiles)
-                RadioListTile<String>(
-                  value: profile.id,
-                  groupValue: _activeProfile?.id,
-                  title: Text(profile.name),
-                  subtitle: profile.id == _activeProfile?.id
-                      ? const Text('Active profile')
-                      : null,
-                  onChanged: (_) => Navigator.pop(context, profile),
-                ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        ),
-      );
-      if (participant == null) return;
-      await _healthStore.setActiveProfile(participant.id);
-      await _loadProfiles();
-    }
-    if (!mounted) return;
+    final participant = _activeProfile;
     controller.markUsed(w.id);
     Navigator.push(
       context,
