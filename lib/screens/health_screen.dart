@@ -32,6 +32,7 @@ class _HealthScreenState extends State<HealthScreen> {
   _ChartRange _range = _ChartRange.month;
   _MeasurementSort _measurementSort = _MeasurementSort.date;
   bool _measurementSortAscending = false;
+  bool _measurementsExpanded = false;
   bool _loading = true;
 
   @override
@@ -502,122 +503,119 @@ class _HealthScreenState extends State<HealthScreen> {
     const rowHeight = 56.0;
     final visibleRows = math.min(5, values.length);
     final showScrollbar = values.length > 5;
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Container(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            child: Row(
-              children: [
-                _measurementHeaderCell(
-                  'Date',
-                  _MeasurementSort.date,
-                  flex: 2,
-                ),
-                _measurementHeaderCell(
-                  'Weight',
-                  _MeasurementSort.weight,
-                ),
-                _measurementHeaderCell(
-                  'Note',
-                  _MeasurementSort.note,
-                  flex: 2,
-                ),
-                const SizedBox(width: 48),
-              ],
-            ),
+    return Column(
+      children: [
+        Container(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Row(
+            children: [
+              _measurementHeaderCell(
+                'Date',
+                _MeasurementSort.date,
+                flex: 2,
+              ),
+              _measurementHeaderCell(
+                'Weight',
+                _MeasurementSort.weight,
+              ),
+              _measurementHeaderCell(
+                'Note',
+                _MeasurementSort.note,
+                flex: 2,
+              ),
+              const SizedBox(width: 48),
+            ],
           ),
-          SizedBox(
-            height: visibleRows * rowHeight,
-            child: RawScrollbar(
-              controller: _measurementScrollController,
-              thumbVisibility: showScrollbar,
-              trackVisibility: showScrollbar,
-              thickness: 8,
-              radius: const Radius.circular(8),
-              trackRadius: const Radius.circular(8),
-              thumbColor:
-                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
-              trackColor: Theme.of(context)
-                  .colorScheme
-                  .surfaceContainerHighest
-                  .withValues(alpha: 0.7),
-              mainAxisMargin: 6,
-              crossAxisMargin: 4,
-              child: Padding(
-                padding: EdgeInsets.only(right: showScrollbar ? 14 : 0),
-                child: ListView.builder(
-                  controller: _measurementScrollController,
-                  primary: false,
-                  itemExtent: rowHeight,
-                  itemCount: values.length,
-                  itemBuilder: (context, index) {
-                    final value = values[index];
-                    return InkWell(
-                      onTap: () => _editMeasurement(value),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            bottom: BorderSide(
-                              color: Theme.of(context).dividerColor,
-                              width: 0.5,
-                            ),
+        ),
+        SizedBox(
+          height: visibleRows * rowHeight,
+          child: RawScrollbar(
+            controller: _measurementScrollController,
+            thumbVisibility: showScrollbar,
+            trackVisibility: showScrollbar,
+            thickness: 8,
+            radius: const Radius.circular(8),
+            trackRadius: const Radius.circular(8),
+            thumbColor:
+                Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+            trackColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest
+                .withValues(alpha: 0.7),
+            mainAxisMargin: 6,
+            crossAxisMargin: 4,
+            child: Padding(
+              padding: EdgeInsets.only(right: showScrollbar ? 14 : 0),
+              child: ListView.builder(
+                controller: _measurementScrollController,
+                primary: false,
+                itemExtent: rowHeight,
+                itemCount: values.length,
+                itemBuilder: (context, index) {
+                  final value = values[index];
+                  return InkWell(
+                    onTap: () => _editMeasurement(value),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Theme.of(context).dividerColor,
+                            width: 0.5,
                           ),
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(
-                                  _formatDateTime(value.measuredAt),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(
-                                  '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: 8),
-                                child: Text(
-                                  value.note ?? '—',
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ),
-                            SizedBox(
-                              width: 48,
-                              child: IconButton(
-                                tooltip: 'Delete measurement',
-                                icon: const Icon(Icons.delete_outline),
-                                onPressed: () => _deleteMeasurement(value),
-                              ),
-                            ),
-                          ],
-                        ),
                       ),
-                    );
-                  },
-                ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 2,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                _formatDateTime(value.measuredAt),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            flex: 2,
+                            child: Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 8),
+                              child: Text(
+                                value.note ?? '—',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 48,
+                            child: IconButton(
+                              tooltip: 'Delete measurement',
+                              icon: const Icon(Icons.delete_outline),
+                              onPressed: () => _deleteMeasurement(value),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -697,40 +695,97 @@ class _HealthScreenState extends State<HealthScreen> {
               ),
               const SizedBox(height: 12),
               Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                clipBehavior: Clip.antiAlias,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Current weight',
+                                  style: Theme.of(context).textTheme.labelLarge,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  latest == null
+                                      ? '—'
+                                      : '${_displayWeight(latest.weightKg).toStringAsFixed(1)} $_weightUnit',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineMedium
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                if (latest != null)
+                                  Text(_formatDateTime(latest.measuredAt)),
+                              ],
+                            ),
+                          ),
+                          FilledButton.icon(
+                            onPressed: () => _editMeasurement(),
+                            icon: const Icon(Icons.monitor_weight_outlined),
+                            label: const Text('Log'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1),
+                    InkWell(
+                      onTap: _measurements.isEmpty
+                          ? null
+                          : () => setState(
+                                () => _measurementsExpanded =
+                                    !_measurementsExpanded,
+                              ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        child: Row(
                           children: [
-                            Text(
-                              'Current weight',
-                              style: Theme.of(context).textTheme.labelLarge,
+                            const Icon(Icons.history, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Measurements (${_measurements.length})',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              latest == null
-                                  ? '—'
-                                  : '${_displayWeight(latest.weightKg).toStringAsFixed(1)} $_weightUnit',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineMedium
-                                  ?.copyWith(fontWeight: FontWeight.w800),
-                            ),
-                            if (latest != null)
-                              Text(_formatDateTime(latest.measuredAt)),
+                            if (_measurements.isEmpty)
+                              Text(
+                                'No data',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              )
+                            else
+                              AnimatedRotation(
+                                turns: _measurementsExpanded ? 0.5 : 0,
+                                duration: const Duration(milliseconds: 180),
+                                child: const Icon(Icons.expand_more),
+                              ),
                           ],
                         ),
                       ),
-                      FilledButton.icon(
-                        onPressed: () => _editMeasurement(),
-                        icon: const Icon(Icons.monitor_weight_outlined),
-                        label: const Text('Log'),
-                      ),
-                    ],
-                  ),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOut,
+                      child: _measurementsExpanded && _measurements.isNotEmpty
+                          ? Column(
+                              children: [
+                                const Divider(height: 1),
+                                _measurementTable(),
+                              ],
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
@@ -840,19 +895,6 @@ class _HealthScreenState extends State<HealthScreen> {
                         ),
                 ),
               ),
-              const SizedBox(height: 18),
-              Text(
-                'Measurements',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 8),
-              if (_measurements.isEmpty)
-                const Text('No measurements yet.')
-              else
-                _measurementTable(),
             ],
           ),
         ),
