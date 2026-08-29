@@ -640,22 +640,65 @@ class _HealthScreenState extends State<HealthScreen> {
               if (_measurements.isEmpty)
                 const Text('No measurements yet.')
               else
-                for (final value in _measurements.take(50))
-                  Card(
-                    child: ListTile(
-                      title: Text(
-                        '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
-                      ),
-                      subtitle: Text(
-                        '${_formatDateTime(value.measuredAt)}${value.note == null ? '' : ' · ${value.note}'}',
-                      ),
-                      onTap: () => _editMeasurement(value),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => _deleteMeasurement(value),
-                      ),
+                Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTable(
+                      showCheckboxColumn: false,
+                      headingRowHeight: 44,
+                      dataRowMinHeight: 44,
+                      dataRowMaxHeight: 56,
+                      columns: const [
+                        DataColumn(label: Text('Date / time')),
+                        DataColumn(label: Text('Weight'), numeric: true),
+                        DataColumn(label: Text('Note')),
+                        DataColumn(label: Text('Actions')),
+                      ],
+                      rows: [
+                        for (final value in _measurements.take(50))
+                          DataRow(
+                            onSelectChanged: (_) => _editMeasurement(value),
+                            cells: [
+                              DataCell(Text(_formatDateTime(value.measuredAt))),
+                              DataCell(
+                                Text(
+                                  '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
+                                ),
+                              ),
+                              DataCell(
+                                SizedBox(
+                                  width: 220,
+                                  child: Text(
+                                    value.note ?? '—',
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ),
+                              DataCell(
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Edit measurement',
+                                      icon: const Icon(Icons.edit_outlined),
+                                      onPressed: () => _editMeasurement(value),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Delete measurement',
+                                      icon: const Icon(Icons.delete_outline),
+                                      onPressed: () => _deleteMeasurement(value),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                      ],
                     ),
                   ),
+                ),
             ],
           ),
         ),
