@@ -3,6 +3,7 @@ import '../app/app_controller.dart';
 import '../models/local_profile.dart';
 import '../models/workout.dart';
 import '../services/health_store.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
 import 'health_screen.dart';
 import 'local_profiles_screen.dart';
@@ -94,11 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             for (final profile in _profiles)
               ListTile(
-                leading: CircleAvatar(
-                  child: Text(profile.name.isEmpty
-                      ? '?'
-                      : profile.name[0].toUpperCase()),
-                ),
+                leading: ProfileAvatar(profile: profile),
                 title: Text(profile.name),
                 trailing: profile.id == _activeProfile?.id
                     ? const Icon(Icons.check)
@@ -175,7 +172,9 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           TextButton.icon(
             onPressed: _chooseActiveProfile,
-            icon: const Icon(Icons.person_outline),
+            icon: _activeProfile == null
+                ? const Icon(Icons.person_outline)
+                : ProfileAvatar(profile: _activeProfile!, radius: 13),
             label: Text(_activeProfile?.name ?? 'Profile'),
           ),
           IconButton(
