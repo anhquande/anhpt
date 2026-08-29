@@ -520,10 +520,10 @@ class _HealthScreenState extends State<HealthScreen> {
                           ],
                         ),
                       ),
-                      FilledButton.icon(
+                      IconButton.filled(
+                        tooltip: 'Add weight',
                         onPressed: () => _editMeasurement(),
-                        icon: const Icon(Icons.monitor_weight_outlined),
-                        label: const Text('Log'),
+                        icon: const Icon(Icons.add),
                       ),
                     ],
                   ),
