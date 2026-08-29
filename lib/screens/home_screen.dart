@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
+import '../models/local_profile.dart';
 import '../models/workout.dart';
+import '../services/health_store.dart';
 import '../widgets/workout_widgets.dart';
 import 'health_screen.dart';
+import 'local_profiles_screen.dart';
 import 'settings_screen.dart';
 import 'workout_builder_screen.dart';
 import 'workout_detail_screen.dart';
@@ -21,8 +24,27 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
   final _searchController = TextEditingController();
+  final HealthStore _healthStore = HealthStore();
+  List<LocalProfile> _profiles = [];
+  LocalProfile? _activeProfile;
 
   AppController get controller => widget.controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfiles();
+  }
+
+  Future<void> _loadProfiles() async {
+    final profiles = await _healthStore.loadLocalProfiles();
+    final active = await _healthStore.activeLocalProfile();
+    if (!mounted) return;
+    setState(() {
+      _profiles = profiles;
+      _activeProfile = active;
+    });
+  }
 
   @override
   void dispose() {
@@ -38,13 +60,103 @@ class _HomeScreenState extends State<HomeScreen> {
                 WorkoutDetailScreen(controller: controller, workoutId: w.id)));
   }
 
-  void _start(BuildContext context, Workout w) {
+  Future<void> _start(BuildContext context, Workout w) async {
+    await _loadProfiles();
+    if (!mounted) return;
+    var participant = _activeProfile;
+    if (_profiles.length > 1) {
+      participant = await showDialog<LocalProfile>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Who is working out?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (final profile in _profiles)
+                RadioListTile<String>(
+                  value: profile.id,
+                  groupValue: _activeProfile?.id,
+                  title: Text(profile.name),
+                  subtitle: profile.id == _activeProfile?.id
+                      ? const Text('Active profile')
+                      : null,
+                  onChanged: (_) => Navigator.pop(context, profile),
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+      if (participant == null) return;
+      await _healthStore.setActiveProfile(participant.id);
+      await _loadProfiles();
+    }
+    if (!mounted) return;
     controller.markUsed(w.id);
     Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) =>
-                WorkoutPlayerScreen(controller: controller, workoutId: w.id)));
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutPlayerScreen(
+          controller: controller,
+          workoutId: w.id,
+          profileId: participant?.id,
+          profileName: participant?.name,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _chooseActiveProfile() async {
+    await _loadProfiles();
+    if (!mounted) return;
+    final selected = await showModalBottomSheet<LocalProfile>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ListTile(
+              title: Text('Active profile',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('Health data and future workout history stay separate.'),
+            ),
+            for (final profile in _profiles)
+              ListTile(
+                leading: CircleAvatar(
+                  child: Text(profile.name.isEmpty
+                      ? '?'
+                      : profile.name[0].toUpperCase()),
+                ),
+                title: Text(profile.name),
+                trailing: profile.id == _activeProfile?.id
+                    ? const Icon(Icons.check)
+                    : null,
+                onTap: () => Navigator.pop(context, profile),
+              ),
+            ListTile(
+              leading: const Icon(Icons.manage_accounts_outlined),
+              title: const Text('Manage profiles'),
+              onTap: () async {
+                Navigator.pop(context);
+                await Navigator.push(
+                  this.context,
+                  MaterialPageRoute(builder: (_) => const LocalProfilesScreen()),
+                );
+                await _loadProfiles();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selected == null) return;
+    await _healthStore.setActiveProfile(selected.id);
+    await _loadProfiles();
   }
 
   Future<void> _importPackage() async {
@@ -94,12 +206,20 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('My Workouts',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          TextButton.icon(
+            onPressed: _chooseActiveProfile,
+            icon: const Icon(Icons.person_outline),
+            label: Text(_activeProfile?.name ?? 'Profile'),
+          ),
           IconButton(
             tooltip: 'Health',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const HealthScreen()),
-            ),
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HealthScreen()),
+              );
+              await _loadProfiles();
+            },
             icon: const Icon(Icons.favorite_outline),
           ),
           IconButton(
