@@ -674,26 +674,8 @@ class _HealthScreenState extends State<HealthScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
             children: [
-              Card(
-                child: ListTile(
-                  contentPadding: const EdgeInsets.all(16),
-                  leading: CircleAvatar(
-                    child: Text(
-                      (_localProfile?.name.isNotEmpty ?? false)
-                          ? _localProfile!.name[0].toUpperCase()
-                          : '?',
-                    ),
-                  ),
-                  title: Text(
-                    _localProfile?.name ?? 'Profile',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(_profileSummary),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: _editProfile,
-                ),
-              ),
-              const SizedBox(height: 12),
+              if (bmi != null) _BmiCard(bmi: bmi),
+              if (bmi != null) const SizedBox(height: 12),
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: Column(
@@ -788,8 +770,6 @@ class _HealthScreenState extends State<HealthScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
-              if (bmi != null) _BmiCard(bmi: bmi),
               const SizedBox(height: 12),
               Card(
                 child: Padding(
