@@ -727,8 +727,8 @@ class _HealthScreenState extends State<HealthScreen> {
                           ),
                           FilledButton.icon(
                             onPressed: () => _editMeasurement(),
-                            icon: const Icon(Icons.monitor_weight_outlined),
-                            label: const Text('Log'),
+                            icon: const Icon(Icons.add_circle_outline),
+                            label: const Text('Add weight'),
                           ),
                         ],
                       ),
