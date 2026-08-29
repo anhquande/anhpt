@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
+import '../models/health.dart';
 import '../models/local_profile.dart';
 import '../services/health_store.dart';
+import '../widgets/profile_editor_dialog.dart';
 
 class LocalProfilesScreen extends StatefulWidget {
   const LocalProfilesScreen({super.key});
@@ -33,45 +35,32 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
     });
   }
 
-  Future<String?> _askName(String title, {String initial = ''}) async {
-    final controller = TextEditingController(text: initial);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(title),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(labelText: 'Name'),
-          onSubmitted: (value) => Navigator.pop(context, value.trim()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    return result == null || result.trim().isEmpty ? null : result.trim();
-  }
-
   Future<void> _add() async {
-    final name = await _askName('Add profile');
-    if (name == null) return;
-    final profile = await _store.createLocalProfile(name);
+    final result = await showProfileEditorDialog(
+      context,
+      title: 'Add profile',
+      initialName: '',
+      initialHealth: const HealthProfile(),
+    );
+    if (result == null) return;
+    final profile = await _store.createLocalProfile(result.name);
+    await _store.saveProfile(result.health, profile.id);
     await _store.setActiveProfile(profile.id);
     await _load();
   }
 
-  Future<void> _rename(LocalProfile profile) async {
-    final name = await _askName('Rename profile', initial: profile.name);
-    if (name == null || name == profile.name) return;
-    await _store.renameLocalProfile(profile.id, name);
+  Future<void> _edit(LocalProfile profile) async {
+    final health = await _store.loadProfile(profile.id);
+    if (!mounted) return;
+    final result = await showProfileEditorDialog(
+      context,
+      title: 'Edit profile',
+      initialName: profile.name,
+      initialHealth: health,
+    );
+    if (result == null) return;
+    await _store.renameLocalProfile(profile.id, result.name);
+    await _store.saveProfile(result.health, profile.id);
     await _load();
   }
 
@@ -84,7 +73,7 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
         title: Text('Delete ${profile.name}?'),
         content: Text(
           hasData
-              ? 'This profile has Health data. Deleting it permanently removes its profile settings and weight measurements. Shared workouts are not deleted.'
+              ? 'This profile has personal Health data. Deleting it permanently removes its profile details and weight measurements. Shared workouts are not deleted.'
               : 'This removes the local profile. Shared workouts are not deleted.',
         ),
         actions: [
@@ -112,6 +101,16 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
     }
   }
 
+  String _healthSummary(HealthProfile health) {
+    final values = <String>[];
+    if (health.birthYear != null) values.add('Born ${health.birthYear}');
+    if (health.heightCm != null) {
+      values.add('${health.heightCm!.toStringAsFixed(0)} cm');
+    }
+    if (health.sex != HealthSex.unspecified) values.add(health.sex.name);
+    return values.isEmpty ? 'Profile details not completed' : values.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -126,51 +125,69 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
               itemCount: _profiles.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final profile = _profiles[index];
                 final active = profile.id == _activeId;
-                return ListTile(
-                  leading: CircleAvatar(
-                    child: Text(profile.name.trim().isEmpty
-                        ? '?'
-                        : profile.name.trim()[0].toUpperCase()),
-                  ),
-                  title: Text(profile.name),
-                  subtitle: Text(active ? 'Active profile' : 'Local profile'),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'active') {
-                        await _store.setActiveProfile(profile.id);
-                        await _load();
-                      } else if (value == 'rename') {
-                        await _rename(profile);
-                      } else if (value == 'delete') {
-                        await _delete(profile);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      if (!active)
-                        const PopupMenuItem(
-                          value: 'active',
-                          child: Text('Make active'),
+                return FutureBuilder<HealthProfile>(
+                  future: _store.loadProfile(profile.id),
+                  builder: (context, snapshot) {
+                    final health = snapshot.data ?? const HealthProfile();
+                    return Card(
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+                        leading: CircleAvatar(
+                          child: Text(
+                            profile.name.trim().isEmpty
+                                ? '?'
+                                : profile.name.trim()[0].toUpperCase(),
+                          ),
                         ),
-                      const PopupMenuItem(
-                        value: 'rename',
-                        child: Text('Rename'),
+                        title: Row(
+                          children: [
+                            Expanded(child: Text(profile.name)),
+                            if (active)
+                              const Chip(
+                                visualDensity: VisualDensity.compact,
+                                label: Text('Active'),
+                              ),
+                          ],
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(_healthSummary(health)),
+                        ),
+                        trailing: PopupMenuButton<String>(
+                          onSelected: (value) async {
+                            if (value == 'active') {
+                              await _store.setActiveProfile(profile.id);
+                              await _load();
+                            } else if (value == 'edit') {
+                              await _edit(profile);
+                            } else if (value == 'delete') {
+                              await _delete(profile);
+                            }
+                          },
+                          itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'edit',
+                              child: Text('Edit profile'),
+                            ),
+                            if (!active)
+                              const PopupMenuItem(
+                                value: 'active',
+                                child: Text('Make active'),
+                              ),
+                            const PopupMenuItem(
+                              value: 'delete',
+                              child: Text('Delete'),
+                            ),
+                          ],
+                        ),
+                        onTap: () => _edit(profile),
                       ),
-                      const PopupMenuItem(
-                        value: 'delete',
-                        child: Text('Delete'),
-                      ),
-                    ],
-                  ),
-                  onTap: active
-                      ? null
-                      : () async {
-                          await _store.setActiveProfile(profile.id);
-                          await _load();
-                        },
+                    );
+                  },
                 );
               },
             ),
