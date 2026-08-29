@@ -460,6 +460,7 @@ class _HealthScreenState extends State<HealthScreen> {
     final values = _sortedMeasurements;
     const rowHeight = 56.0;
     final visibleRows = math.min(5, values.length);
+    final showScrollbar = values.length > 5;
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
@@ -488,71 +489,85 @@ class _HealthScreenState extends State<HealthScreen> {
           ),
           SizedBox(
             height: visibleRows * rowHeight,
-            child: Scrollbar(
+            child: RawScrollbar(
               controller: _measurementScrollController,
-              thumbVisibility: values.length > 5,
-              child: ListView.builder(
-                controller: _measurementScrollController,
-                primary: false,
-                itemExtent: rowHeight,
-                itemCount: values.length,
-                itemBuilder: (context, index) {
-                  final value = values[index];
-                  return InkWell(
-                    onTap: () => _editMeasurement(value),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        border: Border(
-                          bottom: BorderSide(
-                            color: Theme.of(context).dividerColor,
-                            width: 0.5,
+              thumbVisibility: showScrollbar,
+              trackVisibility: showScrollbar,
+              thickness: 8,
+              radius: const Radius.circular(8),
+              trackRadius: const Radius.circular(8),
+              thumbColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              trackColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: 0.7),
+              mainAxisMargin: 6,
+              crossAxisMargin: 4,
+              child: Padding(
+                padding: EdgeInsets.only(right: showScrollbar ? 14 : 0),
+                child: ListView.builder(
+                  controller: _measurementScrollController,
+                  primary: false,
+                  itemExtent: rowHeight,
+                  itemCount: values.length,
+                  itemBuilder: (context, index) {
+                    final value = values[index];
+                    return InkWell(
+                      onTap: () => _editMeasurement(value),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Theme.of(context).dividerColor,
+                              width: 0.5,
+                            ),
                           ),
                         ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  _formatDateTime(value.measuredAt),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  value.note ?? '—',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 48,
+                              child: IconButton(
+                                tooltip: 'Delete measurement',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _deleteMeasurement(value),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(
-                                _formatDateTime(value.measuredAt),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(
-                                '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          Expanded(
-                            flex: 2,
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                              child: Text(
-                                value.note ?? '—',
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 48,
-                            child: IconButton(
-                              tooltip: 'Delete measurement',
-                              icon: const Icon(Icons.delete_outline),
-                              onPressed: () => _deleteMeasurement(value),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
           ),
