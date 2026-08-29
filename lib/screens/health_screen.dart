@@ -66,6 +66,18 @@ class _HealthScreenState extends State<HealthScreen> {
   String get _weightUnit =>
       _profile.unitSystem == HealthUnitSystem.metric ? 'kg' : 'lb';
 
+  String get _profileSummary {
+    final values = <String>[];
+    if (_profile.birthYear != null) values.add('Born ${_profile.birthYear}');
+    if (_profile.heightCm != null) {
+      values.add('${_profile.heightCm!.toStringAsFixed(0)} cm');
+    }
+    if (_profile.sex != HealthSex.unspecified) values.add(_profile.sex.name);
+    return values.isEmpty
+        ? 'Complete your profile for BMI and better estimates.'
+        : values.join(' · ');
+  }
+
   Future<void> _editMeasurement([WeightMeasurement? existing]) async {
     final now = existing?.measuredAt ?? DateTime.now();
     final weightController = TextEditingController(
@@ -439,25 +451,7 @@ class _HealthScreenState extends State<HealthScreen> {
                     _localProfile?.name ?? 'Profile',
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  subtitle: Text(
-                    [
-                      if (_profile.birthYear != null)
-                        'Born ${_profile.birthYear}',
-                      if (_profile.heightCm != null)
-                        '${_profile.heightCm!.toStringAsFixed(0)} cm',
-                      if (_profile.sex != HealthSex.unspecified)
-                        _profile.sex.name,
-                    ].isEmpty
-                        ? 'Complete your profile for BMI and better estimates.'
-                        : [
-                            if (_profile.birthYear != null)
-                              'Born ${_profile.birthYear}',
-                            if (_profile.heightCm != null)
-                              '${_profile.heightCm!.toStringAsFixed(0)} cm',
-                            if (_profile.sex != HealthSex.unspecified)
-                              _profile.sex.name,
-                          ].join(' · '),
-                  ),
+                  subtitle: Text(_profileSummary),
                   trailing: const Icon(Icons.edit_outlined),
                   onTap: _editProfile,
                 ),
