@@ -76,13 +76,17 @@ class HealthStore {
     await preferences.setString(_activeProfileKey, profileId);
   }
 
-  Future<LocalProfile> createLocalProfile(String name) async {
+  Future<LocalProfile> createLocalProfile(
+    String name, {
+    String? avatarBase64,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) throw ArgumentError('Profile name cannot be empty.');
     final profiles = await loadLocalProfiles();
     final profile = LocalProfile(
       id: 'p_${DateTime.now().microsecondsSinceEpoch}',
       name: trimmed,
+      avatarBase64: avatarBase64,
       createdAt: DateTime.now(),
     );
     final preferences = await SharedPreferences.getInstance();
@@ -93,18 +97,38 @@ class HealthStore {
     return profile;
   }
 
-  Future<void> renameLocalProfile(String profileId, String name) async {
+  Future<void> updateLocalProfile(
+    String profileId, {
+    required String name,
+    String? avatarBase64,
+  }) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) throw ArgumentError('Profile name cannot be empty.');
     final profiles = await loadLocalProfiles();
     final updated = [
       for (final profile in profiles)
-        profile.id == profileId ? profile.copyWith(name: trimmed) : profile,
+        profile.id == profileId
+            ? profile.copyWith(
+                name: trimmed,
+                avatarBase64: avatarBase64,
+                clearAvatar: avatarBase64 == null,
+              )
+            : profile,
     ];
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(
       _profilesKey,
       jsonEncode(updated.map((value) => value.toJson()).toList()),
+    );
+  }
+
+  Future<void> renameLocalProfile(String profileId, String name) async {
+    final profiles = await loadLocalProfiles();
+    final current = profiles.firstWhere((profile) => profile.id == profileId);
+    await updateLocalProfile(
+      profileId,
+      name: name,
+      avatarBase64: current.avatarBase64,
     );
   }
 
