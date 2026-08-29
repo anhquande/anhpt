@@ -101,7 +101,7 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
     }
   }
 
-  String _healthSummary(HealthProfile health) {
+  String _profileSummary(HealthProfile health) {
     final values = <String>[];
     if (health.birthYear != null) values.add('Born ${health.birthYear}');
     if (health.heightCm != null) {
@@ -155,7 +155,7 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
                         ),
                         subtitle: Padding(
                           padding: const EdgeInsets.only(top: 4),
-                          child: Text(_healthSummary(health)),
+                          child: Text(_profileSummary(health)),
                         ),
                         trailing: PopupMenuButton<String>(
                           onSelected: (value) async {
