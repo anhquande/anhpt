@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'app/app_controller.dart';
+import 'app/theme_preference.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/local_store.dart';
@@ -12,7 +13,10 @@ Future<void> main() async {
     LocalStore(),
     yamlFileStore: WorkoutYamlFileStore(),
   );
-  await controller.initialize();
+  await Future.wait([
+    controller.initialize(),
+    ThemePreference.instance.initialize(),
+  ]);
   runApp(AnhPtApp(controller: controller));
 }
 
@@ -45,22 +49,25 @@ class AnhPtApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: controller,
-      builder: (_, __) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'AnhPT',
-        theme: _theme(Brightness.light),
-        darkTheme: _theme(Brightness.dark),
-        themeMode: ThemeMode.system,
-        home: controller.loading
-            ? const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              )
-            : controller.onboarded
-                ? HomeScreen(controller: controller)
-                : OnboardingScreen(
-                    onContinue: controller.completeOnboarding,
-                  ),
+      animation: ThemePreference.instance,
+      builder: (_, __) => AnimatedBuilder(
+        animation: controller,
+        builder: (_, __) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'AnhPT',
+          theme: _theme(Brightness.light),
+          darkTheme: _theme(Brightness.dark),
+          themeMode: ThemePreference.instance.mode,
+          home: controller.loading
+              ? const Scaffold(
+                  body: Center(child: CircularProgressIndicator()),
+                )
+              : controller.onboarded
+                  ? HomeScreen(controller: controller)
+                  : OnboardingScreen(
+                      onContinue: controller.completeOnboarding,
+                    ),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
+import '../app/theme_preference.dart';
 import '../services/coach_recording_service.dart';
 import 'bucket_sources_screen.dart';
 import 'music_library_screen.dart';
@@ -20,6 +21,18 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  String _appearanceLabel(ThemeMode mode) => switch (mode) {
+        ThemeMode.system => 'System (follows device)',
+        ThemeMode.light => 'Light',
+        ThemeMode.dark => 'Dark',
+      };
+
+  IconData _appearanceIcon(ThemeMode mode) => switch (mode) {
+        ThemeMode.system => Icons.brightness_auto_outlined,
+        ThemeMode.light => Icons.light_mode_outlined,
+        ThemeMode.dark => Icons.dark_mode_outlined,
+      };
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,10 +45,38 @@ class SettingsScreen extends StatelessWidget {
             builder: (_, __) => ListView(
               padding: const EdgeInsets.all(20),
               children: [
-                const ListTile(
-                  leading: Icon(Icons.brightness_6_outlined),
-                  title: Text('Appearance'),
-                  subtitle: Text('System (Light/Dark follows device)'),
+                AnimatedBuilder(
+                  animation: ThemePreference.instance,
+                  builder: (context, _) {
+                    final mode = ThemePreference.instance.mode;
+                    return ListTile(
+                      leading: Icon(_appearanceIcon(mode)),
+                      title: const Text('Appearance'),
+                      subtitle: Text(_appearanceLabel(mode)),
+                      trailing: DropdownButton<ThemeMode>(
+                        value: mode,
+                        onChanged: (value) {
+                          if (value != null) {
+                            ThemePreference.instance.setMode(value);
+                          }
+                        },
+                        items: const [
+                          DropdownMenuItem(
+                            value: ThemeMode.system,
+                            child: Text('System'),
+                          ),
+                          DropdownMenuItem(
+                            value: ThemeMode.light,
+                            child: Text('Light'),
+                          ),
+                          DropdownMenuItem(
+                            value: ThemeMode.dark,
+                            child: Text('Dark'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const Divider(),
                 ListTile(
