@@ -14,6 +14,7 @@ import '../services/health_store.dart';
 import '../widgets/profile_editor_dialog.dart';
 
 enum _ChartRange { week, month, quarter, year }
+enum _MeasurementSort { date, weight, note }
 
 class HealthScreen extends StatefulWidget {
   const HealthScreen({super.key});
@@ -24,16 +25,25 @@ class HealthScreen extends StatefulWidget {
 
 class _HealthScreenState extends State<HealthScreen> {
   final HealthStore _store = HealthStore();
+  final ScrollController _measurementScrollController = ScrollController();
   LocalProfile? _localProfile;
   HealthProfile _profile = const HealthProfile();
   List<WeightMeasurement> _measurements = [];
   _ChartRange _range = _ChartRange.month;
+  _MeasurementSort _measurementSort = _MeasurementSort.date;
+  bool _measurementSortAscending = false;
   bool _loading = true;
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _measurementScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -53,6 +63,34 @@ class _HealthScreenState extends State<HealthScreen> {
     _measurements.sort((a, b) => b.measuredAt.compareTo(a.measuredAt));
     await _store.saveMeasurements(_measurements, _localProfile?.id);
     if (mounted) setState(() {});
+  }
+
+  List<WeightMeasurement> get _sortedMeasurements {
+    final values = List<WeightMeasurement>.of(_measurements);
+    values.sort((a, b) {
+      final comparison = switch (_measurementSort) {
+        _MeasurementSort.date => a.measuredAt.compareTo(b.measuredAt),
+        _MeasurementSort.weight => a.weightKg.compareTo(b.weightKg),
+        _MeasurementSort.note =>
+          (a.note ?? '').toLowerCase().compareTo((b.note ?? '').toLowerCase()),
+      };
+      return _measurementSortAscending ? comparison : -comparison;
+    });
+    return values;
+  }
+
+  void _sortMeasurements(_MeasurementSort sort) {
+    setState(() {
+      if (_measurementSort == sort) {
+        _measurementSortAscending = !_measurementSortAscending;
+      } else {
+        _measurementSort = sort;
+        _measurementSortAscending = true;
+      }
+    });
+    if (_measurementScrollController.hasClients) {
+      _measurementScrollController.jumpTo(0);
+    }
   }
 
   double _displayWeight(double kg) =>
@@ -129,8 +167,7 @@ class _HealthScreenState extends State<HealthScreen> {
                           context: context,
                           initialDate: initial,
                           firstDate: DateTime(2000),
-                          lastDate:
-                              DateTime.now().add(const Duration(days: 1)),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
                         );
                         if (date == null || !context.mounted) return;
                         final time = await showTimePicker(
@@ -422,6 +459,168 @@ class _HealthScreenState extends State<HealthScreen> {
     setState(() => _measurements = []);
   }
 
+  Widget _measurementHeaderCell(
+    String label,
+    _MeasurementSort sort, {
+    int flex = 1,
+  }) {
+    final selected = _measurementSort == sort;
+    return Expanded(
+      flex: flex,
+      child: InkWell(
+        onTap: () => _sortMeasurements(sort),
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  _measurementSortAscending
+                      ? Icons.arrow_upward
+                      : Icons.arrow_downward,
+                  size: 16,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _measurementTable() {
+    final values = _sortedMeasurements;
+    const rowHeight = 56.0;
+    final visibleRows = math.min(5, values.length);
+    final showScrollbar = values.length > 5;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            child: Row(
+              children: [
+                _measurementHeaderCell(
+                  'Date',
+                  _MeasurementSort.date,
+                  flex: 2,
+                ),
+                _measurementHeaderCell(
+                  'Weight',
+                  _MeasurementSort.weight,
+                ),
+                _measurementHeaderCell(
+                  'Note',
+                  _MeasurementSort.note,
+                  flex: 2,
+                ),
+                const SizedBox(width: 48),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: visibleRows * rowHeight,
+            child: RawScrollbar(
+              controller: _measurementScrollController,
+              thumbVisibility: showScrollbar,
+              trackVisibility: showScrollbar,
+              thickness: 8,
+              radius: const Radius.circular(8),
+              trackRadius: const Radius.circular(8),
+              thumbColor:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              trackColor: Theme.of(context)
+                  .colorScheme
+                  .surfaceContainerHighest
+                  .withValues(alpha: 0.7),
+              mainAxisMargin: 6,
+              crossAxisMargin: 4,
+              child: Padding(
+                padding: EdgeInsets.only(right: showScrollbar ? 14 : 0),
+                child: ListView.builder(
+                  controller: _measurementScrollController,
+                  primary: false,
+                  itemExtent: rowHeight,
+                  itemCount: values.length,
+                  itemBuilder: (context, index) {
+                    final value = values[index];
+                    return InkWell(
+                      onTap: () => _editMeasurement(value),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border(
+                            bottom: BorderSide(
+                              color: Theme.of(context).dividerColor,
+                              width: 0.5,
+                            ),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  _formatDateTime(value.measuredAt),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              flex: 2,
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
+                                child: Text(
+                                  value.note ?? '—',
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              width: 48,
+                              child: IconButton(
+                                tooltip: 'Delete measurement',
+                                icon: const Icon(Icons.delete_outline),
+                                onPressed: () => _deleteMeasurement(value),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) {
@@ -466,11 +665,16 @@ class _HealthScreenState extends State<HealthScreen> {
           ),
         ],
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _editMeasurement(),
+        icon: const Icon(Icons.add),
+        label: const Text('Add weight'),
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
             children: [
               Card(
                 child: ListTile(
@@ -520,10 +724,10 @@ class _HealthScreenState extends State<HealthScreen> {
                           ],
                         ),
                       ),
-                      IconButton.filled(
-                        tooltip: 'Add weight',
+                      FilledButton.icon(
                         onPressed: () => _editMeasurement(),
-                        icon: const Icon(Icons.add),
+                        icon: const Icon(Icons.monitor_weight_outlined),
+                        label: const Text('Log'),
                       ),
                     ],
                   ),
@@ -553,13 +757,21 @@ class _HealthScreenState extends State<HealthScreen> {
                             showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(
-                                  value: _ChartRange.week, label: Text('W')),
+                                value: _ChartRange.week,
+                                label: Text('W'),
+                              ),
                               ButtonSegment(
-                                  value: _ChartRange.month, label: Text('M')),
+                                value: _ChartRange.month,
+                                label: Text('M'),
+                              ),
                               ButtonSegment(
-                                  value: _ChartRange.quarter, label: Text('Q')),
+                                value: _ChartRange.quarter,
+                                label: Text('Q'),
+                              ),
                               ButtonSegment(
-                                  value: _ChartRange.year, label: Text('Y')),
+                                value: _ChartRange.year,
+                                label: Text('Y'),
+                              ),
                             ],
                             selected: {_range},
                             onSelectionChanged: (value) =>
@@ -640,65 +852,7 @@ class _HealthScreenState extends State<HealthScreen> {
               if (_measurements.isEmpty)
                 const Text('No measurements yet.')
               else
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: DataTable(
-                      showCheckboxColumn: false,
-                      headingRowHeight: 44,
-                      dataRowMinHeight: 44,
-                      dataRowMaxHeight: 56,
-                      columns: const [
-                        DataColumn(label: Text('Date / time')),
-                        DataColumn(label: Text('Weight'), numeric: true),
-                        DataColumn(label: Text('Note')),
-                        DataColumn(label: Text('Actions')),
-                      ],
-                      rows: [
-                        for (final value in _measurements.take(50))
-                          DataRow(
-                            onSelectChanged: (_) => _editMeasurement(value),
-                            cells: [
-                              DataCell(Text(_formatDateTime(value.measuredAt))),
-                              DataCell(
-                                Text(
-                                  '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
-                                ),
-                              ),
-                              DataCell(
-                                SizedBox(
-                                  width: 220,
-                                  child: Text(
-                                    value.note ?? '—',
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                              DataCell(
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      tooltip: 'Edit measurement',
-                                      icon: const Icon(Icons.edit_outlined),
-                                      onPressed: () => _editMeasurement(value),
-                                    ),
-                                    IconButton(
-                                      tooltip: 'Delete measurement',
-                                      icon: const Icon(Icons.delete_outline),
-                                      onPressed: () => _deleteMeasurement(value),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
+                _measurementTable(),
             ],
           ),
         ),
