@@ -32,11 +32,15 @@ CompletionDeviceAction? completionDeviceActionFor(
 class WorkoutPlayerScreen extends StatefulWidget {
   final AppController controller;
   final String workoutId;
+  final String? profileId;
+  final String? profileName;
 
   const WorkoutPlayerScreen({
     super.key,
     required this.controller,
     required this.workoutId,
+    this.profileId,
+    this.profileName,
   });
 
   @override
@@ -202,6 +206,10 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(engine.workout.name),
+            if (widget.profileName != null) ...[
+              const SizedBox(height: 6),
+              Text('Profile: ${widget.profileName}'),
+            ],
             const SizedBox(height: 10),
             Text('Active time: ${formatDuration(engine.activeElapsed)}'),
             Text('Progress: ${(engine.progress * 100).round()}%'),
@@ -306,6 +314,13 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                   const Spacer(),
+                  if (widget.profileName != null) ...[
+                    Chip(
+                      avatar: const Icon(Icons.person_outline, size: 16),
+                      label: Text(widget.profileName!),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                   Icon(
                     audioReady ? Icons.volume_up : Icons.volume_off,
                     size: 18,
