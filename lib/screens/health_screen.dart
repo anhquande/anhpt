@@ -123,8 +123,12 @@ class _HealthScreenState extends State<HealthScreen> {
           ? ''
           : _displayWeight(existing.weightKg).toStringAsFixed(1),
     );
+    final timestampController = TextEditingController(
+      text: _formatDateTime(now),
+    );
     final noteController = TextEditingController(text: existing?.note ?? '');
     var selected = now;
+    String? timestampError;
     const suggestions = ['Morning', 'After meal', 'Before meal', 'After workout'];
 
     final saved = await showDialog<bool>(
@@ -145,35 +149,53 @@ class _HealthScreenState extends State<HealthScreen> {
                   decoration: InputDecoration(labelText: 'Weight ($_weightUnit)'),
                 ),
                 const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.schedule),
-                  title: Text(_formatDateTime(selected)),
-                  trailing: const Icon(Icons.edit_outlined),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: selected,
-                      firstDate: DateTime(2000),
-                      lastDate: DateTime.now().add(const Duration(days: 1)),
-                    );
-                    if (date == null || !context.mounted) return;
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: TimeOfDay.fromDateTime(selected),
-                    );
-                    if (time == null) return;
-                    setDialogState(() {
-                      selected = DateTime(
-                        date.year,
-                        date.month,
-                        date.day,
-                        time.hour,
-                        time.minute,
-                      );
-                    });
+                TextField(
+                  controller: timestampController,
+                  keyboardType: TextInputType.datetime,
+                  decoration: InputDecoration(
+                    labelText: 'Timestamp',
+                    hintText: 'DD.MM.YYYY HH:MM',
+                    helperText: 'Type the timestamp or use the date/time picker.',
+                    errorText: timestampError,
+                    suffixIcon: IconButton(
+                      tooltip: 'Choose date and time',
+                      icon: const Icon(Icons.calendar_month_outlined),
+                      onPressed: () async {
+                        final typed = _parseDateTime(timestampController.text);
+                        final initial = typed ?? selected;
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: initial,
+                          firstDate: DateTime(2000),
+                          lastDate: DateTime.now().add(const Duration(days: 1)),
+                        );
+                        if (date == null || !context.mounted) return;
+                        final time = await showTimePicker(
+                          context: context,
+                          initialTime: TimeOfDay.fromDateTime(initial),
+                        );
+                        if (time == null) return;
+                        setDialogState(() {
+                          selected = DateTime(
+                            date.year,
+                            date.month,
+                            date.day,
+                            time.hour,
+                            time.minute,
+                          );
+                          timestampController.text = _formatDateTime(selected);
+                          timestampError = null;
+                        });
+                      },
+                    ),
+                  ),
+                  onChanged: (_) {
+                    if (timestampError != null) {
+                      setDialogState(() => timestampError = null);
+                    }
                   },
                 ),
+                const SizedBox(height: 12),
                 TextField(
                   controller: noteController,
                   decoration: const InputDecoration(
@@ -209,6 +231,25 @@ class _HealthScreenState extends State<HealthScreen> {
                 if (parsed == null) return;
                 final kg = _toKg(parsed);
                 if (kg <= 0 || kg >= 500) return;
+
+                final parsedTimestamp =
+                    _parseDateTime(timestampController.text.trim());
+                if (parsedTimestamp == null) {
+                  setDialogState(() {
+                    timestampError = 'Use DD.MM.YYYY HH:MM';
+                  });
+                  return;
+                }
+                final maxTimestamp =
+                    DateTime.now().add(const Duration(days: 1));
+                if (parsedTimestamp.isBefore(DateTime(2000)) ||
+                    parsedTimestamp.isAfter(maxTimestamp)) {
+                  setDialogState(() {
+                    timestampError = 'Choose a date between 2000 and tomorrow.';
+                  });
+                  return;
+                }
+                selected = parsedTimestamp;
                 Navigator.pop(context, true);
               },
               child: const Text('Save'),
@@ -496,7 +537,8 @@ class _HealthScreenState extends State<HealthScreen> {
               thickness: 8,
               radius: const Radius.circular(8),
               trackRadius: const Radius.circular(8),
-              thumbColor: Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
+              thumbColor:
+                  Theme.of(context).colorScheme.primary.withValues(alpha: 0.8),
               trackColor: Theme.of(context)
                   .colorScheme
                   .surfaceContainerHighest
@@ -528,7 +570,8 @@ class _HealthScreenState extends State<HealthScreen> {
                             Expanded(
                               flex: 2,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
                                   _formatDateTime(value.measuredAt),
                                   overflow: TextOverflow.ellipsis,
@@ -537,7 +580,8 @@ class _HealthScreenState extends State<HealthScreen> {
                             ),
                             Expanded(
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
                                   '${_displayWeight(value.weightKg).toStringAsFixed(1)} $_weightUnit',
                                   overflow: TextOverflow.ellipsis,
@@ -547,7 +591,8 @@ class _HealthScreenState extends State<HealthScreen> {
                             Expanded(
                               flex: 2,
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 8),
                                 child: Text(
                                   value.note ?? '—',
                                   overflow: TextOverflow.ellipsis,
@@ -712,13 +757,21 @@ class _HealthScreenState extends State<HealthScreen> {
                             showSelectedIcon: false,
                             segments: const [
                               ButtonSegment(
-                                  value: _ChartRange.week, label: Text('W')),
+                                value: _ChartRange.week,
+                                label: Text('W'),
+                              ),
                               ButtonSegment(
-                                  value: _ChartRange.month, label: Text('M')),
+                                value: _ChartRange.month,
+                                label: Text('M'),
+                              ),
                               ButtonSegment(
-                                  value: _ChartRange.quarter, label: Text('Q')),
+                                value: _ChartRange.quarter,
+                                label: Text('Q'),
+                              ),
                               ButtonSegment(
-                                  value: _ChartRange.year, label: Text('Y')),
+                                value: _ChartRange.year,
+                                label: Text('Y'),
+                              ),
                             ],
                             selected: {_range},
                             onSelectionChanged: (value) =>
@@ -910,4 +963,42 @@ String _formatDateTime(DateTime value) {
   final local = value.toLocal();
   String two(int value) => value.toString().padLeft(2, '0');
   return '${two(local.day)}.${two(local.month)}.${local.year} ${two(local.hour)}:${two(local.minute)}';
+}
+
+DateTime? _parseDateTime(String value) {
+  final match = RegExp(
+    r'^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})$',
+  ).firstMatch(value.trim());
+  if (match == null) return null;
+
+  final day = int.tryParse(match.group(1)!);
+  final month = int.tryParse(match.group(2)!);
+  final year = int.tryParse(match.group(3)!);
+  final hour = int.tryParse(match.group(4)!);
+  final minute = int.tryParse(match.group(5)!);
+  if (day == null ||
+      month == null ||
+      year == null ||
+      hour == null ||
+      minute == null ||
+      month < 1 ||
+      month > 12 ||
+      day < 1 ||
+      day > 31 ||
+      hour < 0 ||
+      hour > 23 ||
+      minute < 0 ||
+      minute > 59) {
+    return null;
+  }
+
+  final parsed = DateTime(year, month, day, hour, minute);
+  if (parsed.year != year ||
+      parsed.month != month ||
+      parsed.day != day ||
+      parsed.hour != hour ||
+      parsed.minute != minute) {
+    return null;
+  }
+  return parsed;
 }
