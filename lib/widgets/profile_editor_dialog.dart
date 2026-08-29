@@ -1,12 +1,21 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/health.dart';
 
 class ProfileEditResult {
   final String name;
   final HealthProfile health;
+  final String? avatarBase64;
 
-  const ProfileEditResult({required this.name, required this.health});
+  const ProfileEditResult({
+    required this.name,
+    required this.health,
+    this.avatarBase64,
+  });
 }
 
 Future<ProfileEditResult?> showProfileEditorDialog(
@@ -14,6 +23,7 @@ Future<ProfileEditResult?> showProfileEditorDialog(
   required String title,
   required String initialName,
   required HealthProfile initialHealth,
+  String? initialAvatarBase64,
 }) async {
   final nameController = TextEditingController(text: initialName);
   final heightController = TextEditingController(
@@ -22,6 +32,15 @@ Future<ProfileEditResult?> showProfileEditorDialog(
   final yearController = TextEditingController(
     text: initialHealth.birthYear?.toString() ?? '',
   );
+  final picker = ImagePicker();
+  Uint8List? avatarBytes;
+  if (initialAvatarBase64 != null && initialAvatarBase64.isNotEmpty) {
+    try {
+      avatarBytes = base64Decode(initialAvatarBase64);
+    } catch (_) {
+      avatarBytes = null;
+    }
+  }
   var sex = initialHealth.sex;
   var units = initialHealth.unitSystem;
 
@@ -34,9 +53,48 @@ Future<ProfileEditResult?> showProfileEditorDialog(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              CircleAvatar(
+                radius: 46,
+                backgroundImage:
+                    avatarBytes == null ? null : MemoryImage(avatarBytes!),
+                child: avatarBytes == null
+                    ? const Icon(Icons.person_outline, size: 42)
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 8,
+                children: [
+                  TextButton.icon(
+                    onPressed: () async {
+                      final picked = await picker.pickImage(
+                        source: ImageSource.gallery,
+                        maxWidth: 512,
+                        maxHeight: 512,
+                        imageQuality: 85,
+                      );
+                      if (picked == null) return;
+                      final bytes = await picked.readAsBytes();
+                      setDialogState(() => avatarBytes = bytes);
+                    },
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: Text(
+                      avatarBytes == null ? 'Choose photo' : 'Change photo',
+                    ),
+                  ),
+                  if (avatarBytes != null)
+                    TextButton.icon(
+                      onPressed: () => setDialogState(() => avatarBytes = null),
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Remove'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
               TextField(
                 controller: nameController,
-                autofocus: true,
+                autofocus: initialName.isEmpty,
                 decoration: const InputDecoration(labelText: 'Name'),
               ),
               const SizedBox(height: 10),
@@ -104,6 +162,8 @@ Future<ProfileEditResult?> showProfileEditorDialog(
                 context,
                 ProfileEditResult(
                   name: name,
+                  avatarBase64:
+                      avatarBytes == null ? null : base64Encode(avatarBytes!),
                   health: HealthProfile(
                     sex: sex,
                     birthYear: birthYear,
