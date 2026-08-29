@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/health.dart';
 import '../models/local_profile.dart';
 import '../services/health_store.dart';
+import '../widgets/profile_avatar.dart';
 import '../widgets/profile_editor_dialog.dart';
 
 class LocalProfilesScreen extends StatefulWidget {
@@ -43,7 +44,10 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
       initialHealth: const HealthProfile(),
     );
     if (result == null) return;
-    final profile = await _store.createLocalProfile(result.name);
+    final profile = await _store.createLocalProfile(
+      result.name,
+      avatarBase64: result.avatarBase64,
+    );
     await _store.saveProfile(result.health, profile.id);
     await _store.setActiveProfile(profile.id);
     await _load();
@@ -56,10 +60,15 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
       context,
       title: 'Edit profile',
       initialName: profile.name,
+      initialAvatarBase64: profile.avatarBase64,
       initialHealth: health,
     );
     if (result == null) return;
-    await _store.renameLocalProfile(profile.id, result.name);
+    await _store.updateLocalProfile(
+      profile.id,
+      name: result.name,
+      avatarBase64: result.avatarBase64,
+    );
     await _store.saveProfile(result.health, profile.id);
     await _load();
   }
@@ -136,13 +145,7 @@ class _LocalProfilesScreenState extends State<LocalProfilesScreen> {
                     return Card(
                       child: ListTile(
                         contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-                        leading: CircleAvatar(
-                          child: Text(
-                            profile.name.trim().isEmpty
-                                ? '?'
-                                : profile.name.trim()[0].toUpperCase(),
-                          ),
-                        ),
+                        leading: ProfileAvatar(profile: profile, radius: 24),
                         title: Row(
                           children: [
                             Expanded(child: Text(profile.name)),
