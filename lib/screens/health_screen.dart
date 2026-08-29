@@ -411,13 +411,11 @@ class _HealthScreenState extends State<HealthScreen> {
         actions: [
           PopupMenuButton<String>(
             onSelected: (value) {
-              if (value == 'profile') _editProfile();
               if (value == 'import') _importData();
               if (value == 'export') _exportData();
               if (value == 'clear') _clearMeasurements();
             },
             itemBuilder: (_) => const [
-              PopupMenuItem(value: 'profile', child: Text('Edit profile')),
               PopupMenuItem(value: 'import', child: Text('Import health data')),
               PopupMenuItem(value: 'export', child: Text('Export health data')),
               PopupMenuDivider(),
