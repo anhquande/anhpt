@@ -674,8 +674,6 @@ class _HealthScreenState extends State<HealthScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 100),
             children: [
-              if (bmi != null) _BmiCard(bmi: bmi),
-              if (bmi != null) const SizedBox(height: 12),
               Card(
                 clipBehavior: Clip.antiAlias,
                 child: Column(
@@ -715,6 +713,13 @@ class _HealthScreenState extends State<HealthScreen> {
                         ],
                       ),
                     ),
+                    if (bmi != null) ...[
+                      const Divider(height: 1),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+                        child: _BmiBar(bmi: bmi),
+                      ),
+                    ],
                     const Divider(height: 1),
                     InkWell(
                       onTap: _measurements.isEmpty
@@ -883,49 +888,44 @@ class _HealthScreenState extends State<HealthScreen> {
   }
 }
 
-class _BmiCard extends StatelessWidget {
+class _BmiBar extends StatelessWidget {
   final double bmi;
-  const _BmiCard({required this.bmi});
+  const _BmiBar({required this.bmi});
 
   @override
   Widget build(BuildContext context) {
     final normalized = ((bmi - 15) / 25).clamp(0.0, 1.0);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'BMI ${bmi.toStringAsFixed(1)} · ${HealthAnalytics.bmiLabel(bmi)}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 10),
-            LayoutBuilder(
-              builder: (context, constraints) => Stack(
-                alignment: Alignment.centerLeft,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'BMI ${bmi.toStringAsFixed(1)} · ${HealthAnalytics.bmiLabel(bmi)}',
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 10),
+        LayoutBuilder(
+          builder: (context, constraints) => Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              const Row(
                 children: [
-                  const Row(
-                    children: [
-                      Expanded(child: _RangeColor(Colors.orange)),
-                      Expanded(flex: 2, child: _RangeColor(Colors.green)),
-                      Expanded(child: _RangeColor(Colors.amber)),
-                      Expanded(child: _RangeColor(Colors.red)),
-                    ],
-                  ),
-                  Positioned(
-                    left: math.max(
-                      0,
-                      constraints.maxWidth * normalized - 7,
-                    ),
-                    child: const Icon(Icons.arrow_drop_down, size: 20),
-                  ),
+                  Expanded(child: _RangeColor(Colors.orange)),
+                  Expanded(flex: 2, child: _RangeColor(Colors.green)),
+                  Expanded(child: _RangeColor(Colors.amber)),
+                  Expanded(child: _RangeColor(Colors.red)),
                 ],
               ),
-            ),
-          ],
+              Positioned(
+                left: math.max(
+                  0,
+                  constraints.maxWidth * normalized - 7,
+                ),
+                child: const Icon(Icons.arrow_drop_down, size: 20),
+              ),
+            ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
