@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../models/workout.dart';
 import '../widgets/workout_widgets.dart';
+import 'health_screen.dart';
 import 'settings_screen.dart';
 import 'workout_builder_screen.dart';
 import 'workout_detail_screen.dart';
@@ -93,6 +94,14 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('My Workouts',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
+          IconButton(
+            tooltip: 'Health',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HealthScreen()),
+            ),
+            icon: const Icon(Icons.favorite_outline),
+          ),
           IconButton(
             tooltip: 'Settings',
             onPressed: () => Navigator.push(

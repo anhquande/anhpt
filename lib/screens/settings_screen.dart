@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../services/coach_recording_service.dart';
 import 'bucket_sources_screen.dart';
+import 'health_screen.dart';
 import 'music_library_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -36,6 +37,17 @@ class SettingsScreen extends StatelessWidget {
                   leading: Icon(Icons.brightness_6_outlined),
                   title: Text('Appearance'),
                   subtitle: Text('System (Light/Dark follows device)'),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.favorite_outline),
+                  title: const Text('Health'),
+                  subtitle: const Text('Weight, BMI, trends, forecasts, and health data'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const HealthScreen()),
+                  ),
                 ),
                 const Divider(),
                 ListTile(
