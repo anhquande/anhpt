@@ -1,0 +1,135 @@
+name: Release APK
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build & Release APK
+    if: >-
+      github.event.pull_request.merged == true &&
+      (startsWith(github.event.pull_request.title, 'feat:') ||
+       startsWith(github.event.pull_request.title, 'fix:'))
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout merged commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Determine release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PUBSPEC_VERSION=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)
+          CURRENT_VERSION=${PUBSPEC_VERSION%%+*}
+          CURRENT_BUILD=${PUBSPEC_VERSION#*+}
+          if [[ "$CURRENT_BUILD" == "$PUBSPEC_VERSION" ]]; then
+            CURRENT_BUILD=0
+          fi
+
+          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1 || true)
+          if [[ -n "$LATEST_TAG" ]]; then
+            BASE_VERSION=${LATEST_TAG#v}
+          else
+            BASE_VERSION=$CURRENT_VERSION
+          fi
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+          TITLE='${{ github.event.pull_request.title }}'
+
+          if [[ "$TITLE" == feat:* ]]; then
+            VERSION="$MAJOR.$((MINOR + 1)).0"
+          elif [[ "$TITLE" == fix:* ]]; then
+            VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          else
+            echo 'Unsupported release type.' >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          BUILD_NUMBER=$((CURRENT_BUILD + GITHUB_RUN_NUMBER))
+
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists." >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "apk_name=anhpt-$TAG.apk" >> "$GITHUB_OUTPUT"
+
+          echo "Release type: ${TITLE%%:*}"
+          echo "Base version: $BASE_VERSION"
+          echo "New version: $VERSION+$BUILD_NUMBER"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run tests
+        run: flutter test
+
+      - name: Prepare Android project
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f android/gradlew ]]; then
+            echo 'Android Gradle scaffolding is incomplete; generating it with Flutter.'
+            if [[ -f android/app/src/main/AndroidManifest.xml ]]; then
+              cp android/app/src/main/AndroidManifest.xml /tmp/AnhPT-AndroidManifest.xml
+            fi
+            flutter create --platforms=android --project-name anhpt .
+            if [[ -f /tmp/AnhPT-AndroidManifest.xml ]]; then
+              cp /tmp/AnhPT-AndroidManifest.xml android/app/src/main/AndroidManifest.xml
+            fi
+          fi
+
+      - name: Build release APK
+        run: >-
+          flutter build apk --release
+          --build-name=${{ steps.version.outputs.version }}
+          --build-number=${{ steps.version.outputs.build_number }}
+
+      - name: Rename APK
+        shell: bash
+        run: >-
+          mv build/app/outputs/flutter-apk/app-release.apk
+          "${{ steps.version.outputs.apk_name }}"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "${{ steps.version.outputs.tag }}"
+          "${{ steps.version.outputs.apk_name }}"
+          --target "${{ github.event.pull_request.merge_commit_sha }}"
+          --title "AnhPT ${{ steps.version.outputs.tag }}"
+          --generate-notes
