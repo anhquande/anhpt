@@ -12,7 +12,6 @@ import 'workout_builder_screen.dart';
 import 'workout_detail_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
-import 'bucket_catalog_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppController controller;
@@ -210,81 +209,61 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                 children: [
-                  LayoutBuilder(
-                    builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 430;
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: FilledButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => WorkoutBuilderScreen(
-                                    controller: controller,
-                                  ),
-                                ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => WorkoutBuilderScreen(
+                                controller: controller,
                               ),
-                              icon: const Icon(Icons.add),
-                              label: Text(compact ? 'New' : 'New workout'),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => BucketCatalogScreen(
-                                    controller: controller,
-                                  ),
+                          icon: const Icon(Icons.add),
+                          label: const Text('New workout'),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      PopupMenuButton<String>(
+                        tooltip: 'More ways to add',
+                        icon: const Icon(Icons.more_vert),
+                        onSelected: (value) {
+                          if (value == 'package') {
+                            _importPackage();
+                          } else if (value == 'yaml') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => WorkoutEditorScreen(
+                                  controller: controller,
+                                  importMode: true,
                                 ),
                               ),
-                              icon: const Icon(Icons.explore_outlined),
-                              label: Text(compact ? 'Browse' : 'Browse workouts'),
+                            );
+                          }
+                        },
+                        itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'package',
+                            child: ListTile(
+                              leading: Icon(Icons.unarchive_outlined),
+                              title: Text('Import package'),
+                              contentPadding: EdgeInsets.zero,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          PopupMenuButton<String>(
-                            tooltip: 'More ways to add',
-                            icon: const Icon(Icons.more_vert),
-                            onSelected: (value) {
-                              if (value == 'package') {
-                                _importPackage();
-                              } else if (value == 'yaml') {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => WorkoutEditorScreen(
-                                      controller: controller,
-                                      importMode: true,
-                                    ),
-                                  ),
-                                );
-                              }
-                            },
-                            itemBuilder: (_) => const [
-                              PopupMenuItem(
-                                value: 'package',
-                                child: ListTile(
-                                  leading: Icon(Icons.unarchive_outlined),
-                                  title: Text('Import package'),
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                              PopupMenuItem(
-                                value: 'yaml',
-                                child: ListTile(
-                                  leading: Icon(Icons.code),
-                                  title: Text('Import YAML'),
-                                  contentPadding: EdgeInsets.zero,
-                                ),
-                              ),
-                            ],
+                          PopupMenuItem(
+                            value: 'yaml',
+                            child: ListTile(
+                              leading: Icon(Icons.code),
+                              title: Text('Import YAML'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                         ],
-                      );
-                    },
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 18),
                   TextField(
@@ -360,7 +339,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 12),
                           Text(
                             _query.isEmpty
-                                ? 'Create or browse for your first workout.'
+                                ? 'Create your first workout.'
                                 : 'No workouts match “$_query”.',
                             textAlign: TextAlign.center,
                           ),
