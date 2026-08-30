@@ -9,7 +9,6 @@ import 'health_screen.dart';
 import 'local_profiles_screen.dart';
 import 'settings_screen.dart';
 import 'workout_builder_screen.dart';
-import 'workout_detail_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
 
@@ -51,14 +50,6 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
-  }
-
-  void _openDetail(BuildContext context, Workout w) {
-    Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) =>
-                WorkoutDetailScreen(controller: controller, workoutId: w.id)));
   }
 
   Future<void> _start(BuildContext context, Workout w) async {
@@ -368,7 +359,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       workout: workout,
                       sourceName: _sourceNameFor(workout),
                       originalName: _originalNameFor(workout),
-                      onOpen: () => _openDetail(context, workout),
                       onStart: () => _start(context, workout),
                       onFavorite: () => controller.toggleFavorite(workout.id),
                     ),
