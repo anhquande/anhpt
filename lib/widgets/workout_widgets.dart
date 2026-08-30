@@ -35,6 +35,20 @@ class WorkoutCard extends StatelessWidget {
     this.originalName,
   });
 
+  IconData _thumbnailIcon() {
+    final tags = workout.tags.map((tag) => tag.toLowerCase()).toSet();
+    if (tags.any((tag) => tag.contains('karate') || tag.contains('martial'))) {
+      return Icons.sports_martial_arts;
+    }
+    if (tags.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
+      return Icons.self_improvement;
+    }
+    if (tags.any((tag) => tag.contains('hiit') || tag.contains('cardio'))) {
+      return Icons.bolt;
+    }
+    return Icons.fitness_center;
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -45,72 +59,42 @@ class WorkoutCard extends StatelessWidget {
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 13, 10, 13),
+          padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
           child: Row(
             children: [
+              Container(
+                width: 68,
+                height: 68,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                alignment: Alignment.center,
+                child: Icon(
+                  _thumbnailIcon(),
+                  size: 30,
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       workout.name,
-                      maxLines: 1,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    if (workout.description.trim().isNotEmpty) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        workout.description.trim(),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                    if (sourceName != null) ...[
-                      const SizedBox(height: 5),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.cloud_outlined,
-                            size: 14,
-                            color: cs.onSurfaceVariant,
-                          ),
-                          const SizedBox(width: 5),
-                          Expanded(
-                            child: Text(
-                              'From $sourceName',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: cs.onSurfaceVariant),
-                            ),
-                          ),
-                        ],
-                      ),
-                      if (originalName != null &&
-                          originalName!.trim() != workout.name.trim()) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          'Originally “$originalName”',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: cs.onSurfaceVariant,
-                                  ),
-                        ),
-                      ],
-                    ],
                     const SizedBox(height: 6),
                     Text(
-                      '${formatDuration(workout.totalDuration)}  ·  '
-                      '${workout.effectiveStepCount} steps  ·  '
+                      '${formatDuration(workout.totalDuration)}  |  '
+                      '${workout.effectiveStepCount} steps  |  '
                       '${workout.voice.language.toUpperCase()}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: cs.onSurfaceVariant,
                           ),
