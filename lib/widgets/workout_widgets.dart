@@ -344,7 +344,7 @@ class _NodeView extends StatelessWidget {
             ],
           ),
         ),
-      ),
+      );
     }
 
     return const SizedBox.shrink();
