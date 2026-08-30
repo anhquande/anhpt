@@ -903,26 +903,38 @@ class _BmiBar extends StatelessWidget {
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 10),
-        LayoutBuilder(
-          builder: (context, constraints) => Stack(
-            alignment: Alignment.centerLeft,
-            children: [
-              const Row(
-                children: [
-                  Expanded(child: _RangeColor(Colors.orange)),
-                  Expanded(flex: 2, child: _RangeColor(Colors.green)),
-                  Expanded(child: _RangeColor(Colors.amber)),
-                  Expanded(child: _RangeColor(Colors.red)),
-                ],
-              ),
-              Positioned(
-                left: math.max(
-                  0,
-                  constraints.maxWidth * normalized - 7,
+        SizedBox(
+          height: 24,
+          child: LayoutBuilder(
+            builder: (context, constraints) => Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Positioned(
+                  left: 0,
+                  right: 0,
+                  top: 7,
+                  child: Row(
+                    children: [
+                      Expanded(child: _RangeColor(Colors.orange)),
+                      Expanded(flex: 2, child: _RangeColor(Colors.green)),
+                      Expanded(child: _RangeColor(Colors.amber)),
+                      Expanded(child: _RangeColor(Colors.red)),
+                    ],
+                  ),
                 ),
-                child: const Icon(Icons.arrow_drop_down, size: 20),
-              ),
-            ],
+                Positioned(
+                  left: math.max(
+                    0,
+                    math.min(
+                      constraints.maxWidth - 20,
+                      constraints.maxWidth * normalized - 10,
+                    ),
+                  ),
+                  top: 0,
+                  child: const Icon(Icons.arrow_drop_down, size: 20),
+                ),
+              ],
+            ),
           ),
         ),
       ],

@@ -210,70 +210,81 @@ class _HomeScreenState extends State<HomeScreen> {
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                 children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
-                    children: [
-                      FilledButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                WorkoutBuilderScreen(controller: controller),
-                          ),
-                        ),
-                        icon: const Icon(Icons.add),
-                        label: const Text('New workout'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                BucketCatalogScreen(controller: controller),
-                          ),
-                        ),
-                        icon: const Icon(Icons.explore_outlined),
-                        label: const Text('Browse workouts'),
-                      ),
-                      PopupMenuButton<String>(
-                        tooltip: 'More ways to add',
-                        icon: const Icon(Icons.more_vert),
-                        onSelected: (value) {
-                          if (value == 'package') {
-                            _importPackage();
-                          } else if (value == 'yaml') {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => WorkoutEditorScreen(
-                                  controller: controller,
-                                  importMode: true,
+                  LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 430;
+                      return Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => WorkoutBuilderScreen(
+                                    controller: controller,
+                                  ),
                                 ),
                               ),
-                            );
-                          }
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'package',
-                            child: ListTile(
-                              leading: Icon(Icons.unarchive_outlined),
-                              title: Text('Import package'),
-                              contentPadding: EdgeInsets.zero,
+                              icon: const Icon(Icons.add),
+                              label: Text(compact ? 'New' : 'New workout'),
                             ),
                           ),
-                          PopupMenuItem(
-                            value: 'yaml',
-                            child: ListTile(
-                              leading: Icon(Icons.code),
-                              title: Text('Import YAML'),
-                              contentPadding: EdgeInsets.zero,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => BucketCatalogScreen(
+                                    controller: controller,
+                                  ),
+                                ),
+                              ),
+                              icon: const Icon(Icons.explore_outlined),
+                              label: Text(compact ? 'Browse' : 'Browse workouts'),
                             ),
+                          ),
+                          const SizedBox(width: 4),
+                          PopupMenuButton<String>(
+                            tooltip: 'More ways to add',
+                            icon: const Icon(Icons.more_vert),
+                            onSelected: (value) {
+                              if (value == 'package') {
+                                _importPackage();
+                              } else if (value == 'yaml') {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => WorkoutEditorScreen(
+                                      controller: controller,
+                                      importMode: true,
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'package',
+                                child: ListTile(
+                                  leading: Icon(Icons.unarchive_outlined),
+                                  title: Text('Import package'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                              PopupMenuItem(
+                                value: 'yaml',
+                                child: ListTile(
+                                  leading: Icon(Icons.code),
+                                  title: Text('Import YAML'),
+                                  contentPadding: EdgeInsets.zero,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
-                      ),
-                    ],
+                      );
+                    },
                   ),
                   const SizedBox(height: 18),
                   TextField(
