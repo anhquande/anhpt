@@ -167,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Workouts',
+        title: const Text('Workouts',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           TextButton.icon(
