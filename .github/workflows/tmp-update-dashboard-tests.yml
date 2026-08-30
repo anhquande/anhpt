@@ -1,0 +1,61 @@
+name: Update dashboard widget tests
+
+on:
+  push:
+    branches:
+      - fix/android-health-dashboard-layout
+
+permissions:
+  contents: write
+
+jobs:
+  patch-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: fix/android-health-dashboard-layout
+
+      - name: Update widget tests for dashboard cleanup
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('test/widget_test.dart')
+          text = path.read_text()
+
+          text = text.replace("expect(find.text('My Workouts'), findsOneWidget);", "expect(find.text('Workouts'), findsOneWidget);")
+          text = text.replace("expect(find.text('Browse workouts'), findsOneWidget);", "expect(find.text('Browse workouts'), findsNothing);")
+
+          start = text.index("  testWidgets('Home opens Browse Workouts with accent-insensitive search',")
+          end = text.index("\n  });\n}", start) + len("\n  });")
+          replacement = '''  testWidgets('Home no longer exposes Browse Workouts', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore());
+
+    await tester.pumpWidget(MaterialApp(
+      home: HomeScreen(controller: controller),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Workouts'), findsOneWidget);
+    expect(find.text('Browse workouts'), findsNothing);
+    expect(find.text('Browse Workouts'), findsNothing);
+    expect(find.byTooltip('More ways to add'), findsOneWidget);
+  });'''
+          text = text[:start] + replacement + text[end:]
+
+          path.write_text(text)
+          PY
+
+          rm .github/workflows/tmp-update-dashboard-tests.yml
+
+      - name: Commit updated tests
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add test/widget_test.dart .github/workflows/tmp-update-dashboard-tests.yml
+          git commit -m "test: update dashboard expectations after browse removal"
+          git push origin HEAD:fix/android-health-dashboard-layout
