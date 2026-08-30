@@ -1,4 +1,4 @@
-# AnhPT Integrated MVP v0.6
+# AnhPT Integrated MVP v0.6.1
 
 Adds real Text-to-Speech and cue sounds for Web and Windows.
 
