@@ -19,7 +19,6 @@ typedef StepMediaCallback = void Function(
 
 class WorkoutCard extends StatelessWidget {
   final Workout workout;
-  final VoidCallback onOpen;
   final VoidCallback onStart;
   final VoidCallback onFavorite;
   final String? sourceName;
@@ -28,7 +27,6 @@ class WorkoutCard extends StatelessWidget {
   const WorkoutCard({
     super.key,
     required this.workout,
-    required this.onOpen,
     required this.onStart,
     required this.onFavorite,
     this.sourceName,
@@ -57,7 +55,7 @@ class WorkoutCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       margin: EdgeInsets.zero,
       child: InkWell(
-        onTap: onOpen,
+        onTap: onStart,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
           child: Row(
@@ -113,11 +111,6 @@ class WorkoutCard extends StatelessWidget {
                       : Icons.star_border_rounded,
                   color: workout.favorite ? cs.primary : cs.onSurfaceVariant,
                 ),
-              ),
-              IconButton.filledTonal(
-                tooltip: 'Start ${workout.name}',
-                onPressed: onStart,
-                icon: const Icon(Icons.play_arrow_rounded),
               ),
             ],
           ),
@@ -351,7 +344,7 @@ class _NodeView extends StatelessWidget {
             ],
           ),
         ),
-      );
+      ),
     }
 
     return const SizedBox.shrink();
