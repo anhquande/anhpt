@@ -23,6 +23,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
+  String _selectedFilter = 'all';
   final _searchController = TextEditingController();
   final HealthStore _healthStore = HealthStore();
   List<LocalProfile> _profiles = [];
@@ -62,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _start(BuildContext context, Workout w) async {
     await _loadProfiles();
-    if (!mounted) return;
+    if (!context.mounted) return;
     final participant = _activeProfile;
     controller.markUsed(w.id);
     Navigator.push(
@@ -90,7 +91,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const ListTile(
               title: Text('Active profile',
                   style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Health data and future workout history stay separate.'),
+              subtitle:
+                  Text('Health data and future workout history stay separate.'),
             ),
             for (final profile in _profiles)
               ListTile(
@@ -139,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  bool _matches(Workout workout) {
+  bool _matchesSearch(Workout workout) {
     final needle = _normalize(_query.trim());
     if (needle.isEmpty) return true;
     return _normalize([
@@ -148,6 +150,36 @@ class _HomeScreenState extends State<HomeScreen> {
       ...workout.tags,
     ].join(' '))
         .contains(needle);
+  }
+
+  bool _matchesFilter(Workout workout) {
+    if (_selectedFilter == 'all') return true;
+    if (_selectedFilter == 'favorites') {
+      return controller.favorites.any((favorite) => favorite.id == workout.id);
+    }
+    return workout.tags.any((tag) => _normalize(tag) == _selectedFilter);
+  }
+
+  List<Workout> _allWorkouts() {
+    final byId = <String, Workout>{};
+    for (final workout in [...controller.favorites, ...controller.others]) {
+      byId[workout.id] = workout;
+    }
+    return byId.values.toList();
+  }
+
+  List<String> _availableTags(List<Workout> workouts) {
+    final tagsByKey = <String, String>{};
+    for (final workout in workouts) {
+      for (final tag in workout.tags) {
+        final trimmed = tag.trim();
+        if (trimmed.isEmpty) continue;
+        tagsByKey.putIfAbsent(_normalize(trimmed), () => trimmed);
+      }
+    }
+    final tags = tagsByKey.values.toList()
+      ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+    return tags;
   }
 
   static String _normalize(String value) {
@@ -200,9 +232,14 @@ class _HomeScreenState extends State<HomeScreen> {
       body: AnimatedBuilder(
         animation: controller,
         builder: (_, __) {
-          final favorites = controller.favorites.where(_matches).toList();
-          final others = controller.others.where(_matches).toList();
-          final noResults = favorites.isEmpty && others.isEmpty;
+          final allWorkouts = _allWorkouts();
+          final tags = _availableTags(allWorkouts);
+          final visibleWorkouts = allWorkouts
+              .where(_matchesSearch)
+              .where(_matchesFilter)
+              .toList();
+          final noResults = visibleWorkouts.isEmpty;
+
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 900),
@@ -293,39 +330,49 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 26),
-                  if (favorites.isNotEmpty) ...[
-                    _HomeSectionHeader(
-                        title: 'Favorites', count: favorites.length),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 42,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('All'),
+                          selected: _selectedFilter == 'all',
+                          onSelected: (_) =>
+                              setState(() => _selectedFilter = 'all'),
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
+                          label: const Text('Favors'),
+                          selected: _selectedFilter == 'favorites',
+                          onSelected: (_) =>
+                              setState(() => _selectedFilter = 'favorites'),
+                        ),
+                        for (final tag in tags) ...[
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: Text(tag),
+                            selected: _selectedFilter == _normalize(tag),
+                            onSelected: (_) => setState(
+                              () => _selectedFilter = _normalize(tag),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  for (final workout in visibleWorkouts) ...[
+                    WorkoutCard(
+                      workout: workout,
+                      sourceName: _sourceNameFor(workout),
+                      originalName: _originalNameFor(workout),
+                      onOpen: () => _openDetail(context, workout),
+                      onStart: () => _start(context, workout),
+                      onFavorite: () => controller.toggleFavorite(workout.id),
+                    ),
                     const SizedBox(height: 10),
-                    for (final workout in favorites) ...[
-                      WorkoutCard(
-                        workout: workout,
-                        sourceName: _sourceNameFor(workout),
-                        originalName: _originalNameFor(workout),
-                        onOpen: () => _openDetail(context, workout),
-                        onStart: () => _start(context, workout),
-                        onFavorite: () => controller.toggleFavorite(workout.id),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    const SizedBox(height: 18),
-                  ],
-                  if (others.isNotEmpty) ...[
-                    _HomeSectionHeader(
-                        title: 'All workouts', count: others.length),
-                    const SizedBox(height: 10),
-                    for (final workout in others) ...[
-                      WorkoutCard(
-                        workout: workout,
-                        sourceName: _sourceNameFor(workout),
-                        originalName: _originalNameFor(workout),
-                        onOpen: () => _openDetail(context, workout),
-                        onStart: () => _start(context, workout),
-                        onFavorite: () => controller.toggleFavorite(workout.id),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
                   ],
                   if (noResults)
                     Padding(
@@ -343,7 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 12),
                           Text(
                             _query.isEmpty
-                                ? 'Create your first workout.'
+                                ? 'No workouts in this filter.'
                                 : 'No workouts match “$_query”.',
                             textAlign: TextAlign.center,
                           ),
@@ -369,35 +416,5 @@ class _HomeScreenState extends State<HomeScreen> {
     return provenance == null
         ? null
         : controller.bucketOriginalName(provenance);
-  }
-}
-
-class _HomeSectionHeader extends StatelessWidget {
-  final String title;
-  final int count;
-
-  const _HomeSectionHeader({required this.title, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
-        Text(
-          '$count',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      ],
-    );
   }
 }
