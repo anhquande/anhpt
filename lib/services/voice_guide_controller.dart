@@ -18,6 +18,7 @@ class VoiceGuideController {
   bool _finished = false;
   bool _processing = false;
   bool _pending = false;
+  bool _muted = false;
   int _generation = 0;
   bool _disposed = false;
 
@@ -29,8 +30,27 @@ class VoiceGuideController {
     this.stepRecordingPaths = const {},
   });
 
+  bool get muted => _muted;
+
   Future<void> initialize() async {
     await audio.configure(workout);
+  }
+
+  Future<void> setMuted(bool muted) async {
+    if (_disposed || _muted == muted) return;
+
+    _muted = muted;
+    _generation++;
+    _lastSpokenSecond = null;
+
+    if (muted) {
+      await audio.cancelCurrentAudio();
+      if (!_disposed &&
+          engine.status == SessionStatus.running &&
+          !engine.announcementComplete) {
+        engine.completeAnnouncement();
+      }
+    }
   }
 
   Future<void> onEngineChanged() async {
@@ -57,13 +77,15 @@ class VoiceGuideController {
     final previousStatus = _lastStatus;
     _lastStatus = status;
 
-    if (previousStatus == SessionStatus.running &&
+    if (!_muted &&
+        previousStatus == SessionStatus.running &&
         status == SessionStatus.paused) {
       await audio.stopSpeech();
       await audio.speak(audio.pausedPhrase(), interrupt: true);
     }
 
-    if (previousStatus == SessionStatus.paused &&
+    if (!_muted &&
+        previousStatus == SessionStatus.paused &&
         status == SessionStatus.running) {
       await audio.speak(
         audio.resumePhrase(engine.currentStep.name),
@@ -77,6 +99,17 @@ class VoiceGuideController {
     if (status == SessionStatus.running && _lastStepIndex != engine.stepIndex) {
       _lastStepIndex = engine.stepIndex;
       _lastSpokenSecond = null;
+
+      if (_muted) {
+        await audio.playCue(workout.sound);
+        if (!_disposed &&
+            engine.status == SessionStatus.running &&
+            !engine.announcementComplete) {
+          engine.completeAnnouncement();
+        }
+        return;
+      }
+
       final announcementGeneration = _generation;
       final announcementStepIndex = engine.stepIndex;
       final announcementStepId = engine.currentExecutableStep.step.id;
@@ -176,7 +209,9 @@ class VoiceGuideController {
 
     // Timing voice starts only after the step announcement is finished,
     // so interval/final-countdown speech cannot cut off name/guide speech.
-    if (status == SessionStatus.running && engine.announcementComplete) {
+    if (!_muted &&
+        status == SessionStatus.running &&
+        engine.announcementComplete) {
       await _handleTimingVoice();
     }
 
@@ -184,7 +219,7 @@ class VoiceGuideController {
       _finished = true;
       await audio.stopSpeech();
       await audio.playCue(workout.sound);
-      if (workout.voice.announceFinish) {
+      if (!_muted && workout.voice.announceFinish) {
         await audio.speak(audio.finishPhrase(), interrupt: true);
       }
     }
@@ -200,6 +235,7 @@ class VoiceGuideController {
     String stepId,
   ) {
     return !_disposed &&
+        !_muted &&
         generation == _generation &&
         (engine.status == SessionStatus.running ||
             engine.status == SessionStatus.paused) &&
