@@ -57,6 +57,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
 
   bool summaryShown = false;
   bool audioReady = false;
+  bool voiceMuted = false;
+  double voiceVolume = 1.0;
   String? musicNotice;
   String musicStatus = 'Music off';
   SessionStatus? _musicStatus;
@@ -138,6 +140,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       await voiceGuide.initialize();
       if (_disposed) return;
       audioReady = true;
+      voiceVolume = audio.voiceVolume;
     } catch (e) {
       debugPrint('Audio initialization failed: $e');
     }
@@ -153,6 +156,18 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       });
     }
     if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleVoice() async {
+    final muted = !voiceMuted;
+    setState(() => voiceMuted = muted);
+    await voiceGuide.setMuted(muted);
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setVoiceVolume(double value) async {
+    setState(() => voiceVolume = value);
+    await audio.setVoiceVolume(value);
   }
 
   void _changed() {
@@ -321,12 +336,16 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  Icon(
-                    audioReady ? Icons.volume_up : Icons.volume_off,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
+                  IconButton(
+                    tooltip: voiceMuted ? 'Turn voice on' : 'Mute voice',
+                    onPressed: audioReady ? _toggleVoice : null,
+                    icon: Icon(
+                      audioReady && !voiceMuted
+                          ? Icons.volume_up
+                          : Icons.volume_off,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'End workout',
                     onPressed: _end,
@@ -340,6 +359,41 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                   size: 16,
                 ),
                 label: Text(musicStatus),
+              ),
+              const SizedBox(height: 6),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 360),
+                child: Row(
+                  children: [
+                    Icon(
+                      voiceMuted || voiceVolume == 0
+                          ? Icons.volume_off
+                          : voiceVolume < 0.5
+                              ? Icons.volume_down
+                              : Icons.volume_up,
+                      size: 20,
+                      color: cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Slider(
+                        value: voiceVolume,
+                        onChanged: audioReady ? _setVoiceVolume : null,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 42,
+                      child: Text(
+                        '${(voiceVolume * 100).round()}%',
+                        textAlign: TextAlign.end,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const Spacer(),
               if (waitingForGuide) const Chip(label: Text('FINISHING GUIDE')),
@@ -410,7 +464,9 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               ],
               const Spacer(),
               Text(
-                'Voice + sound enabled on Web/Windows',
+                voiceMuted
+                    ? 'Voice muted • volume ${(voiceVolume * 100).round()}%'
+                    : 'Voice volume ${(voiceVolume * 100).round()}%',
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.onSurfaceVariant,
