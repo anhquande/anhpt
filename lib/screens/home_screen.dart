@@ -212,25 +212,45 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: FilledButton.icon(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => WorkoutBuilderScreen(
-                                controller: controller,
-                              ),
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            filled: true,
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: 'Search workouts',
+                            suffixIcon: _query.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Clear search',
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _query = '');
+                                    },
+                                    icon: const Icon(Icons.close),
+                                  ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
                             ),
                           ),
-                          icon: const Icon(Icons.add),
-                          label: const Text('New workout'),
+                          onChanged: (value) => setState(() => _query = value),
                         ),
                       ),
                       const SizedBox(width: 4),
                       PopupMenuButton<String>(
-                        tooltip: 'More ways to add',
+                        tooltip: 'Workout actions',
                         icon: const Icon(Icons.more_vert),
                         onSelected: (value) {
-                          if (value == 'package') {
+                          if (value == 'new') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => WorkoutBuilderScreen(
+                                  controller: controller,
+                                ),
+                              ),
+                            );
+                          } else if (value == 'package') {
                             _importPackage();
                           } else if (value == 'yaml') {
                             Navigator.push(
@@ -245,6 +265,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                         itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'new',
+                            child: ListTile(
+                              leading: Icon(Icons.add),
+                              title: Text('Create new workout'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
                           PopupMenuItem(
                             value: 'package',
                             child: ListTile(
@@ -264,30 +292,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 18),
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      filled: true,
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: 'Search my workouts',
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                              icon: const Icon(Icons.close),
-                            ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    onChanged: (value) => setState(() => _query = value),
                   ),
                   const SizedBox(height: 26),
                   if (favorites.isNotEmpty) ...[
