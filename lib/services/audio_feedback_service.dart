@@ -13,6 +13,7 @@ class AudioFeedbackService {
 
   String _language = 'vi';
   bool _ready = false;
+  double _voiceVolume = 1.0;
   int _nextOperationId = 0;
   int? _activeSpeechOperationId;
   Completer<void>? _speechCompleter;
@@ -27,6 +28,8 @@ class AudioFeedbackService {
     @visibleForTesting bool initializePlayer = true,
   })  : _tts = tts ?? FlutterTts(),
         _player = player ?? (initializePlayer ? AudioPlayer() : null);
+
+  double get voiceVolume => _voiceVolume;
 
   static AudioContext mixingAudioContext() => AudioContextConfig(
         focus: AudioContextConfigFocus.mixWithOthers,
@@ -47,9 +50,18 @@ class AudioFeedbackService {
     await _tts.setLanguage(_language == 'vi' ? 'vi-VN' : 'en-US');
     await _tts.setSpeechRate(0.46);
     await _tts.setPitch(1.0);
-    await _tts.setVolume(1.0);
+    await _tts.setVolume(_voiceVolume);
     if (_disposed) throw StateError('Audio feedback service is disposed.');
     _ready = true;
+  }
+
+  Future<void> setVoiceVolume(double volume) async {
+    if (_disposed) return;
+    _voiceVolume = volume.clamp(0.0, 1.0).toDouble();
+    await _tts.setVolume(_voiceVolume);
+    if (_activeRecordingOperationId != null) {
+      await _player?.setVolume(_voiceVolume);
+    }
   }
 
   int _beginSpeechOperation() {
@@ -173,7 +185,7 @@ class AudioFeedbackService {
     try {
       onCoachAudioChanged?.call(true);
       await _player.stop();
-      await _player.play(DeviceFileSource(path));
+      await _player.play(DeviceFileSource(path), volume: _voiceVolume);
       await completer.future.timeout(const Duration(minutes: 5));
       return _activeRecordingOperationId == operationId && !_disposed;
     } catch (_) {

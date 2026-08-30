@@ -40,6 +40,24 @@ void main() {
     expect(secondCompleted, isTrue);
   });
 
+  test('voice volume updates TTS and clamps to supported range', () async {
+    final tts = _FakeFlutterTts();
+    final service = AudioFeedbackService(tts: tts, initializePlayer: false);
+    await service.configure(_workout());
+
+    await service.setVoiceVolume(0.35);
+    expect(service.voiceVolume, closeTo(0.35, 0.001));
+    expect(tts.volumes.last, closeTo(0.35, 0.001));
+
+    await service.setVoiceVolume(2.0);
+    expect(service.voiceVolume, 1.0);
+    expect(tts.volumes.last, 1.0);
+
+    await service.setVoiceVolume(-1.0);
+    expect(service.voiceVolume, 0.0);
+    expect(tts.volumes.last, 0.0);
+  });
+
   test('pause invalidates an in-flight guide and replays it on resume',
       () async {
     final workout = _workout();
@@ -65,6 +83,29 @@ void main() {
     await audio.waitForAnnouncementCount(2);
     audio.completeAnnouncement();
     await resumed;
+    expect(engine.announcementComplete, isTrue);
+  });
+
+  test('muting an in-flight guide cancels voice and releases announcement',
+      () async {
+    final workout = _workout();
+    final engine = SessionEngine(workout);
+    final audio = _ControlledAudioFeedbackService();
+    final controller = VoiceGuideController(
+      workout: workout,
+      engine: engine,
+      audio: audio,
+    );
+    await controller.initialize();
+    engine.start();
+
+    final processing = controller.onEngineChanged();
+    await audio.waitForAnnouncementCount(1);
+    await controller.setMuted(true);
+    await processing;
+
+    expect(controller.muted, isTrue);
+    expect(audio.cancelCount, greaterThanOrEqualTo(1));
     expect(engine.announcementComplete, isTrue);
   });
 
@@ -109,6 +150,7 @@ steps:
 
 class _FakeFlutterTts extends FlutterTts {
   final List<VoidCallback> completionHandlers = [];
+  final List<double> volumes = [];
 
   @override
   void setCompletionHandler(VoidCallback callback) {
@@ -131,7 +173,10 @@ class _FakeFlutterTts extends FlutterTts {
   Future<dynamic> setPitch(double pitch) async => 1;
 
   @override
-  Future<dynamic> setVolume(double volume) async => 1;
+  Future<dynamic> setVolume(double volume) async {
+    volumes.add(volume);
+    return 1;
+  }
 
   @override
   Future<dynamic> speak(String text, {bool focus = false}) async => 1;
