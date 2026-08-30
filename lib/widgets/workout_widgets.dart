@@ -56,21 +56,18 @@ class WorkoutCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       child: InkWell(
         onTap: onStart,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(10, 10, 8, 10),
+        child: SizedBox(
+          height: 82,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  color: cs.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                width: 82,
+                color: cs.surfaceContainerHighest,
                 alignment: Alignment.center,
                 child: Icon(
                   _thumbnailIcon(),
-                  size: 30,
+                  size: 32,
                   color: cs.onSurfaceVariant,
                 ),
               ),
@@ -100,16 +97,19 @@ class WorkoutCard extends StatelessWidget {
                   ],
                 ),
               ),
-              IconButton(
-                tooltip:
-                    workout.favorite ? 'Remove favorite' : 'Add to favorites',
-                visualDensity: VisualDensity.compact,
-                onPressed: onFavorite,
-                icon: Icon(
-                  workout.favorite
-                      ? Icons.star_rounded
-                      : Icons.star_border_rounded,
-                  color: workout.favorite ? cs.primary : cs.onSurfaceVariant,
+              Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: IconButton(
+                  tooltip:
+                      workout.favorite ? 'Remove favorite' : 'Add to favorites',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: onFavorite,
+                  icon: Icon(
+                    workout.favorite
+                        ? Icons.star_rounded
+                        : Icons.star_border_rounded,
+                    color: workout.favorite ? cs.primary : cs.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
