@@ -57,6 +57,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
 
   bool summaryShown = false;
   bool audioReady = false;
+  bool voiceMuted = false;
   String? musicNotice;
   String musicStatus = 'Music off';
   SessionStatus? _musicStatus;
@@ -152,6 +153,13 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
         }
       });
     }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _toggleVoice() async {
+    final muted = !voiceMuted;
+    setState(() => voiceMuted = muted);
+    await voiceGuide.setMuted(muted);
     if (mounted) setState(() {});
   }
 
@@ -321,12 +329,16 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                     ),
                     const SizedBox(width: 8),
                   ],
-                  Icon(
-                    audioReady ? Icons.volume_up : Icons.volume_off,
-                    size: 18,
-                    color: cs.onSurfaceVariant,
+                  IconButton(
+                    tooltip: voiceMuted ? 'Turn voice on' : 'Mute voice',
+                    onPressed: audioReady ? _toggleVoice : null,
+                    icon: Icon(
+                      audioReady && !voiceMuted
+                          ? Icons.volume_up
+                          : Icons.volume_off,
+                    ),
                   ),
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 4),
                   IconButton(
                     tooltip: 'End workout',
                     onPressed: _end,
@@ -410,7 +422,9 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               ],
               const Spacer(),
               Text(
-                'Voice + sound enabled on Web/Windows',
+                voiceMuted
+                    ? 'Voice muted'
+                    : 'Voice + sound enabled on Web/Windows',
                 style: TextStyle(
                   fontSize: 12,
                   color: cs.onSurfaceVariant,
