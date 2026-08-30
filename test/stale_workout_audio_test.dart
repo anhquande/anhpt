@@ -68,6 +68,29 @@ void main() {
     expect(engine.announcementComplete, isTrue);
   });
 
+  test('muting an in-flight guide cancels voice and releases announcement',
+      () async {
+    final workout = _workout();
+    final engine = SessionEngine(workout);
+    final audio = _ControlledAudioFeedbackService();
+    final controller = VoiceGuideController(
+      workout: workout,
+      engine: engine,
+      audio: audio,
+    );
+    await controller.initialize();
+    engine.start();
+
+    final processing = controller.onEngineChanged();
+    await audio.waitForAnnouncementCount(1);
+    await controller.setMuted(true);
+    await processing;
+
+    expect(controller.muted, isTrue);
+    expect(audio.cancelCount, greaterThanOrEqualTo(1));
+    expect(engine.announcementComplete, isTrue);
+  });
+
   test('end and dispose prevent an awaited guide completing the engine',
       () async {
     final workout = _workout();
