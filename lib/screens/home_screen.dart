@@ -9,8 +9,8 @@ import 'health_screen.dart';
 import 'local_profiles_screen.dart';
 import 'settings_screen.dart';
 import 'workout_builder_screen.dart';
+import 'workout_detail_screen.dart';
 import 'workout_editor_screen.dart';
-import 'workout_player_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppController controller;
@@ -71,19 +71,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  Future<void> _start(BuildContext context, Workout w) async {
-    await _loadProfiles();
+  Future<void> _openWorkout(BuildContext context, Workout workout) async {
+    await controller.store.markWorkoutSeen(workout.id);
     if (!context.mounted) return;
-    final participant = _activeProfile;
-    controller.markUsed(w.id);
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => WorkoutPlayerScreen(
+        builder: (_) => WorkoutDetailScreen(
           controller: controller,
-          workoutId: w.id,
-          profileId: participant?.id,
-          profileName: participant?.name,
+          workoutId: workout.id,
         ),
       ),
     );
@@ -185,9 +181,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final knownKeys = tagsByKey.keys.toSet();
     final orderedKeys = <String>[
       ..._tagOrder.where(knownKeys.contains),
-      ...knownKeys.where((key) => !_tagOrder.contains(key))
-        ..toList().sort((a, b) =>
-            tagsByKey[a]!.toLowerCase().compareTo(tagsByKey[b]!.toLowerCase())),
+      ...knownKeys.where((key) => !_tagOrder.contains(key)),
     ];
     return orderedKeys.map((key) => tagsByKey[key]!).toList();
   }
@@ -512,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       workout: workout,
                       sourceName: _sourceNameFor(workout),
                       originalName: _originalNameFor(workout),
-                      onStart: () => _start(context, workout),
+                      onStart: () => _openWorkout(context, workout),
                       onFavorite: () => controller.toggleFavorite(workout.id),
                     ),
                     const SizedBox(height: 10),
