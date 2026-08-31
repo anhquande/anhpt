@@ -129,14 +129,19 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Screen during workout'), findsOneWidget);
     expect(find.text('Keep current display behavior'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(SwitchListTile, 'After workout'));
+    final afterWorkout = find.widgetWithText(SwitchListTile, 'After workout');
+    await tester.ensureVisible(afterWorkout);
+    await tester.pumpAndSettle();
+    await tester.tap(afterWorkout);
     await tester.pumpAndSettle();
     expect(controller.byId('sticky')!.completionAction, 'shutdown_or_exit');
     expect(find.text('Shut down or exit when complete'), findsOneWidget);
 
-    await tester.tap(
-      find.widgetWithText(SwitchListTile, 'Screen during workout'),
-    );
+    final screenDuringWorkout =
+        find.widgetWithText(SwitchListTile, 'Screen during workout');
+    await tester.ensureVisible(screenDuringWorkout);
+    await tester.pumpAndSettle();
+    await tester.tap(screenDuringWorkout);
     await tester.pumpAndSettle();
     expect(
       controller.byId('sticky')!.screenOffAfterStart,
@@ -144,7 +149,10 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     );
     expect(find.text('Turn display off after Start'), findsOneWidget);
 
-    await tester.tap(find.text('More'));
+    final moreButton = find.text('More');
+    await tester.ensureVisible(moreButton);
+    await tester.pumpAndSettle();
+    await tester.tap(moreButton);
     await tester.pumpAndSettle();
     expect(find.text('Less'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
