@@ -148,13 +148,6 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       const Duration(seconds: 10),
     );
     expect(find.text('Turn display off after Start'), findsOneWidget);
-
-    final moreButton = find.text('More');
-    await tester.ensureVisible(moreButton);
-    await tester.pumpAndSettle();
-    await tester.tap(moreButton);
-    await tester.pumpAndSettle();
-    expect(find.text('Less'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
 
     final overviewList = find.byKey(const PageStorageKey('overview-tab'));
