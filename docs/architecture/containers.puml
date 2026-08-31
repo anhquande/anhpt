@@ -1,0 +1,34 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+LAYOUT_WITH_LEGEND()
+
+title AnhPT — Container Diagram
+
+Person(user, "AnhPT User", "Uses AnhPT to manage and perform workouts and track health data.")
+
+System_Boundary(anhpt, "AnhPT") {
+  Container(ui, "Flutter UI", "Flutter / Dart", "Screens, navigation, forms and user interaction for workouts, health and profiles.")
+  Container(appController, "Application Controller", "Dart", "Coordinates application state, repositories, bucket operations and user-facing actions.")
+  Container(workoutRuntime, "Workout Runtime", "Dart", "Executes workout sessions, timers, repeats, pause/resume and step transitions.")
+  Container(audio, "Voice and Audio Services", "Dart / Flutter plugins", "Coordinates TTS, recorded coaching cues, feedback sounds and background music.")
+  Container(catalog, "Workout Catalog and Bucket Services", "Dart", "Reads configured sources, discovers remote workouts and installs or updates packages.")
+  Container(storage, "Local Persistence", "Device storage", "Stores workouts, settings, profiles, health measurements and downloaded assets.")
+}
+
+System_Ext(bucketRepo, "Workout Bucket Repository", "Hosts bucket metadata and workout packages.")
+System_Ext(deviceServices, "Device Services", "Audio, TTS, media, file-system and platform capabilities.")
+
+Rel(user, ui, "Uses")
+Rel(ui, appController, "Invokes application actions and observes state")
+Rel(ui, workoutRuntime, "Starts and controls workout sessions")
+Rel(appController, catalog, "Refreshes, downloads and updates workouts")
+Rel(appController, storage, "Reads and persists application data")
+Rel(workoutRuntime, audio, "Requests spoken and audio cues")
+Rel(workoutRuntime, storage, "Reads workout definitions and session configuration")
+Rel(catalog, storage, "Installs workout definitions and assets")
+Rel(catalog, bucketRepo, "Fetches metadata and packages", "HTTPS")
+Rel(audio, deviceServices, "Uses")
+Rel(storage, deviceServices, "Uses file-system APIs")
+
+@enduml
