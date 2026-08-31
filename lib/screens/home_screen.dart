@@ -193,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _manageTags(List<String> tags) async {
-    final displayByKey = {_normalizeTags(tags)};
+    final displayByKey = _normalizeTags(tags);
     final allKeys = tags.map(_normalize).toList();
     var draftOrder = <String>[
       ..._tagOrder.where(allKeys.contains),
