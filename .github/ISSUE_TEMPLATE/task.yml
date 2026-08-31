@@ -1,0 +1,116 @@
+name: Task
+description: Track technical work, maintenance, refactoring, documentation, or internal tasks
+title: "task: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for implementation work that is not best represented as a bug report or feature request.
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What should be achieved?
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: Why is this task needed now?
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What work is included?
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: What is intentionally excluded?
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define how completion will be verified.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Task type
+      options:
+        - Refactor
+        - Documentation
+        - Testing
+        - CI / Release
+        - Maintenance
+        - Technical debt
+        - Research
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - UI
+        - Workout
+        - Voice / Audio
+        - Health
+        - Catalog
+        - Storage
+        - CI / Release
+        - Documentation
+        - Other
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_notes
+    attributes:
+      label: Technical notes
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies
+      description: List blocking issues, pull requests, or external dependencies.
+
+  - type: checkboxes
+    id: definition_of_done
+    attributes:
+      label: Definition of Done
+      options:
+        - label: Implementation or documentation is complete.
+          required: true
+        - label: Relevant tests or verification steps are complete.
+          required: true
+        - label: Documentation is updated when needed.
+          required: true
