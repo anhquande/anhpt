@@ -35,6 +35,8 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   late final TabController _tabController;
   final _overviewScrollController = ScrollController(keepScrollOffset: false);
   final _stepsScrollController = ScrollController(keepScrollOffset: false);
+  Workout? _editingWorkout;
+  int _selectedTab = 0;
   String? error;
 
   @override
@@ -42,12 +44,29 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     if (widget.workoutId != null) {
-      draft =
-          WorkoutDraft.fromWorkout(widget.controller.byId(widget.workoutId!)!);
+      final workout = widget.controller.byId(widget.workoutId!);
+      if (workout != null) {
+        _editingWorkout = workout;
+        draft = WorkoutDraft.fromWorkout(workout);
+      } else {
+        draft = WorkoutDraft(
+          voiceLanguage: widget.controller.defaultVoiceLanguage,
+          steps: [StepDraft(name: 'Exercise', duration: '30s')],
+        );
+        error = 'Workout is no longer available.';
+      }
     } else if (widget.duplicateFromId != null) {
-      final source = widget.controller.byId(widget.duplicateFromId!)!;
-      draft = WorkoutDraft.fromWorkout(source);
-      draft.name = '${source.name} Copy';
+      final source = widget.controller.byId(widget.duplicateFromId!);
+      if (source != null) {
+        draft = WorkoutDraft.fromWorkout(source);
+        draft.name = '${source.name} Copy';
+      } else {
+        draft = WorkoutDraft(
+          voiceLanguage: widget.controller.defaultVoiceLanguage,
+          steps: [StepDraft(name: 'Exercise', duration: '30s')],
+        );
+        error = 'Source workout is no longer available.';
+      }
     } else {
       draft = WorkoutDraft(
         voiceLanguage: widget.controller.defaultVoiceLanguage,
@@ -76,9 +95,10 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   Future<Workout?> _persistDraft({bool close = true}) async {
     try {
       final yaml = WorkoutSerializer.toYaml(draft);
-      final existing = widget.workoutId == null
-          ? null
-          : widget.controller.byId(widget.workoutId!);
+      final existing = _editingWorkout ??
+          (widget.workoutId == null
+              ? null
+              : widget.controller.byId(widget.workoutId!));
       final workout = WorkoutParser.parse(
         yaml,
         id: existing?.id ?? WorkoutParser.generateId(),
@@ -87,10 +107,11 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
         createdAt: existing?.createdAt,
       );
       await widget.controller.saveWorkout(workout);
+      if (widget.workoutId != null) _editingWorkout = workout;
       if (close && mounted) Navigator.pop(context);
       return workout;
     } on WorkoutValidationException catch (e) {
-      setState(() => error = e.message);
+      if (mounted) setState(() => error = e.message);
       return null;
     }
   }
@@ -138,6 +159,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     );
     final latest = widget.controller.byId(saved.id);
     if (latest != null && mounted) {
+      _editingWorkout = latest;
       setState(() => draft = WorkoutDraft.fromWorkout(latest));
     }
   }
@@ -335,6 +357,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
               ),
               children: [
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: draft.voiceLanguage,
                   decoration: const InputDecoration(labelText: 'Language'),
                   items: const [
@@ -346,6 +369,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                 ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
+                  isExpanded: true,
                   initialValue: draft.voiceMode,
                   decoration: const InputDecoration(labelText: 'Mode'),
                   items: const [
@@ -402,11 +426,11 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
             ),
           ),
           const SizedBox(height: 8),
-          if (widget.workoutId != null &&
-              widget.controller.byId(widget.workoutId!) != null)
+          if (_editingWorkout case final workout?)
             WorkoutMusicCard(
+              key: ValueKey('builder-music-${workout.id}'),
               controller: widget.controller,
-              workout: widget.controller.byId(widget.workoutId!)!,
+              workout: workout,
             )
           else
             _BuilderOptionContainer(
@@ -466,6 +490,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: draft.backgroundMusicDucking,
                     decoration:
                         const InputDecoration(labelText: 'Coach ducking'),
@@ -582,20 +607,16 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                 ),
               TabBar(
                 controller: _tabController,
+                onTap: (index) => setState(() => _selectedTab = index),
                 tabs: const [
                   Tab(text: 'Overview'),
                   Tab(text: 'Steps'),
                 ],
               ),
               Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    _overviewTab(context),
-                    _stepsTab(context),
-                  ],
-                ),
+                child: _selectedTab == 0
+                    ? _overviewTab(context)
+                    : _stepsTab(context),
               ),
             ],
           ),
