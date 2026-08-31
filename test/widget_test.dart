@@ -10,6 +10,7 @@ import 'package:anhpt/services/workout_parser.dart';
 import 'package:anhpt/screens/workout_detail_screen.dart';
 import 'package:anhpt/screens/workout_player_screen.dart';
 import 'package:anhpt/screens/workout_builder_screen.dart';
+import 'package:anhpt/widgets/workout_widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -249,20 +250,19 @@ steps:
         .pumpWidget(MaterialApp(home: HomeScreen(controller: controller)));
     await tester.pumpAndSettle();
 
-    expect(find.text('My Workouts'), findsOneWidget);
-    expect(find.text('New workout'), findsOneWidget);
-    expect(find.text('Browse workouts'), findsOneWidget);
-    expect(find.text('From AnhPT Official'), findsOneWidget);
-    expect(find.text('Originally “Morning Warmup”'), findsOneWidget);
+    expect(find.text('Workouts'), findsOneWidget);
+    expect(find.text('Browse workouts'), findsNothing);
+    expect(find.byType(WorkoutCard), findsNWidgets(2));
     expect(find.text('Import package'), findsNothing);
     expect(find.text('Import YAML'), findsNothing);
-    expect(find.byTooltip('More ways to add'), findsOneWidget);
-    expect(find.byTooltip('Import workouts'), findsNothing);
+    expect(find.byTooltip('Workout actions'), findsOneWidget);
+    expect(find.byTooltip('Manage tags'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.text('Ready to move?'), findsNothing);
 
-    await tester.tap(find.byTooltip('More ways to add'));
+    await tester.tap(find.byTooltip('Workout actions'));
     await tester.pumpAndSettle();
+    expect(find.text('Create new workout'), findsOneWidget);
     expect(find.text('Import package'), findsOneWidget);
     expect(find.text('Import YAML'), findsOneWidget);
 
@@ -293,70 +293,19 @@ steps:
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('Home opens Browse Workouts with accent-insensitive search',
-      (tester) async {
+  testWidgets('Home no longer exposes Browse Workouts', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    final controller = AppController(LocalStore())
-      ..bucketSources = const [
-        WorkoutBucketSource(
-          id: 'official',
-          name: 'Official',
-          catalogUrl: 'https://example.com/bucket.json',
-        ),
-      ]
-      ..bucketCatalogEntries = [
-        WorkoutBucketEntry(
-          sourceId: 'official',
-          id: 'warmup',
-          name: 'Khởi động buổi sáng',
-          description: 'Nhẹ nhàng bắt đầu ngày mới.',
-          version: '1.0.0',
-          packageUrl: 'https://example.com/warmup.zip',
-          sha256: List.filled(64, '0').join(),
-          tags: const ['Beginner', 'Mobility'],
-        ),
-        WorkoutBucketEntry(
-          sourceId: 'official',
-          id: 'strength',
-          name: 'Strength Builder',
-          version: '1.0.0',
-          packageUrl: 'https://example.com/strength.zip',
-          sha256: List.filled(64, '1').join(),
-        ),
-      ]
-      ..installedBucketWorkouts = [
-        InstalledWorkoutProvenance(
-          workoutId: 'local-warmup-variant',
-          sourceId: 'official',
-          sourceName: 'Official',
-          entryId: 'warmup',
-          originalName: 'Khởi động buổi sáng',
-          version: '1.0.0',
-          packageUrl: 'https://example.com/warmup.zip',
-          sha256: List.filled(64, '0').join(),
-          installedAt: DateTime.utc(2026, 8, 28),
-        ),
-      ];
+    final controller = AppController(LocalStore());
 
     await tester.pumpWidget(MaterialApp(
       home: HomeScreen(controller: controller),
     ));
-    await tester.tap(find.text('Browse workouts'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Browse Workouts'), findsOneWidget);
-    expect(find.text('Khởi động buổi sáng'), findsOneWidget);
-    expect(find.text('Strength Builder'), findsOneWidget);
-    expect(find.text('Add another'), findsOneWidget);
-    expect(find.text('Install'), findsOneWidget);
-
-    await tester.enterText(find.byType(TextField), 'khoi dong');
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Khởi động buổi sáng'), findsOneWidget);
-    expect(find.text('Strength Builder'), findsNothing);
-
-    await tester.tap(find.byTooltip('Manage workout sources'));
-    await tester.pumpAndSettle();
-    expect(find.text('Workout sources'), findsOneWidget);
+    expect(find.text('Workouts'), findsOneWidget);
+    expect(find.text('Browse workouts'), findsNothing);
+    expect(find.text('Browse Workouts'), findsNothing);
+    expect(find.byTooltip('Workout actions'), findsOneWidget);
+    expect(find.byTooltip('Manage tags'), findsOneWidget);
   });
 }

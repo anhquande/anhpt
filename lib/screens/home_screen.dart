@@ -11,8 +11,6 @@ import 'settings_screen.dart';
 import 'workout_builder_screen.dart';
 import 'workout_detail_screen.dart';
 import 'workout_editor_screen.dart';
-import 'workout_player_screen.dart';
-import 'bucket_catalog_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppController controller;
@@ -24,10 +22,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _query = '';
+  String _selectedFilter = 'all';
   final _searchController = TextEditingController();
   final HealthStore _healthStore = HealthStore();
   List<LocalProfile> _profiles = [];
   LocalProfile? _activeProfile;
+  List<String> _tagOrder = [];
+  Set<String> _hiddenTags = {};
 
   AppController get controller => widget.controller;
 
@@ -35,7 +36,24 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadProfiles();
+    _loadTagPreferences();
   }
+
+  Future<void> _loadTagPreferences() async {
+    final order = await controller.store.loadQuickFilterTagOrder();
+    final hidden = await controller.store.loadQuickFilterHiddenTags();
+    if (!mounted) return;
+    setState(() {
+      _tagOrder = order;
+      _hiddenTags = hidden;
+    });
+  }
+
+  Future<void> _saveTagPreferences() =>
+      controller.store.saveQuickFilterPreferences(
+        orderedTags: _tagOrder,
+        hiddenTags: _hiddenTags,
+      );
 
   Future<void> _loadProfiles() async {
     final profiles = await _healthStore.loadLocalProfiles();
@@ -53,27 +71,15 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _openDetail(BuildContext context, Workout w) {
-    Navigator.push(
-        context,
-        MaterialPageRoute(
-            builder: (_) =>
-                WorkoutDetailScreen(controller: controller, workoutId: w.id)));
-  }
-
-  Future<void> _start(BuildContext context, Workout w) async {
-    await _loadProfiles();
-    if (!mounted) return;
-    final participant = _activeProfile;
-    controller.markUsed(w.id);
-    Navigator.push(
+  Future<void> _openWorkout(BuildContext context, Workout workout) async {
+    await controller.store.markWorkoutSeen(workout.id);
+    if (!context.mounted) return;
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => WorkoutPlayerScreen(
+        builder: (_) => WorkoutDetailScreen(
           controller: controller,
-          workoutId: w.id,
-          profileId: participant?.id,
-          profileName: participant?.name,
+          workoutId: workout.id,
         ),
       ),
     );
@@ -91,7 +97,8 @@ class _HomeScreenState extends State<HomeScreen> {
             const ListTile(
               title: Text('Active profile',
                   style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('Health data and future workout history stay separate.'),
+              subtitle:
+                  Text('Health data and future workout history stay separate.'),
             ),
             for (final profile in _profiles)
               ListTile(
@@ -140,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  bool _matches(Workout workout) {
+  bool _matchesSearch(Workout workout) {
     final needle = _normalize(_query.trim());
     if (needle.isEmpty) return true;
     return _normalize([
@@ -150,6 +157,140 @@ class _HomeScreenState extends State<HomeScreen> {
     ].join(' '))
         .contains(needle);
   }
+
+  bool _matchesFilter(Workout workout) {
+    if (_selectedFilter == 'all') return true;
+    if (_selectedFilter == 'recent') return workout.lastUsedAt != null;
+    if (_selectedFilter == 'favorites') {
+      return controller.favorites.any((favorite) => favorite.id == workout.id);
+    }
+    return workout.tags.any((tag) => _normalize(tag) == _selectedFilter);
+  }
+
+  List<Workout> _allWorkouts() => List<Workout>.from(controller.workouts);
+
+  List<String> _availableTags(List<Workout> workouts) {
+    final tagsByKey = <String, String>{};
+    for (final workout in workouts) {
+      for (final tag in workout.tags) {
+        final trimmed = tag.trim();
+        if (trimmed.isEmpty) continue;
+        tagsByKey.putIfAbsent(_normalize(trimmed), () => trimmed);
+      }
+    }
+    final knownKeys = tagsByKey.keys.toSet();
+    final orderedKeys = <String>[
+      ..._tagOrder.where(knownKeys.contains),
+      ...knownKeys.where((key) => !_tagOrder.contains(key)),
+    ];
+    return orderedKeys.map((key) => tagsByKey[key]!).toList();
+  }
+
+  Future<void> _manageTags(List<String> tags) async {
+    final displayByKey = _normalizeTags(tags);
+    final allKeys = tags.map(_normalize).toList();
+    var draftOrder = <String>[
+      ..._tagOrder.where(allKeys.contains),
+      ...allKeys.where((key) => !_tagOrder.contains(key)),
+    ];
+    var draftHidden = Set<String>.from(_hiddenTags);
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * .72,
+            child: Column(
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.tune),
+                  title: Text('Manage tags',
+                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('Drag to reorder. Hide tags you do not need.'),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: draftOrder.length,
+                    onReorder: (oldIndex, newIndex) {
+                      setSheetState(() {
+                        if (newIndex > oldIndex) newIndex--;
+                        final item = draftOrder.removeAt(oldIndex);
+                        draftOrder.insert(newIndex, item);
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final key = draftOrder[index];
+                      final label = displayByKey[key] ?? key;
+                      final visible = !draftHidden.contains(key);
+                      return SwitchListTile(
+                        key: ValueKey(key),
+                        secondary: ReorderableDragStartListener(
+                          index: index,
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.drag_handle),
+                          ),
+                        ),
+                        title: Text(label),
+                        value: visible,
+                        onChanged: (value) => setSheetState(() {
+                          if (value) {
+                            draftHidden.remove(key);
+                          } else {
+                            draftHidden.add(key);
+                          }
+                        }),
+                      );
+                    },
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  child: Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => setSheetState(() {
+                          draftOrder = List<String>.from(allKeys);
+                          draftHidden.clear();
+                        }),
+                        child: const Text('Reset'),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Save'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    setState(() {
+      _tagOrder = draftOrder;
+      _hiddenTags = draftHidden;
+      if (_hiddenTags.contains(_selectedFilter)) _selectedFilter = 'all';
+    });
+    await _saveTagPreferences();
+  }
+
+  Map<String, String> _normalizeTags(List<String> tags) => {
+        for (final tag in tags) _normalize(tag): tag,
+      };
 
   static String _normalize(String value) {
     var normalized = value.toLowerCase();
@@ -167,7 +308,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Workouts',
+        title: const Text('Workouts',
             style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           TextButton.icon(
@@ -201,46 +342,70 @@ class _HomeScreenState extends State<HomeScreen> {
       body: AnimatedBuilder(
         animation: controller,
         builder: (_, __) {
-          final favorites = controller.favorites.where(_matches).toList();
-          final others = controller.others.where(_matches).toList();
-          final noResults = favorites.isEmpty && others.isEmpty;
+          final allWorkouts = _allWorkouts();
+          final tags = _availableTags(allWorkouts);
+          final visibleTags = tags
+              .where((tag) => !_hiddenTags.contains(_normalize(tag)))
+              .toList();
+          final visibleWorkouts = allWorkouts
+              .where(_matchesSearch)
+              .where(_matchesFilter)
+              .toList();
+          if (_selectedFilter == 'recent') {
+            visibleWorkouts.sort(
+              (a, b) => b.lastUsedAt!.compareTo(a.lastUsedAt!),
+            );
+          }
+          final noResults = visibleWorkouts.isEmpty;
+
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 900),
               child: ListView(
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                 children: [
-                  Wrap(
-                    spacing: 10,
-                    runSpacing: 10,
+                  Row(
                     children: [
-                      FilledButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                WorkoutBuilderScreen(controller: controller),
+                      Expanded(
+                        child: TextField(
+                          controller: _searchController,
+                          decoration: InputDecoration(
+                            filled: true,
+                            prefixIcon: const Icon(Icons.search),
+                            hintText: 'Search workouts',
+                            suffixIcon: _query.isEmpty
+                                ? null
+                                : IconButton(
+                                    tooltip: 'Clear search',
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _query = '');
+                                    },
+                                    icon: const Icon(Icons.close),
+                                  ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              borderSide: BorderSide.none,
+                            ),
                           ),
+                          onChanged: (value) => setState(() => _query = value),
                         ),
-                        icon: const Icon(Icons.add),
-                        label: const Text('New workout'),
                       ),
-                      OutlinedButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                BucketCatalogScreen(controller: controller),
-                          ),
-                        ),
-                        icon: const Icon(Icons.explore_outlined),
-                        label: const Text('Browse workouts'),
-                      ),
+                      const SizedBox(width: 4),
                       PopupMenuButton<String>(
-                        tooltip: 'More ways to add',
+                        tooltip: 'Workout actions',
                         icon: const Icon(Icons.more_vert),
                         onSelected: (value) {
-                          if (value == 'package') {
+                          if (value == 'new') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => WorkoutBuilderScreen(
+                                  controller: controller,
+                                ),
+                              ),
+                            );
+                          } else if (value == 'package') {
                             _importPackage();
                           } else if (value == 'yaml') {
                             Navigator.push(
@@ -255,6 +420,14 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         },
                         itemBuilder: (_) => const [
+                          PopupMenuItem(
+                            value: 'new',
+                            child: ListTile(
+                              leading: Icon(Icons.add),
+                              title: Text('Create new workout'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
                           PopupMenuItem(
                             value: 'package',
                             child: ListTile(
@@ -275,63 +448,68 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 18),
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      filled: true,
-                      prefixIcon: const Icon(Icons.search),
-                      hintText: 'Search my workouts',
-                      suffixIcon: _query.isEmpty
-                          ? null
-                          : IconButton(
-                              tooltip: 'Clear search',
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() => _query = '');
-                              },
-                              icon: const Icon(Icons.close),
-                            ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide.none,
-                      ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 42,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: ListView(
+                            scrollDirection: Axis.horizontal,
+                            children: [
+                              ChoiceChip(
+                                label: const Text('All'),
+                                selected: _selectedFilter == 'all',
+                                onSelected: (_) =>
+                                    setState(() => _selectedFilter = 'all'),
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text('Recent'),
+                                selected: _selectedFilter == 'recent',
+                                onSelected: (_) =>
+                                    setState(() => _selectedFilter = 'recent'),
+                              ),
+                              const SizedBox(width: 8),
+                              ChoiceChip(
+                                label: const Text('Favors'),
+                                selected: _selectedFilter == 'favorites',
+                                onSelected: (_) => setState(
+                                    () => _selectedFilter = 'favorites'),
+                              ),
+                              for (final tag in visibleTags) ...[
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: Text(tag),
+                                  selected:
+                                      _selectedFilter == _normalize(tag),
+                                  onSelected: (_) => setState(
+                                    () => _selectedFilter = _normalize(tag),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        IconButton(
+                          tooltip: 'Manage tags',
+                          onPressed: () => _manageTags(tags),
+                          icon: const Icon(Icons.tune),
+                        ),
+                      ],
                     ),
-                    onChanged: (value) => setState(() => _query = value),
                   ),
-                  const SizedBox(height: 26),
-                  if (favorites.isNotEmpty) ...[
-                    _HomeSectionHeader(
-                        title: 'Favorites', count: favorites.length),
+                  const SizedBox(height: 18),
+                  for (final workout in visibleWorkouts) ...[
+                    WorkoutCard(
+                      workout: workout,
+                      sourceName: _sourceNameFor(workout),
+                      originalName: _originalNameFor(workout),
+                      onStart: () => _openWorkout(context, workout),
+                      onFavorite: () => controller.toggleFavorite(workout.id),
+                    ),
                     const SizedBox(height: 10),
-                    for (final workout in favorites) ...[
-                      WorkoutCard(
-                        workout: workout,
-                        sourceName: _sourceNameFor(workout),
-                        originalName: _originalNameFor(workout),
-                        onOpen: () => _openDetail(context, workout),
-                        onStart: () => _start(context, workout),
-                        onFavorite: () => controller.toggleFavorite(workout.id),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-                    const SizedBox(height: 18),
-                  ],
-                  if (others.isNotEmpty) ...[
-                    _HomeSectionHeader(
-                        title: 'All workouts', count: others.length),
-                    const SizedBox(height: 10),
-                    for (final workout in others) ...[
-                      WorkoutCard(
-                        workout: workout,
-                        sourceName: _sourceNameFor(workout),
-                        originalName: _originalNameFor(workout),
-                        onOpen: () => _openDetail(context, workout),
-                        onStart: () => _start(context, workout),
-                        onFavorite: () => controller.toggleFavorite(workout.id),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
                   ],
                   if (noResults)
                     Padding(
@@ -349,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(height: 12),
                           Text(
                             _query.isEmpty
-                                ? 'Create or browse for your first workout.'
+                                ? 'No workouts in this filter.'
                                 : 'No workouts match “$_query”.',
                             textAlign: TextAlign.center,
                           ),
@@ -375,35 +553,5 @@ class _HomeScreenState extends State<HomeScreen> {
     return provenance == null
         ? null
         : controller.bucketOriginalName(provenance);
-  }
-}
-
-class _HomeSectionHeader extends StatelessWidget {
-  final String title;
-  final int count;
-
-  const _HomeSectionHeader({required this.title, required this.count});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context)
-                .textTheme
-                .titleMedium
-                ?.copyWith(fontWeight: FontWeight.w700),
-          ),
-        ),
-        Text(
-          '$count',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-        ),
-      ],
-    );
   }
 }
