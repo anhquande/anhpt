@@ -23,6 +23,7 @@ class WorkoutCard extends StatelessWidget {
   final VoidCallback onFavorite;
   final String? sourceName;
   final String? originalName;
+  final bool showLastUsed;
 
   const WorkoutCard({
     super.key,
@@ -31,6 +32,7 @@ class WorkoutCard extends StatelessWidget {
     required this.onFavorite,
     this.sourceName,
     this.originalName,
+    this.showLastUsed = false,
   });
 
   IconData _thumbnailIcon() {
@@ -47,9 +49,25 @@ class WorkoutCard extends StatelessWidget {
     return Icons.fitness_center;
   }
 
+  String _formatLastUsed(DateTime value) {
+    final used = value.toLocal();
+    final now = DateTime.now();
+    final usedDate = DateUtils.dateOnly(used);
+    final today = DateUtils.dateOnly(now);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final time =
+        '${used.hour.toString().padLeft(2, '0')}:${used.minute.toString().padLeft(2, '0')}';
+
+    if (usedDate == today) return 'Today, $time';
+    if (usedDate == yesterday) return 'Yesterday, $time';
+    return '${used.day.toString().padLeft(2, '0')}.'
+        '${used.month.toString().padLeft(2, '0')}.${used.year}, $time';
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final displayLastUsed = showLastUsed && workout.lastUsedAt != null;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -57,12 +75,12 @@ class WorkoutCard extends StatelessWidget {
       child: InkWell(
         onTap: onStart,
         child: SizedBox(
-          height: 82,
+          height: displayLastUsed ? 96 : 82,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                width: 82,
+                width: displayLastUsed ? 96 : 82,
                 color: cs.surfaceContainerHighest,
                 alignment: Alignment.center,
                 child: Icon(
@@ -94,6 +112,18 @@ class WorkoutCard extends StatelessWidget {
                             color: cs.onSurfaceVariant,
                           ),
                     ),
+                    if (displayLastUsed) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        _formatLastUsed(workout.lastUsedAt!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: cs.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -128,10 +158,10 @@ class WorkoutStructure extends StatelessWidget {
   final Set<String> recordedStepKeys;
   final StepMediaCallback? onBrowseStepMedia;
   final String? Function(WorkoutStep step)? resolveStepRecording;
-  final String? Function(WorkoutStep step)? demoMediaIdForStep;
   final Future<MediaAsset?> Function(String id)? resolveMediaAsset;
   final Future<Uri?> Function(String id)? resolveMediaUri;
   final StepMediaCallback? onRemoveStepMedia;
+  final String? Function(WorkoutStep step)? demoMediaIdForStep;
 
   const WorkoutStructure({
     super.key,
