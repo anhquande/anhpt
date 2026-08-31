@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../models/workout_bucket.dart';
 import 'bucket_sources_screen.dart';
-import 'workout_detail_screen.dart';
+import 'workout_download_screen.dart';
 
 enum _CatalogStatus { all, notInstalled, installed, updates }
 
@@ -25,7 +25,6 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
   String? _sourceId;
   _CatalogStatus _status = _CatalogStatus.all;
   _CatalogSort _sort = _CatalogSort.recommended;
-  String? _installingId;
   final _searchController = TextEditingController();
   Timer? _searchDebounce;
 
@@ -47,57 +46,17 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
     WorkoutBucketEntry entry, {
     BucketInstallConflictResolution? resolution,
   }) async {
-    final existingWorkoutIds =
-        widget.controller.workouts.map((workout) => workout.id).toSet();
-    setState(() => _installingId = entry.id);
-    try {
-      final installed = await widget.controller
-          .installBucketEntry(entry, resolution: resolution);
-      if (mounted && installed) {
-        String? workoutId;
-        for (final workout in widget.controller.workouts) {
-          if (!existingWorkoutIds.contains(workout.id)) {
-            workoutId = workout.id;
-            break;
-          }
-        }
-        if (workoutId == null) {
-          for (final item in widget.controller.installedBucketWorkouts) {
-            if (item.sourceId == entry.sourceId && item.entryId == entry.id) {
-              workoutId = item.workoutId;
-              break;
-            }
-          }
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${entry.name} installed.'),
-            action: workoutId == null
-                ? null
-                : SnackBarAction(
-                    label: 'Open',
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => WorkoutDetailScreen(
-                          controller: widget.controller,
-                          workoutId: workoutId!,
-                        ),
-                      ),
-                    ),
-                  ),
-          ),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Install failed: $error')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _installingId = null);
-    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutDownloadScreen(
+          controller: widget.controller,
+          entry: entry,
+          sourceName: _sourceName(entry.sourceId),
+          resolution: resolution,
+        ),
+      ),
+    );
   }
 
   Future<void> _showUpdateChoices(WorkoutBucketEntry entry) async {
@@ -350,8 +309,7 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                         ),
                       ),
                     ),
-                  if (!widget.controller.bucketCatalogLoading &&
-                      entries.isEmpty)
+                  if (!widget.controller.bucketCatalogLoading && entries.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(32),
                       child: Column(
@@ -369,7 +327,8 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) => BucketSourcesScreen(
-                                      controller: widget.controller),
+                                    controller: widget.controller,
+                                  ),
                                 ),
                               ),
                               child: const Text('Manage sources'),
@@ -401,7 +360,6 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
 
   Widget _entryCard(BuildContext context, WorkoutBucketEntry entry) {
     final state = widget.controller.bucketInstallState(entry);
-    final installing = _installingId == entry.id;
     final label = switch (state) {
       'installed' => 'Add another',
       'updateAvailable' => 'Update',
@@ -460,23 +418,21 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              if (installing)
-                const SizedBox.square(
-                  dimension: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                FilledButton.tonal(
-                  onPressed: () => switch (state) {
-                    'installed' => _install(
-                        entry,
-                        resolution: BucketInstallConflictResolution.installCopy,
-                      ),
-                    'updateAvailable' => _showUpdateChoices(entry),
-                    _ => _install(entry),
-                  },
-                  child: Text(label),
-                ),
+              FilledButton.tonal(
+                onPressed: () {
+                  if (state == 'installed') {
+                    _install(
+                      entry,
+                      resolution: BucketInstallConflictResolution.installCopy,
+                    );
+                  } else if (state == 'updateAvailable') {
+                    _showUpdateChoices(entry);
+                  } else {
+                    _install(entry);
+                  }
+                },
+                child: Text(label),
+              ),
             ],
           ),
         ),
