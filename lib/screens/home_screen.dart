@@ -372,7 +372,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       workout: workout,
                       sourceName: _sourceNameFor(workout),
                       originalName: _originalNameFor(workout),
-                      showLastUsed: _selectedFilter == 'recent',
                       onStart: () => _start(context, workout),
                       onFavorite: () => controller.toggleFavorite(workout.id),
                     ),
