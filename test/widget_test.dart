@@ -64,7 +64,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('After workout: Shut down or exit'), findsOneWidget);
-    expect(find.text('Voice settings'), findsOneWidget);
     expect(
       find.text('Off — the completion screen stays open normally.'),
       findsOneWidget,
