@@ -17,6 +17,8 @@ class LocalStore {
   static const _defaultBucketSourceSeeded =
       'anhpt.defaultBucketSourceSeeded.v1';
   static const _installedBucketWorkouts = 'anhpt.installedBucketWorkouts.v1';
+  static const _quickFilterTagOrder = 'anhpt.quickFilterTagOrder.v1';
+  static const _quickFilterHiddenTags = 'anhpt.quickFilterHiddenTags.v1';
 
   static const defaultBucketSourceId = 'official';
   static const defaultBucketSourceName = 'AnhPT Official';
@@ -38,6 +40,25 @@ class LocalStore {
       _workouts,
       jsonEncode(workouts.map((e) => e.toJson()).toList()),
     );
+  }
+
+  Future<List<String>> loadQuickFilterTagOrder() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getStringList(_quickFilterTagOrder) ?? const [];
+  }
+
+  Future<Set<String>> loadQuickFilterHiddenTags() async {
+    final p = await SharedPreferences.getInstance();
+    return (p.getStringList(_quickFilterHiddenTags) ?? const []).toSet();
+  }
+
+  Future<void> saveQuickFilterPreferences({
+    required List<String> orderedTags,
+    required Set<String> hiddenTags,
+  }) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setStringList(_quickFilterTagOrder, orderedTags);
+    await p.setStringList(_quickFilterHiddenTags, hiddenTags.toList());
   }
 
   Future<void> saveDraft(String value) async {
@@ -180,11 +201,11 @@ class LocalStore {
   }
 
   Future<void> saveInstalledBucketWorkouts(
-      List<InstalledWorkoutProvenance> installed) async {
+      List<InstalledWorkoutProvenance> workouts) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(
       _installedBucketWorkouts,
-      jsonEncode(installed.map((item) => item.toJson()).toList()),
+      jsonEncode(workouts.map((workout) => workout.toJson()).toList()),
     );
   }
 }
