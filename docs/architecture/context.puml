@@ -1,0 +1,19 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+LAYOUT_WITH_LEGEND()
+
+title AnhPT — System Context
+
+Person(user, "AnhPT User", "Creates, downloads and performs guided workouts, and tracks personal health data.")
+
+System(anhpt, "AnhPT", "Flutter application for voice-guided workouts, workout management, downloadable workout catalogs and health tracking.")
+
+System_Ext(bucketRepo, "Workout Bucket Repository", "Publishes bucket metadata, workout YAML/packages and downloadable workout content.")
+System_Ext(deviceServices, "Device Services", "Operating-system audio, text-to-speech, media playback, storage and screen/power capabilities.")
+
+Rel(user, anhpt, "Uses")
+Rel(anhpt, bucketRepo, "Reads catalog metadata and downloads workout content", "HTTPS / JSON / YAML / ZIP")
+Rel(anhpt, deviceServices, "Uses", "Flutter platform APIs / plugins")
+
+@enduml
