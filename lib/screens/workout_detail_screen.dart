@@ -6,9 +6,9 @@ import '../models/workout.dart';
 import '../widgets/coach_recording_card.dart';
 import '../widgets/common.dart';
 import '../widgets/demo_media_source_sheet.dart';
-import '../widgets/workout_widgets.dart';
-import '../widgets/workout_music_card.dart';
 import '../widgets/step_recording_mini_player.dart';
+import '../widgets/workout_music_card.dart';
+import '../widgets/workout_widgets.dart';
 import 'workout_builder_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
@@ -27,8 +27,11 @@ class WorkoutDetailScreen extends StatefulWidget {
   final AppController controller;
   final String workoutId;
 
-  const WorkoutDetailScreen(
-      {super.key, required this.controller, required this.workoutId});
+  const WorkoutDetailScreen({
+    super.key,
+    required this.controller,
+    required this.workoutId,
+  });
 
   @override
   State<WorkoutDetailScreen> createState() => _WorkoutDetailScreenState();
@@ -42,7 +45,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, initialIndex: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
@@ -142,7 +145,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                    'Source: ${widget.controller.bucketSourceName(provenance)}'),
+                  'Source: ${widget.controller.bucketSourceName(provenance)}',
+                ),
                 const SizedBox(height: 8),
                 Text('Workout ID: ${provenance.entryId}'),
                 if (widget.controller.bucketOriginalName(provenance)
@@ -302,6 +306,46 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         stepKey: stepKey,
       );
 
+  Widget _introductionOption(
+    BuildContext context,
+    AppController controller,
+    Workout workout,
+  ) {
+    return _CompactOptionContainer(
+      child: Row(
+        children: [
+          const Icon(Icons.mic_none_outlined),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Introduction',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                SizedBox(height: 2),
+                Text('Workout introduction recording'),
+              ],
+            ),
+          ),
+          if (workout.recording == null)
+            IconButton(
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Record workout introduction',
+              onPressed: () => _openIntroductionRecording(context, workout),
+              icon: const Icon(Icons.add_circle_outline),
+            )
+          else
+            StepRecordingMiniPlayer(
+              audioPath: controller.resolveAudioSource(workout.recording!),
+              onManage: () => _openIntroductionRecording(context, workout),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
@@ -312,6 +356,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         if (workout == null) {
           return const Scaffold(body: Center(child: Text('Workout not found')));
         }
+
         final recordedStepKeys = <String>{};
         void collectRecordings(List<WorkoutNode> nodes, [String prefix = '']) {
           for (var index = 0; index < nodes.length; index++) {
@@ -332,6 +377,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         final originalName = provenance == null
             ? null
             : controller.bucketOriginalName(provenance);
+
         return Scaffold(
           appBar: AppBar(
             title: Text(
@@ -340,11 +386,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
               overflow: TextOverflow.ellipsis,
             ),
             actions: [
-              FilledButton.icon(
-                onPressed: () => _startWorkout(workout),
-                icon: const Icon(Icons.play_arrow_rounded),
-                label: const Text('Start'),
-              ),
               PopupMenuButton<_WorkoutAction>(
                 tooltip: 'Workout actions',
                 icon: const Icon(Icons.more_vert),
@@ -352,16 +393,28 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                     _handleWorkoutAction(action, workout),
                 itemBuilder: (_) => [
                   _menuItem(_WorkoutAction.edit, Icons.edit_outlined, 'Edit'),
-                  _menuItem(_WorkoutAction.duplicate, Icons.copy_outlined,
-                      'Duplicate'),
-                  _menuItem(_WorkoutAction.copyYaml, Icons.copy_all_outlined,
-                      'Copy YAML'),
+                  _menuItem(
+                    _WorkoutAction.duplicate,
+                    Icons.copy_outlined,
+                    'Duplicate',
+                  ),
+                  _menuItem(
+                    _WorkoutAction.copyYaml,
+                    Icons.copy_all_outlined,
+                    'Copy YAML',
+                  ),
                   _menuItem(_WorkoutAction.editYaml, Icons.code, 'Edit YAML'),
-                  _menuItem(_WorkoutAction.exportPackage,
-                      Icons.archive_outlined, 'Export package'),
+                  _menuItem(
+                    _WorkoutAction.exportPackage,
+                    Icons.archive_outlined,
+                    'Export package',
+                  ),
                   if (provenance != null)
-                    _menuItem(_WorkoutAction.viewSource, Icons.cloud_outlined,
-                        'View source'),
+                    _menuItem(
+                      _WorkoutAction.viewSource,
+                      Icons.cloud_outlined,
+                      'View source',
+                    ),
                   const PopupMenuDivider(),
                   _menuItem(
                     _WorkoutAction.delete,
@@ -370,143 +423,187 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                     color: Theme.of(context).colorScheme.error,
                   ),
                 ],
-              )
+              ),
             ],
           ),
           body: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 820),
-              child: NestedScrollView(
-                headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                    sliver: SliverToBoxAdapter(
-                      child: _WorkoutSummary(
-                        workout: workout,
-                        sourceName: sourceName,
-                        originalName: originalName,
-                        onCompletionActionChanged: (enabled) =>
-                            controller.setWorkoutCompletionAction(
-                          workout.id,
-                          enabled: enabled,
-                        ),
-                        onScreenOffAfterStartChanged: (enabled) =>
-                            controller.setWorkoutScreenOffAfterStart(
-                          workout.id,
-                          enabled: enabled,
-                        ),
-                      ),
-                    ),
+              child: Column(
+                children: [
+                  _CompactWorkoutHeader(workout: workout),
+                  TabBar(
+                    controller: _tabController,
+                    tabs: const [
+                      Tab(text: 'Overview'),
+                      Tab(text: 'Steps'),
+                    ],
                   ),
-                  SliverPersistentHeader(
-                    pinned: true,
-                    delegate: _PinnedTabBarDelegate(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      tabBar: TabBar(
-                        controller: _tabController,
-                        tabs: const [
-                          Tab(text: 'Introduction'),
-                          Tab(text: 'Music'),
-                          Tab(text: 'Structure'),
-                        ],
-                      ),
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        ListView(
+                          key: const PageStorageKey('overview-tab'),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                          children: [
+                            if (sourceName != null) ...[
+                              _WorkoutOrigin(
+                                sourceName,
+                                originalName: originalName != null &&
+                                        originalName.trim() !=
+                                            workout.name.trim()
+                                    ? originalName
+                                    : null,
+                              ),
+                              const SizedBox(height: 14),
+                            ],
+                            if (workout.description.trim().isNotEmpty) ...[
+                              const _SectionTitle('About'),
+                              const SizedBox(height: 8),
+                              _WorkoutDescription(workout.description.trim()),
+                              const SizedBox(height: 18),
+                            ],
+                            if (workout.tags.isNotEmpty) ...[
+                              Wrap(
+                                spacing: 7,
+                                runSpacing: 7,
+                                children: [
+                                  for (final tag in workout.tags)
+                                    Chip(
+                                      label: Text(tag),
+                                      visualDensity: VisualDensity.compact,
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      side: BorderSide.none,
+                                      backgroundColor: Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 20),
+                            ],
+                            const _SectionTitle('Workout options'),
+                            const SizedBox(height: 8),
+                            _CompactOptionContainer(
+                              child: SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                secondary:
+                                    const Icon(Icons.power_settings_new),
+                                title: const Text('After workout'),
+                                subtitle: Text(
+                                  workout.completionAction == 'shutdown_or_exit'
+                                      ? 'Shut down or exit when complete'
+                                      : 'Stay open after completion',
+                                ),
+                                value: workout.completionAction ==
+                                    'shutdown_or_exit',
+                                onChanged: (enabled) =>
+                                    controller.setWorkoutCompletionAction(
+                                  workout.id,
+                                  enabled: enabled,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _CompactOptionContainer(
+                              child: SwitchListTile(
+                                contentPadding: EdgeInsets.zero,
+                                secondary: const Icon(
+                                  Icons.screen_lock_landscape_outlined,
+                                ),
+                                title: const Text('Screen during workout'),
+                                subtitle: Text(
+                                  workout.screenOffAfterStart != null
+                                      ? 'Turn display off after Start'
+                                      : 'Keep current display behavior',
+                                ),
+                                value: workout.screenOffAfterStart != null,
+                                onChanged: (enabled) =>
+                                    controller.setWorkoutScreenOffAfterStart(
+                                  workout.id,
+                                  enabled: enabled,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            _introductionOption(context, controller, workout),
+                            const SizedBox(height: 20),
+                            const _SectionTitle('Audio'),
+                            const SizedBox(height: 8),
+                            WorkoutMusicCard(
+                              key: _musicCardKey,
+                              controller: controller,
+                              workout: workout,
+                            ),
+                          ],
+                        ),
+                        ListView(
+                          key: const PageStorageKey('steps-tab'),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                          children: [
+                            WorkoutStructure(
+                              nodes: workout.steps,
+                              recordedStepKeys: recordedStepKeys,
+                              onRecordStep: (context, step, stepKey) =>
+                                  _openStepRecording(
+                                context,
+                                workout,
+                                step,
+                                stepKey,
+                              ),
+                              onBrowseStepMedia: (_, __, stepKey) =>
+                                  _browseStepMedia(stepKey),
+                              onRemoveStepMedia: (_, __, stepKey) =>
+                                  _removeStepMedia(stepKey),
+                              demoMediaIdForStep: (step) {
+                                for (final exercise in workout.exercises) {
+                                  if (exercise.id == step.exerciseId) {
+                                    return exercise.demoMediaId;
+                                  }
+                                }
+                                return null;
+                              },
+                              resolveMediaAsset: controller.mediaAsset,
+                              resolveMediaUri: controller.resolveMediaUri,
+                              resolveStepRecording: (step) =>
+                                  step.recording == null
+                                      ? null
+                                      : controller.resolveAudioSource(
+                                          step.recording!,
+                                        ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ],
-                body: TabBarView(
-                  controller: _tabController,
-                  physics: const NeverScrollableScrollPhysics(),
-                  children: [
-                    ListView(
-                      key: const PageStorageKey('introduction-tab'),
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerLow,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            children: [
-                              const Expanded(
-                                child: Text(
-                                  'Workout introduction recording',
-                                  style: TextStyle(fontWeight: FontWeight.w600),
-                                ),
-                              ),
-                              if (workout.recording == null)
-                                IconButton(
-                                  visualDensity: VisualDensity.compact,
-                                  tooltip: 'Record workout introduction',
-                                  onPressed: () => _openIntroductionRecording(
-                                      context, workout),
-                                  icon: Icon(
-                                    Icons.mic_none_outlined,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onSurfaceVariant,
-                                  ),
-                                )
-                              else
-                                StepRecordingMiniPlayer(
-                                  audioPath: controller
-                                      .resolveAudioSource(workout.recording!),
-                                  onManage: () => _openIntroductionRecording(
-                                      context, workout),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
+              ),
+            ),
+          ),
+          bottomNavigationBar: SafeArea(
+            top: false,
+            child: Material(
+              elevation: 8,
+              child: Center(
+                heightFactor: 1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 820),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: FilledButton.icon(
+                        onPressed: () => _startWorkout(workout),
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: const Text('Start workout'),
+                      ),
                     ),
-                    ListView(
-                      key: const PageStorageKey('music-tab'),
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        WorkoutMusicCard(
-                          key: _musicCardKey,
-                          controller: controller,
-                          workout: workout,
-                        ),
-                      ],
-                    ),
-                    ListView(
-                      key: const PageStorageKey('structure-tab'),
-                      padding: const EdgeInsets.all(20),
-                      children: [
-                        WorkoutStructure(
-                          nodes: workout.steps,
-                          recordedStepKeys: recordedStepKeys,
-                          onRecordStep: (context, step, stepKey) =>
-                              _openStepRecording(
-                                  context, workout, step, stepKey),
-                          onBrowseStepMedia: (_, __, stepKey) =>
-                              _browseStepMedia(stepKey),
-                          onRemoveStepMedia: (_, __, stepKey) =>
-                              _removeStepMedia(stepKey),
-                          demoMediaIdForStep: (step) {
-                            for (final exercise in workout.exercises) {
-                              if (exercise.id == step.exerciseId) {
-                                return exercise.demoMediaId;
-                              }
-                            }
-                            return null;
-                          },
-                          resolveMediaAsset: controller.mediaAsset,
-                          resolveMediaUri: controller.resolveMediaUri,
-                          resolveStepRecording: (step) => step.recording == null
-                              ? null
-                              : controller.resolveAudioSource(step.recording!),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -517,117 +614,73 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
   }
 }
 
-class _WorkoutSummary extends StatelessWidget {
+class _CompactWorkoutHeader extends StatelessWidget {
   final Workout workout;
-  final String? sourceName;
-  final String? originalName;
-  final Future<void> Function(bool enabled) onCompletionActionChanged;
-  final Future<void> Function(bool enabled) onScreenOffAfterStartChanged;
 
-  const _WorkoutSummary({
-    required this.workout,
-    this.sourceName,
-    this.originalName,
-    required this.onCompletionActionChanged,
-    required this.onScreenOffAfterStartChanged,
-  });
+  const _CompactWorkoutHeader({required this.workout});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (sourceName != null) ...[
-          _WorkoutOrigin(
-            sourceName!,
-            originalName: originalName != null &&
-                    originalName!.trim() != workout.name.trim()
-                ? originalName
-                : null,
+    final color = Theme.of(context).colorScheme.onSurfaceVariant;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Wrap(
+        spacing: 14,
+        runSpacing: 6,
+        children: [
+          _MetadataItem(
+            icon: Icons.schedule_outlined,
+            label: formatDuration(workout.totalDuration),
           ),
-          const SizedBox(height: 14),
+          _MetadataItem(
+            icon: Icons.format_list_numbered,
+            label: '${workout.effectiveStepCount} steps',
+          ),
+          _MetadataItem(
+            icon: Icons.language_outlined,
+            label: workout.voice.language.toUpperCase(),
+          ),
+          if (workout.voice.mode.trim().isNotEmpty)
+            Text(
+              workout.voice.mode,
+              style: TextStyle(color: color),
+            ),
         ],
-        if (workout.description.trim().isNotEmpty) ...[
-          _WorkoutDescription(workout.description.trim()),
-          const SizedBox(height: 16),
-        ],
-        if (workout.tags.isNotEmpty) ...[
-          Wrap(
-            spacing: 7,
-            runSpacing: 7,
-            children: [
-              for (final tag in workout.tags)
-                Chip(
-                  label: Text(tag),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  side: BorderSide.none,
-                  backgroundColor:
-                      Theme.of(context).colorScheme.secondaryContainer,
-                ),
-            ],
+      ),
+    );
+  }
+}
+
+class _CompactOptionContainer extends StatelessWidget {
+  final Widget child;
+
+  const _CompactOptionContainer({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  final String text;
+
+  const _SectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
-          const SizedBox(height: 16),
-        ],
-        Card(
-          margin: EdgeInsets.zero,
-          child: SwitchListTile(
-            secondary: const Icon(Icons.power_settings_new),
-            title: const Text(
-              'After workout',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              workout.completionAction == 'shutdown_or_exit'
-                  ? 'Shut down Windows or exit Android when complete'
-                  : 'Stay open after completion',
-            ),
-            value: workout.completionAction == 'shutdown_or_exit',
-            onChanged: onCompletionActionChanged,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Card(
-          margin: EdgeInsets.zero,
-          child: SwitchListTile(
-            secondary: const Icon(Icons.screen_lock_landscape_outlined),
-            title: const Text(
-              'Screen during workout',
-              style: TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Text(
-              workout.screenOffAfterStart != null
-                  ? 'Turn off the Windows display 10 seconds after Start'
-                  : 'Leave the display unchanged after Start',
-            ),
-            value: workout.screenOffAfterStart != null,
-            onChanged: onScreenOffAfterStartChanged,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 18,
-          runSpacing: 10,
-          children: [
-            _MetadataItem(
-              icon: Icons.schedule_outlined,
-              label: formatDuration(workout.totalDuration),
-            ),
-            _MetadataItem(
-              icon: Icons.format_list_numbered,
-              label: '${workout.effectiveStepCount} steps',
-            ),
-            _MetadataItem(
-              icon: Icons.language_outlined,
-              label: workout.voice.language.toUpperCase(),
-            ),
-            _MetadataItem(
-              icon: Icons.graphic_eq_outlined,
-              label: workout.voice.mode,
-            ),
-          ],
-        ),
-      ],
     );
   }
 }
@@ -658,36 +711,6 @@ class _WorkoutOrigin extends StatelessWidget {
   }
 }
 
-class _PinnedTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final TabBar tabBar;
-  final Color color;
-
-  const _PinnedTabBarDelegate({required this.tabBar, required this.color});
-
-  @override
-  double get minExtent => tabBar.preferredSize.height;
-
-  @override
-  double get maxExtent => tabBar.preferredSize.height;
-
-  @override
-  Widget build(
-    BuildContext context,
-    double shrinkOffset,
-    bool overlapsContent,
-  ) {
-    return Material(
-      color: color,
-      elevation: overlapsContent ? 1 : 0,
-      child: tabBar,
-    );
-  }
-
-  @override
-  bool shouldRebuild(_PinnedTabBarDelegate oldDelegate) =>
-      oldDelegate.tabBar != tabBar || oldDelegate.color != color;
-}
-
 class _WorkoutDescription extends StatefulWidget {
   final String text;
 
@@ -703,62 +726,45 @@ class _WorkoutDescriptionState extends State<_WorkoutDescription> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final style = theme.textTheme.bodyLarge?.copyWith(
+    final style = theme.textTheme.bodyMedium?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
-      height: 1.45,
+      height: 1.4,
     );
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Icon(
-            Icons.notes_outlined,
-            size: 20,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final painter = TextPainter(
-                text: TextSpan(text: widget.text, style: style),
-                textDirection: Directionality.of(context),
-                maxLines: 3,
-              )..layout(maxWidth: constraints.maxWidth);
-              final canExpand = painter.didExceedMaxLines;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  AnimatedSize(
-                    duration: const Duration(milliseconds: 180),
-                    alignment: Alignment.topCenter,
-                    child: Text(
-                      widget.text,
-                      style: style,
-                      maxLines: _expanded ? null : 3,
-                      overflow: _expanded
-                          ? TextOverflow.visible
-                          : TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (canExpand)
-                    TextButton(
-                      onPressed: () => setState(() => _expanded = !_expanded),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.only(top: 2),
-                        minimumSize: const Size(48, 30),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: Text(_expanded ? 'Less' : 'More'),
-                    ),
-                ],
-              );
-            },
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = TextPainter(
+          text: TextSpan(text: widget.text, style: style),
+          textDirection: Directionality.of(context),
+          maxLines: 3,
+        )..layout(maxWidth: constraints.maxWidth);
+        final canExpand = painter.didExceedMaxLines;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 180),
+              alignment: Alignment.topCenter,
+              child: Text(
+                widget.text,
+                style: style,
+                maxLines: _expanded ? null : 3,
+                overflow:
+                    _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
+            ),
+            if (canExpand)
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.only(top: 2),
+                  minimumSize: const Size(48, 30),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: Text(_expanded ? 'Less' : 'More'),
+              ),
+          ],
+        );
+      },
     );
   }
 }
