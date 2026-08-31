@@ -11,13 +11,11 @@ String formatDuration(Duration d) {
   final s = totalSeconds % 60;
 
   if (h > 0) {
-    return '${h.toString().padLeft(2, '0')}:'
-        '${m.toString().padLeft(2, '0')}:'
+    return '$h:${m.toString().padLeft(2, '0')}:'
         '${s.toString().padLeft(2, '0')}';
   }
 
-  return '${m.toString().padLeft(2, '0')}:'
-      '${s.toString().padLeft(2, '0')}';
+  return '$m:${s.toString().padLeft(2, '0')}';
 }
 
 class SectionTitle extends StatelessWidget {
