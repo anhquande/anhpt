@@ -1,0 +1,30 @@
+@startuml
+!includeurl https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+LAYOUT_WITH_LEGEND()
+
+title AnhPT — Workout Player Components
+
+Container_Boundary(player, "Workout Player") {
+  Component(screen, "WorkoutPlayerScreen", "Flutter Widget", "Displays the active workout session and handles player controls.")
+  Component(engine, "SessionEngine", "Dart", "Owns workout execution state, timing, step transitions, repeats and pause/resume behavior.")
+  Component(voice, "VoiceGuideController", "Dart", "Decides when and what spoken guidance should be produced during a session.")
+  Component(feedback, "AudioFeedbackService", "Dart", "Plays non-speech audio feedback and cues.")
+  Component(music, "BackgroundMusicService", "Dart", "Controls background music independently from coach voice and feedback cues.")
+}
+
+Container_Ext(storage, "Local Persistence", "Device storage", "Workout definitions, settings, recordings and media assets.")
+System_Ext(deviceAudio, "Device Audio / TTS Services", "Platform audio, media and text-to-speech capabilities.")
+
+Rel(screen, engine, "Starts, pauses, resumes and observes the session")
+Rel(engine, voice, "Requests scheduled voice guidance")
+Rel(engine, feedback, "Requests session feedback cues")
+Rel(screen, music, "Starts/stops or previews background music")
+Rel(engine, storage, "Reads workout/session data")
+Rel(voice, storage, "Reads voice configuration and coach recordings")
+Rel(music, storage, "Reads background music configuration/assets")
+Rel(voice, deviceAudio, "Speaks or plays recorded coaching")
+Rel(feedback, deviceAudio, "Plays cues")
+Rel(music, deviceAudio, "Plays music")
+
+@enduml
