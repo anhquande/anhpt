@@ -1,0 +1,79 @@
+@startsalt
+skinparam dpi 120
+
+{
+  {+
+    [< Back] | **Heian Shodan** | [⋮]
+  }
+
+  ==
+
+  {
+    {+
+      **Heian Shodan**
+      15 min · Beginner · 8 steps
+    }
+  }
+
+  {
+    {/ <&warning> Update available: v1.1 → v1.2 | [Update] }
+  }
+
+  ==
+
+  {^"Overview" | "Steps"}
+
+  ==
+
+  {
+    **Overview**
+
+    Source
+    Official Bucket
+
+    --
+
+    **About**
+    Learn the basic movements and sequence of Heian Shodan.
+
+    [karate] [beginner] [kata]
+
+    --
+
+    **Workout options**
+
+    {+
+      <&power-standby> After workout
+      Stay open after completion | [ ]
+    }
+
+    {+
+      <&monitor> Screen during workout
+      Keep current display behavior | [ ]
+    }
+
+    --
+
+    **Voice guide**
+
+    {+
+      Announce step name | [X]
+      Elapsed time | [ ]
+      Periodic remaining time | [X]
+      Final countdown | [X]
+    }
+
+    --
+
+    **Background music**
+    Selected track: None
+    Volume: 70%
+    Coach ducking: Gentle
+  }
+
+  ==
+
+  [                  START WORKOUT                  ]
+}
+
+@endsalt
