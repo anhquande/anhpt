@@ -250,19 +250,18 @@ steps:
     await tester.pumpAndSettle();
 
     expect(find.text('Workouts'), findsOneWidget);
-    expect(find.text('New workout'), findsOneWidget);
+    expect(find.byType(WorkoutCard), findsNWidgets(2));
     expect(find.text('Browse workouts'), findsNothing);
-    expect(find.text('From AnhPT Official'), findsOneWidget);
-    expect(find.text('Originally “Morning Warmup”'), findsOneWidget);
     expect(find.text('Import package'), findsNothing);
     expect(find.text('Import YAML'), findsNothing);
-    expect(find.byTooltip('More ways to add'), findsOneWidget);
-    expect(find.byTooltip('Import workouts'), findsNothing);
+    expect(find.byTooltip('Workout actions'), findsOneWidget);
+    expect(find.byTooltip('Manage tags'), findsOneWidget);
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.text('Ready to move?'), findsNothing);
 
-    await tester.tap(find.byTooltip('More ways to add'));
+    await tester.tap(find.byTooltip('Workout actions'));
     await tester.pumpAndSettle();
+    expect(find.text('Create new workout'), findsOneWidget);
     expect(find.text('Import package'), findsOneWidget);
     expect(find.text('Import YAML'), findsOneWidget);
 
@@ -305,6 +304,7 @@ steps:
     expect(find.text('Workouts'), findsOneWidget);
     expect(find.text('Browse workouts'), findsNothing);
     expect(find.text('Browse Workouts'), findsNothing);
-    expect(find.byTooltip('More ways to add'), findsOneWidget);
+    expect(find.byTooltip('Workout actions'), findsOneWidget);
+    expect(find.byTooltip('Manage tags'), findsOneWidget);
   });
 }
