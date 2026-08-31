@@ -328,6 +328,7 @@ class _NodeView extends StatelessWidget {
     if (node is WorkoutStep) {
       final step = node as WorkoutStep;
       final mediaId = demoMediaIdForStep?.call(step);
+      final guide = step.guide?.trim() ?? '';
       return Padding(
         padding: EdgeInsets.only(left: indent, bottom: 8),
         child: Card(
@@ -402,10 +403,10 @@ class _NodeView extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
-                        if (step.guide.trim().isNotEmpty) ...[
+                        if (guide.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
-                            step.guide.trim(),
+                            guide,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style:
