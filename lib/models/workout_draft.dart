@@ -27,15 +27,15 @@ class StepDraft extends WorkoutDraftNode {
 
   @override
   StepDraft clone() => StepDraft(
-        id: '',
-        hasExplicitId: false,
-        name: name,
-        duration: duration,
-        guide: guide,
-        countdown: countdown,
-        recording: '',
-        exerciseId: exerciseId,
-      );
+    id: '',
+    hasExplicitId: false,
+    name: name,
+    duration: duration,
+    guide: guide,
+    countdown: countdown,
+    recording: '',
+    exerciseId: exerciseId,
+  );
 }
 
 class RepeatDraft extends WorkoutDraftNode {
@@ -43,13 +43,11 @@ class RepeatDraft extends WorkoutDraftNode {
   final List<WorkoutDraftNode> steps;
 
   RepeatDraft({this.repeat = 2, List<WorkoutDraftNode>? steps})
-      : steps = steps ?? <WorkoutDraftNode>[];
+    : steps = steps ?? <WorkoutDraftNode>[];
 
   @override
-  RepeatDraft clone() => RepeatDraft(
-        repeat: repeat,
-        steps: steps.map((e) => e.clone()).toList(),
-      );
+  RepeatDraft clone() =>
+      RepeatDraft(repeat: repeat, steps: steps.map((e) => e.clone()).toList());
 }
 
 class WorkoutDraft {
@@ -58,7 +56,9 @@ class WorkoutDraft {
   List<String> tags;
   String startCountdown;
   String voiceLanguage;
-  String voiceMode;
+  bool announceElapsedTime;
+  bool announceInterval;
+  bool announceFinalCountdown;
   String announceEvery;
   String countdownFrom;
   bool announceStepName;
@@ -84,7 +84,9 @@ class WorkoutDraft {
     List<String>? tags,
     this.startCountdown = '3s',
     this.voiceLanguage = 'vi',
-    this.voiceMode = 'combined',
+    this.announceElapsedTime = false,
+    this.announceInterval = true,
+    this.announceFinalCountdown = true,
     this.announceEvery = '10s',
     this.countdownFrom = '5s',
     this.announceStepName = true,
@@ -103,38 +105,40 @@ class WorkoutDraft {
     this.backgroundMusicDucking = 'gentle',
     List<WorkoutDraftNode>? steps,
     List<Exercise>? exercises,
-  })  : tags = tags ?? <String>[],
-        steps = steps ?? <WorkoutDraftNode>[],
-        exercises = exercises ?? <Exercise>[];
+  }) : tags = tags ?? <String>[],
+       steps = steps ?? <WorkoutDraftNode>[],
+       exercises = exercises ?? <Exercise>[];
 
   factory WorkoutDraft.fromWorkout(Workout workout) => WorkoutDraft(
-        name: workout.name,
-        description: workout.description,
-        tags: List<String>.from(workout.tags),
-        startCountdown: _duration(workout.startCountdown),
-        voiceLanguage: workout.voice.language,
-        voiceMode: workout.voice.mode,
-        announceEvery: _duration(workout.voice.announceEvery),
-        countdownFrom: _duration(workout.voice.countdownFrom),
-        announceStepName: workout.voice.announceStepName,
-        announceStart: workout.voice.announceStart,
-        announceFinish: workout.voice.announceFinish,
-        sound: workout.sound,
-        haptic: workout.haptic,
-        ducking: workout.ducking,
-        completionAction: workout.completionAction,
-        screenOffAfterStart: workout.screenOffAfterStart == null
-            ? ''
-            : _duration(workout.screenOffAfterStart!),
-        recording: workout.recording ?? '',
-        backgroundMusicSource: workout.backgroundMusic?.source ?? '',
-        backgroundMusicName: workout.backgroundMusic?.name ?? '',
-        backgroundMusicEnabled: workout.backgroundMusic?.enabled ?? true,
-        backgroundMusicVolume: workout.backgroundMusic?.volume ?? .35,
-        backgroundMusicDucking: workout.backgroundMusic?.ducking ?? 'gentle',
-        steps: workout.steps.map(_node).toList(),
-        exercises: List<Exercise>.from(workout.exercises),
-      );
+    name: workout.name,
+    description: workout.description,
+    tags: List<String>.from(workout.tags),
+    startCountdown: _duration(workout.startCountdown),
+    voiceLanguage: workout.voice.language,
+    announceElapsedTime: workout.voice.announceElapsedTime,
+    announceInterval: workout.voice.announceInterval,
+    announceFinalCountdown: workout.voice.announceFinalCountdown,
+    announceEvery: _duration(workout.voice.announceEvery),
+    countdownFrom: _duration(workout.voice.countdownFrom),
+    announceStepName: workout.voice.announceStepName,
+    announceStart: workout.voice.announceStart,
+    announceFinish: workout.voice.announceFinish,
+    sound: workout.sound,
+    haptic: workout.haptic,
+    ducking: workout.ducking,
+    completionAction: workout.completionAction,
+    screenOffAfterStart: workout.screenOffAfterStart == null
+        ? ''
+        : _duration(workout.screenOffAfterStart!),
+    recording: workout.recording ?? '',
+    backgroundMusicSource: workout.backgroundMusic?.source ?? '',
+    backgroundMusicName: workout.backgroundMusic?.name ?? '',
+    backgroundMusicEnabled: workout.backgroundMusic?.enabled ?? true,
+    backgroundMusicVolume: workout.backgroundMusic?.volume ?? .35,
+    backgroundMusicDucking: workout.backgroundMusic?.ducking ?? 'gentle',
+    steps: workout.steps.map(_node).toList(),
+    exercises: List<Exercise>.from(workout.exercises),
+  );
 
   static WorkoutDraftNode _node(WorkoutNode node) {
     if (node is WorkoutStep) {
@@ -142,8 +146,9 @@ class WorkoutDraft {
         id: node.id,
         hasExplicitId: node.hasExplicitId,
         name: node.name,
-        duration:
-            node.duration == Duration.zero ? '' : _duration(node.duration),
+        duration: node.duration == Duration.zero
+            ? ''
+            : _duration(node.duration),
         guide: node.guide ?? '',
         countdown: node.countdown,
         recording: node.recording ?? '',

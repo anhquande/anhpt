@@ -77,49 +77,49 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
   Future<void> _updateWorkout(WorkoutUpdateInfo update) async {
     final resolution =
         await showModalBottomSheet<BucketInstallConflictResolution>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.system_update_alt),
-              title: const Text(
-                'Update workout',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(
-                'v${update.installedVersion} → v${update.availableVersion}',
-              ),
+          context: context,
+          builder: (sheetContext) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.system_update_alt),
+                  title: const Text(
+                    'Update workout',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    'v${update.installedVersion} → v${update.availableVersion}',
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.sync),
+                  title: const Text('Replace current workout'),
+                  subtitle: const Text(
+                    'Install the new bucket version in place of this workout.',
+                  ),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    BucketInstallConflictResolution.replace,
+                  ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.copy_outlined),
+                  title: const Text('Install as copy'),
+                  subtitle: const Text(
+                    'Keep the current workout and install the update separately.',
+                  ),
+                  onTap: () => Navigator.pop(
+                    sheetContext,
+                    BucketInstallConflictResolution.installCopy,
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
             ),
-            const Divider(height: 1),
-            ListTile(
-              leading: const Icon(Icons.sync),
-              title: const Text('Replace current workout'),
-              subtitle: const Text(
-                'Install the new bucket version in place of this workout.',
-              ),
-              onTap: () => Navigator.pop(
-                sheetContext,
-                BucketInstallConflictResolution.replace,
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.copy_outlined),
-              title: const Text('Install as copy'),
-              subtitle: const Text(
-                'Keep the current workout and install the update separately.',
-              ),
-              onTap: () => Navigator.pop(
-                sheetContext,
-                BucketInstallConflictResolution.installCopy,
-              ),
-            ),
-            const SizedBox(height: 6),
-          ],
-        ),
-      ),
-    );
+          ),
+        );
     if (resolution == null || !mounted) return;
 
     await _musicCardKey.currentState?.stopPreview();
@@ -189,8 +189,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         return;
       case _WorkoutAction.exportPackage:
         try {
-          final exported =
-              await widget.controller.exportWorkoutPackage(workout.id);
+          final exported = await widget.controller.exportWorkoutPackage(
+            workout.id,
+          );
           if (mounted && exported) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Workout package exported.')),
@@ -198,9 +199,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
           }
         } catch (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Export failed: $error')),
-            );
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Export failed: $error')));
           }
         }
         return;
@@ -273,17 +273,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
     IconData icon,
     String label, {
     Color? color,
-  }) =>
-      PopupMenuItem(
-        value: value,
-        child: Row(
-          children: [
-            Icon(icon, size: 20, color: color),
-            const SizedBox(width: 12),
-            Text(label, style: TextStyle(color: color)),
-          ],
-        ),
-      );
+  }) => PopupMenuItem(
+    value: value,
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: color),
+        const SizedBox(width: 12),
+        Text(label, style: TextStyle(color: color)),
+      ],
+    ),
+  );
 
   Future<void> _openStepRecording(
     BuildContext context,
@@ -339,11 +338,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
     }
   }
 
-  Future<void> _removeStepMedia(String stepKey) =>
-      widget.controller.removeStepDemoMedia(
-        workoutId: widget.workoutId,
-        stepKey: stepKey,
-      );
+  Future<void> _removeStepMedia(String stepKey) => widget.controller
+      .removeStepDemoMedia(workoutId: widget.workoutId, stepKey: stepKey);
 
   @override
   Widget build(BuildContext context) {
@@ -372,8 +368,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         collectRecordings(workout.steps);
         final provenance = controller.bucketProvenanceFor(workout.id);
         final update = controller.updateForWorkout(workout.id);
-        final sourceName =
-            provenance == null ? null : controller.bucketSourceName(provenance);
+        final sourceName = provenance == null
+            ? null
+            : controller.bucketSourceName(provenance);
         final originalName = provenance == null
             ? null
             : controller.bucketOriginalName(provenance);
@@ -456,7 +453,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                             if (sourceName != null) ...[
                               _WorkoutOrigin(
                                 sourceName,
-                                originalName: originalName != null &&
+                                originalName:
+                                    originalName != null &&
                                         originalName.trim() !=
                                             workout.name.trim()
                                     ? originalName
@@ -495,21 +493,21 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                             _CompactOptionContainer(
                               child: SwitchListTile(
                                 contentPadding: EdgeInsets.zero,
-                                secondary:
-                                    const Icon(Icons.power_settings_new),
+                                secondary: const Icon(Icons.power_settings_new),
                                 title: const Text('After workout'),
                                 subtitle: Text(
                                   workout.completionAction == 'shutdown_or_exit'
                                       ? 'Shut down or exit when complete'
                                       : 'Stay open after completion',
                                 ),
-                                value: workout.completionAction ==
+                                value:
+                                    workout.completionAction ==
                                     'shutdown_or_exit',
                                 onChanged: (enabled) =>
                                     controller.setWorkoutCompletionAction(
-                                  workout.id,
-                                  enabled: enabled,
-                                ),
+                                      workout.id,
+                                      enabled: enabled,
+                                    ),
                               ),
                             ),
                             const SizedBox(height: 8),
@@ -528,9 +526,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                                 value: workout.screenOffAfterStart != null,
                                 onChanged: (enabled) =>
                                     controller.setWorkoutScreenOffAfterStart(
-                                  workout.id,
-                                  enabled: enabled,
-                                ),
+                                      workout.id,
+                                      enabled: enabled,
+                                    ),
                               ),
                             ),
                             const SizedBox(height: 20),
@@ -552,11 +550,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                               recordedStepKeys: recordedStepKeys,
                               onRecordStep: (context, step, stepKey) =>
                                   _openStepRecording(
-                                context,
-                                workout,
-                                step,
-                                stepKey,
-                              ),
+                                    context,
+                                    workout,
+                                    step,
+                                    stepKey,
+                                  ),
                               onBrowseStepMedia: (_, __, stepKey) =>
                                   _browseStepMedia(stepKey),
                               onRemoveStepMedia: (_, __, stepKey) =>
@@ -573,10 +571,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                               resolveMediaUri: controller.resolveMediaUri,
                               resolveStepRecording: (step) =>
                                   step.recording == null
-                                      ? null
-                                      : controller.resolveAudioSource(
-                                          step.recording!,
-                                        ),
+                                  ? null
+                                  : controller.resolveAudioSource(
+                                      step.recording!,
+                                    ),
                             ),
                           ],
                         ),
@@ -621,10 +619,7 @@ class _WorkoutUpdateBanner extends StatelessWidget {
   final WorkoutUpdateInfo update;
   final VoidCallback onUpdate;
 
-  const _WorkoutUpdateBanner({
-    required this.update,
-    required this.onUpdate,
-  });
+  const _WorkoutUpdateBanner({required this.update, required this.onUpdate});
 
   @override
   Widget build(BuildContext context) {
@@ -660,10 +655,7 @@ class _WorkoutUpdateBanner extends StatelessWidget {
                 ],
               ),
             ),
-            TextButton(
-              onPressed: onUpdate,
-              child: const Text('Update'),
-            ),
+            TextButton(onPressed: onUpdate, child: const Text('Update')),
           ],
         ),
       ),
@@ -697,9 +689,15 @@ class _CompactWorkoutHeader extends StatelessWidget {
             icon: Icons.language_outlined,
             label: workout.voice.language.toUpperCase(),
           ),
-          if (workout.voice.mode.trim().isNotEmpty)
+          if (workout.voice.announceElapsedTime ||
+              workout.voice.announceInterval ||
+              workout.voice.announceFinalCountdown)
             Text(
-              workout.voice.mode,
+              [
+                if (workout.voice.announceElapsedTime) 'Elapsed',
+                if (workout.voice.announceInterval) 'Periodic',
+                if (workout.voice.announceFinalCountdown) 'Countdown',
+              ].join(' · '),
               style: TextStyle(color: color),
             ),
         ],
@@ -735,9 +733,8 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
+      style: Theme.of(context).textTheme.titleSmall
+          ?.copyWith(fontWeight: FontWeight.w800),
     );
   }
 }
@@ -805,8 +802,9 @@ class _WorkoutDescriptionState extends State<_WorkoutDescription> {
                 widget.text,
                 style: style,
                 maxLines: _expanded ? null : 3,
-                overflow:
-                    _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                overflow: _expanded
+                    ? TextOverflow.visible
+                    : TextOverflow.ellipsis,
               ),
             ),
             if (canExpand)
