@@ -10,6 +10,7 @@ import '../widgets/coach_recording_card.dart';
 import '../widgets/demo_media_source_sheet.dart';
 import '../widgets/step_recording_mini_player.dart';
 import '../widgets/step_demonstration_button.dart';
+import '../widgets/workout_music_card.dart';
 import 'workout_editor_screen.dart';
 
 class WorkoutBuilderScreen extends StatefulWidget {
@@ -34,7 +35,6 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   late final TabController _tabController;
   final _overviewScrollController = ScrollController(keepScrollOffset: false);
   final _stepsScrollController = ScrollController(keepScrollOffset: false);
-  int _selectedTab = 0;
   String? error;
 
   @override
@@ -402,82 +402,92 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
             ),
           ),
           const SizedBox(height: 8),
-          _BuilderOptionContainer(
-            child: ExpansionTile(
-              maintainState: true,
-              tilePadding: EdgeInsets.zero,
-              childrenPadding: const EdgeInsets.only(bottom: 8),
-              leading: const Icon(Icons.music_note_outlined),
-              title: const Text(
-                'Background music',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
-              subtitle: Text(
-                draft.backgroundMusicEnabled
-                    ? 'Enabled · ${(draft.backgroundMusicVolume * 100).round()}%'
-                    : 'Off',
-              ),
-              children: [
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Play background music'),
-                  subtitle: const Text(
-                    'Duck the track while the coach speaks.',
-                  ),
-                  value: draft.backgroundMusicEnabled,
-                  onChanged: (value) => setState(
-                    () => draft.backgroundMusicEnabled = value,
-                  ),
+          if (widget.workoutId != null &&
+              widget.controller.byId(widget.workoutId!) != null)
+            WorkoutMusicCard(
+              controller: widget.controller,
+              workout: widget.controller.byId(widget.workoutId!)!,
+            )
+          else
+            _BuilderOptionContainer(
+              child: ExpansionTile(
+                maintainState: true,
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                leading: const Icon(Icons.music_note_outlined),
+                title: const Text(
+                  'Background music',
+                  style: TextStyle(fontWeight: FontWeight.w700),
                 ),
-                const SizedBox(height: 8),
-                TextFormField(
-                  initialValue: draft.backgroundMusicName,
-                  decoration: const InputDecoration(labelText: 'Track name'),
-                  onChanged: (value) => draft.backgroundMusicName = value,
+                subtitle: Text(
+                  draft.backgroundMusicEnabled
+                      ? 'Enabled · ${(draft.backgroundMusicVolume * 100).round()}%'
+                      : 'Off',
                 ),
-                const SizedBox(height: 10),
-                TextFormField(
-                  initialValue: draft.backgroundMusicSource,
-                  decoration: const InputDecoration(
-                    labelText: 'Source',
-                    hintText: 'asset:audio/music.mp3 or imported file path',
-                  ),
-                  onChanged: (value) => draft.backgroundMusicSource = value,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'Volume ${(draft.backgroundMusicVolume * 100).round()}%',
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-                Slider(
-                  value: draft.backgroundMusicVolume.clamp(0.0, 1.0),
-                  divisions: 20,
-                  label: '${(draft.backgroundMusicVolume * 100).round()}%',
-                  onChanged: (value) => setState(
-                    () => draft.backgroundMusicVolume = value,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  initialValue: draft.backgroundMusicDucking,
-                  decoration: const InputDecoration(labelText: 'Coach ducking'),
-                  items: const [
-                    DropdownMenuItem(value: 'off', child: Text('Off')),
-                    DropdownMenuItem(value: 'gentle', child: Text('Gentle')),
-                    DropdownMenuItem(value: 'medium', child: Text('Medium')),
-                    DropdownMenuItem(value: 'high', child: Text('High')),
-                    DropdownMenuItem(
-                      value: 'very_high',
-                      child: Text('Very high'),
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Play background music'),
+                    subtitle: const Text(
+                      'Duck the track while the coach speaks.',
                     ),
-                  ],
-                  onChanged: (value) => setState(
-                    () => draft.backgroundMusicDucking = value ?? 'gentle',
+                    value: draft.backgroundMusicEnabled,
+                    onChanged: (value) => setState(
+                      () => draft.backgroundMusicEnabled = value,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    initialValue: draft.backgroundMusicName,
+                    decoration: const InputDecoration(labelText: 'Track name'),
+                    onChanged: (value) => draft.backgroundMusicName = value,
+                  ),
+                  const SizedBox(height: 10),
+                  TextFormField(
+                    initialValue: draft.backgroundMusicSource,
+                    decoration: const InputDecoration(
+                      labelText: 'Source',
+                      hintText: 'asset:audio/music.mp3 or imported file path',
+                    ),
+                    onChanged: (value) => draft.backgroundMusicSource = value,
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    'Volume ${(draft.backgroundMusicVolume * 100).round()}%',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  Slider(
+                    value: draft.backgroundMusicVolume.clamp(0.0, 1.0),
+                    divisions: 20,
+                    label: '${(draft.backgroundMusicVolume * 100).round()}%',
+                    onChanged: (value) => setState(
+                      () => draft.backgroundMusicVolume = value,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: draft.backgroundMusicDucking,
+                    decoration:
+                        const InputDecoration(labelText: 'Coach ducking'),
+                    items: const [
+                      DropdownMenuItem(value: 'off', child: Text('Off')),
+                      DropdownMenuItem(
+                          value: 'gentle', child: Text('Gentle')),
+                      DropdownMenuItem(
+                          value: 'medium', child: Text('Medium')),
+                      DropdownMenuItem(value: 'high', child: Text('High')),
+                      DropdownMenuItem(
+                        value: 'very_high',
+                        child: Text('Very high'),
+                      ),
+                    ],
+                    onChanged: (value) => setState(
+                      () => draft.backgroundMusicDucking = value ?? 'gentle',
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
         ],
       );
 
@@ -572,15 +582,15 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                 ),
               TabBar(
                 controller: _tabController,
-                onTap: (index) => setState(() => _selectedTab = index),
                 tabs: const [
                   Tab(text: 'Overview'),
                   Tab(text: 'Steps'),
                 ],
               ),
               Expanded(
-                child: IndexedStack(
-                  index: _selectedTab,
+                child: TabBarView(
+                  controller: _tabController,
+                  physics: const NeverScrollableScrollPhysics(),
                   children: [
                     _overviewTab(context),
                     _stepsTab(context),
