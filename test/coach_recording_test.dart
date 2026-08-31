@@ -6,6 +6,7 @@ import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/services/workout_parser.dart';
 import 'package:anhpt/screens/workout_detail_screen.dart';
+import 'package:anhpt/screens/workout_builder_screen.dart';
 import 'package:anhpt/widgets/coach_recording_card.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -175,7 +176,7 @@ steps:
     expect(find.text('Ready to record.'), findsNothing);
   });
 
-  testWidgets('assigned introduction uses the shared recording mini player',
+  testWidgets('assigned description recording is managed from edit overview',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
@@ -183,6 +184,7 @@ steps:
       WorkoutParser.parse('''
 version: 2
 name: Recorded introduction
+description: Keep your core engaged.
 recording: coach_recordings/introduction.m4a
 steps:
   - name: Plank
@@ -190,17 +192,17 @@ steps:
     ];
 
     await tester.pumpWidget(MaterialApp(
-      home: WorkoutDetailScreen(
+      home: WorkoutBuilderScreen(
         controller: controller,
         workoutId: 'workout-intro',
       ),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Introduction'));
-    await tester.pumpAndSettle();
 
+    expect(find.text('Description'), findsOneWidget);
+    expect(find.text('Description recording'), findsOneWidget);
     expect(find.byTooltip('Play recording'), findsOneWidget);
-    expect(find.byTooltip('Record workout introduction'), findsNothing);
+    expect(find.byTooltip('Record description'), findsNothing);
   });
 
   for (final scope in ['description', 'step']) {
