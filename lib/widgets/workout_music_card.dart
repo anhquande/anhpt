@@ -191,12 +191,18 @@ class WorkoutMusicCardState extends State<WorkoutMusicCard> {
             child:
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Row(children: [
-                Text('Background music',
+                Expanded(
+                  child: Text(
+                    'Background music',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w800)),
-                const Spacer(),
+                        ?.copyWith(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                const SizedBox(width: 8),
                 TextButton(
                     onPressed: () => Navigator.push(
                         context,
