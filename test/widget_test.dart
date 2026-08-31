@@ -72,9 +72,9 @@ void main() {
     expect(find.text('Turn off screen after starting'), findsOneWidget);
   });
 
-  testWidgets('workout overview has a sticky title, Start, and action menu',
+  testWidgets('workout detail uses compact Overview and Steps layout',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(700, 700));
+    await tester.binding.setSurfaceSize(const Size(390, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
@@ -110,9 +110,12 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     await tester.pumpAndSettle();
 
     expect(find.text('Sticky workout title'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
     expect(find.byTooltip('Workout actions'), findsOneWidget);
-    expect(find.text('START WORKOUT'), findsNothing);
+    expect(find.text('Overview'), findsOneWidget);
+    expect(find.text('Steps'), findsOneWidget);
+    expect(find.text('Music'), findsNothing);
+    expect(find.text('Structure'), findsNothing);
     expect(find.text('Strength'), findsOneWidget);
     expect(find.text('Beginner'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
@@ -120,18 +123,22 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       find.text('From AnhPT Official · Originally “Original Sticky Workout”'),
       findsOneWidget,
     );
+    expect(find.text('Workout options'), findsOneWidget);
     expect(find.text('After workout'), findsOneWidget);
     expect(find.text('Stay open after completion'), findsOneWidget);
+    expect(find.text('Screen during workout'), findsOneWidget);
+    expect(find.text('Keep current display behavior'), findsOneWidget);
+    expect(find.text('Introduction'), findsOneWidget);
+    expect(find.text('Workout introduction recording'), findsOneWidget);
+    expect(find.byTooltip('Record workout introduction'), findsOneWidget);
+    expect(find.text('Audio'), findsOneWidget);
+    expect(find.text('Background music'), findsOneWidget);
+
     await tester.tap(find.widgetWithText(SwitchListTile, 'After workout'));
     await tester.pumpAndSettle();
     expect(controller.byId('sticky')!.completionAction, 'shutdown_or_exit');
-    expect(
-      find.text('Shut down Windows or exit Android when complete'),
-      findsOneWidget,
-    );
-    expect(find.text('Screen during workout'), findsOneWidget);
-    expect(
-        find.text('Leave the display unchanged after Start'), findsOneWidget);
+    expect(find.text('Shut down or exit when complete'), findsOneWidget);
+
     await tester.tap(
       find.widgetWithText(SwitchListTile, 'Screen during workout'),
     );
@@ -140,34 +147,18 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       controller.byId('sticky')!.screenOffAfterStart,
       const Duration(seconds: 10),
     );
-    expect(
-      find.text('Turn off the Windows display 10 seconds after Start'),
-      findsOneWidget,
-    );
-    expect(find.text('Introduction'), findsOneWidget);
-    expect(find.text('Music'), findsOneWidget);
-    expect(find.text('Structure'), findsOneWidget);
-    expect(find.text('Step 1'), findsOneWidget);
+    expect(find.text('Turn display off after Start'), findsOneWidget);
+
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
     expect(find.text('Less'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
 
-    await tester.drag(
-      find.byType(NestedScrollView),
-      const Offset(0, -900),
-    );
+    await tester.tap(find.text('Steps'));
     await tester.pumpAndSettle();
-    expect(find.text('Sticky workout title'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, 'Start'), findsOneWidget);
-
-    await tester.tap(find.text('Introduction'));
-    await tester.pumpAndSettle();
-    expect(find.text('Workout introduction recording'), findsOneWidget);
-    expect(find.byTooltip('Record workout introduction'), findsOneWidget);
-
-    await tester.tap(find.text('Music'));
-    await tester.pumpAndSettle();
-    expect(find.text('Background music'), findsOneWidget);
+    expect(find.text('Step 1'), findsOneWidget);
+    expect(find.text('Workout options'), findsNothing);
+    expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Workout actions'));
     await tester.pumpAndSettle();
@@ -193,7 +184,6 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
 
     await tester.tap(find.byTooltip('Workout actions'));
     await tester.pumpAndSettle();
-
     await tester.tap(find.text('View source'));
     await tester.pumpAndSettle();
     expect(find.text('Source: AnhPT Official'), findsOneWidget);
