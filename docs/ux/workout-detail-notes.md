@@ -2,6 +2,12 @@
 
 Canonical wireframe: [`workout-detail.puml`](workout-detail.puml)
 
+## Preview
+
+![Workout Detail wireframe](workout-detail.svg)
+
+The SVG above is generated automatically from the canonical PlantUML source. Edit `workout-detail.puml`, not the SVG.
+
 ## Purpose
 
 The Workout Detail screen lets the user inspect a workout, adjust workout-level playback options, inspect steps, update an installed bucket workout when a newer version exists, and start the workout.
