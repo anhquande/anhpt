@@ -23,7 +23,6 @@ class WorkoutCard extends StatelessWidget {
   final VoidCallback onFavorite;
   final String? sourceName;
   final String? originalName;
-  final bool showLastUsed;
 
   const WorkoutCard({
     super.key,
@@ -32,7 +31,6 @@ class WorkoutCard extends StatelessWidget {
     required this.onFavorite,
     this.sourceName,
     this.originalName,
-    this.showLastUsed = false,
   });
 
   IconData _thumbnailIcon() {
@@ -58,16 +56,16 @@ class WorkoutCard extends StatelessWidget {
     final time =
         '${used.hour.toString().padLeft(2, '0')}:${used.minute.toString().padLeft(2, '0')}';
 
-    if (usedDate == today) return 'Today, $time';
-    if (usedDate == yesterday) return 'Yesterday, $time';
-    return '${used.day.toString().padLeft(2, '0')}.'
+    if (usedDate == today) return 'Last: Today, $time';
+    if (usedDate == yesterday) return 'Last: Yesterday, $time';
+    return 'Last: ${used.day.toString().padLeft(2, '0')}.'
         '${used.month.toString().padLeft(2, '0')}.${used.year}, $time';
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final displayLastUsed = showLastUsed && workout.lastUsedAt != null;
+    final displayLastUsed = workout.lastUsedAt != null;
 
     return Card(
       clipBehavior: Clip.antiAlias,
