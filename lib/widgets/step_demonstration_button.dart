@@ -11,6 +11,9 @@ class StepDemonstrationButton extends StatefulWidget {
   final Future<Uri?> Function(String id) resolveUri;
   final Future<void> Function() onReplace;
   final Future<void> Function() onRemove;
+  final double width;
+  final double height;
+  final double borderRadius;
 
   const StepDemonstrationButton({
     super.key,
@@ -19,6 +22,9 @@ class StepDemonstrationButton extends StatefulWidget {
     required this.resolveUri,
     required this.onReplace,
     required this.onRemove,
+    this.width = 40,
+    this.height = 40,
+    this.borderRadius = 10,
   });
 
   @override
@@ -124,32 +130,45 @@ class _StepDemonstrationButtonState extends State<StepDemonstrationButton> {
           return Tooltip(
             message: 'View demonstration',
             child: InkWell(
-              borderRadius: BorderRadius.circular(10),
               onTap: _openPreview,
               child: SizedBox(
-                width: 40,
-                height: 40,
-                child: Center(
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    clipBehavior: Clip.antiAlias,
-                    decoration: BoxDecoration(
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
+                width: widget.width,
+                height: widget.height,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(widget.borderRadius),
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
                     child: asset == null || uri == null
-                        ? const Icon(Icons.perm_media_outlined, size: 20)
+                        ? const Center(
+                            child: Icon(Icons.perm_media_outlined, size: 24),
+                          )
                         : asset.type == 'video'
-                            ? const Icon(Icons.play_circle_outline, size: 20)
+                            ? Stack(
+                                fit: StackFit.expand,
+                                children: [
+                                  Center(
+                                    child: Icon(
+                                      Icons.movie_outlined,
+                                      size: widget.width >= 60 ? 30 : 20,
+                                    ),
+                                  ),
+                                  Center(
+                                    child: Icon(
+                                      Icons.play_circle_fill_rounded,
+                                      size: widget.width >= 60 ? 34 : 20,
+                                    ),
+                                  ),
+                                ],
+                              )
                             : Image.file(
                                 File.fromUri(uri),
                                 fit: BoxFit.cover,
                                 gaplessPlayback: true,
-                                errorBuilder: (_, __, ___) => const Icon(
-                                  Icons.broken_image_outlined,
-                                  size: 20,
+                                errorBuilder: (_, __, ___) => const Center(
+                                  child: Icon(
+                                    Icons.broken_image_outlined,
+                                    size: 24,
+                                  ),
                                 ),
                               ),
                   ),

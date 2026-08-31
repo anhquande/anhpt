@@ -10,6 +10,7 @@ import '../widgets/coach_recording_card.dart';
 import '../widgets/demo_media_source_sheet.dart';
 import '../widgets/step_recording_mini_player.dart';
 import '../widgets/step_demonstration_button.dart';
+import '../widgets/workout_music_card.dart';
 import 'workout_editor_screen.dart';
 
 class WorkoutBuilderScreen extends StatefulWidget {
@@ -32,23 +33,40 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     with SingleTickerProviderStateMixin {
   late WorkoutDraft draft;
   late final TabController _tabController;
-  final _introductionScrollController = ScrollController(keepScrollOffset: false);
-  final _musicScrollController = ScrollController(keepScrollOffset: false);
-  final _structureScrollController = ScrollController(keepScrollOffset: false);
+  final _overviewScrollController = ScrollController(keepScrollOffset: false);
+  final _stepsScrollController = ScrollController(keepScrollOffset: false);
+  Workout? _editingWorkout;
   int _selectedTab = 0;
   String? error;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     if (widget.workoutId != null) {
-      draft =
-          WorkoutDraft.fromWorkout(widget.controller.byId(widget.workoutId!)!);
+      final workout = widget.controller.byId(widget.workoutId!);
+      if (workout != null) {
+        _editingWorkout = workout;
+        draft = WorkoutDraft.fromWorkout(workout);
+      } else {
+        draft = WorkoutDraft(
+          voiceLanguage: widget.controller.defaultVoiceLanguage,
+          steps: [StepDraft(name: 'Exercise', duration: '30s')],
+        );
+        error = 'Workout is no longer available.';
+      }
     } else if (widget.duplicateFromId != null) {
-      final source = widget.controller.byId(widget.duplicateFromId!)!;
-      draft = WorkoutDraft.fromWorkout(source);
-      draft.name = '${source.name} Copy';
+      final source = widget.controller.byId(widget.duplicateFromId!);
+      if (source != null) {
+        draft = WorkoutDraft.fromWorkout(source);
+        draft.name = '${source.name} Copy';
+      } else {
+        draft = WorkoutDraft(
+          voiceLanguage: widget.controller.defaultVoiceLanguage,
+          steps: [StepDraft(name: 'Exercise', duration: '30s')],
+        );
+        error = 'Source workout is no longer available.';
+      }
     } else {
       draft = WorkoutDraft(
         voiceLanguage: widget.controller.defaultVoiceLanguage,
@@ -69,18 +87,18 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _introductionScrollController.dispose();
-    _musicScrollController.dispose();
-    _structureScrollController.dispose();
+    _overviewScrollController.dispose();
+    _stepsScrollController.dispose();
     super.dispose();
   }
 
   Future<Workout?> _persistDraft({bool close = true}) async {
     try {
       final yaml = WorkoutSerializer.toYaml(draft);
-      final existing = widget.workoutId == null
-          ? null
-          : widget.controller.byId(widget.workoutId!);
+      final existing = _editingWorkout ??
+          (widget.workoutId == null
+              ? null
+              : widget.controller.byId(widget.workoutId!));
       final workout = WorkoutParser.parse(
         yaml,
         id: existing?.id ?? WorkoutParser.generateId(),
@@ -89,10 +107,11 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
         createdAt: existing?.createdAt,
       );
       await widget.controller.saveWorkout(workout);
+      if (widget.workoutId != null) _editingWorkout = workout;
       if (close && mounted) Navigator.pop(context);
       return workout;
     } on WorkoutValidationException catch (e) {
-      setState(() => error = e.message);
+      if (mounted) setState(() => error = e.message);
       return null;
     }
   }
@@ -140,6 +159,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     );
     final latest = widget.controller.byId(saved.id);
     if (latest != null && mounted) {
+      _editingWorkout = latest;
       setState(() => draft = WorkoutDraft.fromWorkout(latest));
     }
   }
@@ -239,10 +259,13 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
     return false;
   }
 
-  Widget _introductionTab(BuildContext context) => ListView(
-        controller: _introductionScrollController,
-        padding: const EdgeInsets.all(18),
+  Widget _overviewTab(BuildContext context) => ListView(
+        key: const PageStorageKey('builder-overview-tab'),
+        controller: _overviewScrollController,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
+          const _BuilderSectionTitle('About'),
+          const SizedBox(height: 8),
           TextFormField(
             initialValue: draft.name,
             decoration: const InputDecoration(labelText: 'Workout name'),
@@ -251,6 +274,8 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           const SizedBox(height: 10),
           TextFormField(
             initialValue: draft.description,
+            minLines: 2,
+            maxLines: 4,
             decoration: const InputDecoration(labelText: 'Description'),
             onChanged: (v) => draft.description = v,
           ),
@@ -258,28 +283,23 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           TextFormField(
             initialValue: draft.tags.join(', '),
             decoration: const InputDecoration(
-                labelText: 'Tags', hintText: 'core, plank, beginner'),
+              labelText: 'Tags',
+              hintText: 'core, plank, beginner',
+            ),
             onChanged: (value) => draft.tags = value
                 .split(',')
                 .map((tag) => tag.trim())
                 .where((tag) => tag.isNotEmpty)
                 .toList(),
           ),
-          const SizedBox(height: 10),
-          TextFormField(
-            initialValue: draft.startCountdown,
-            decoration: const InputDecoration(labelText: 'Start countdown'),
-            onChanged: (v) => draft.startCountdown = v,
-          ),
-          const SizedBox(height: 12),
-          Card(
-            margin: EdgeInsets.zero,
+          const SizedBox(height: 20),
+          const _BuilderSectionTitle('Workout options'),
+          const SizedBox(height: 8),
+          _BuilderOptionContainer(
             child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.power_settings_new),
-              title: const Text(
-                'After workout: Shut down or exit',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+              title: const Text('After workout: Shut down or exit'),
               subtitle: Text(
                 draft.completionAction == 'shutdown_or_exit'
                     ? 'Enabled — Windows shuts down immediately and may discard unsaved work.'
@@ -291,15 +311,12 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
               }),
             ),
           ),
-          const SizedBox(height: 12),
-          Card(
-            margin: EdgeInsets.zero,
+          const SizedBox(height: 8),
+          _BuilderOptionContainer(
             child: SwitchListTile(
+              contentPadding: EdgeInsets.zero,
               secondary: const Icon(Icons.screen_lock_landscape_outlined),
-              title: const Text(
-                'Turn off screen after starting',
-                style: TextStyle(fontWeight: FontWeight.w700),
-              ),
+              title: const Text('Turn off screen after starting'),
               subtitle: Text(
                 draft.screenOffAfterStart.isNotEmpty
                     ? 'Enabled — Windows turns off the display 10 seconds after Start.'
@@ -311,89 +328,137 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
               }),
             ),
           ),
-          const SizedBox(height: 12),
-          ExpansionTile(
-            maintainState: true,
-            tilePadding: EdgeInsets.zero,
-            title: const Text('Voice settings',
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            children: [
-              DropdownButtonFormField<String>(
-                initialValue: draft.voiceLanguage,
-                decoration: const InputDecoration(labelText: 'Language'),
-                items: const [
-                  DropdownMenuItem(value: 'vi', child: Text('Vietnamese')),
-                  DropdownMenuItem(value: 'en', child: Text('English')),
-                ],
-                onChanged: (v) =>
-                    setState(() => draft.voiceLanguage = v ?? 'vi'),
-              ),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                initialValue: draft.voiceMode,
-                decoration: const InputDecoration(labelText: 'Mode'),
-                items: const [
-                  DropdownMenuItem(
-                      value: 'continuous', child: Text('Continuous')),
-                  DropdownMenuItem(value: 'interval', child: Text('Interval')),
-                  DropdownMenuItem(
-                      value: 'ending', child: Text('Ending countdown')),
-                  DropdownMenuItem(value: 'combined', child: Text('Combined')),
-                ],
-                onChanged: (v) =>
-                    setState(() => draft.voiceMode = v ?? 'combined'),
-              ),
-              const SizedBox(height: 8),
-              Row(children: [
-                Expanded(
-                    child: TextFormField(
-                  initialValue: draft.announceEvery,
-                  decoration:
-                      const InputDecoration(labelText: 'Announce every'),
-                  onChanged: (v) => draft.announceEvery = v,
-                )),
-                const SizedBox(width: 8),
-                Expanded(
-                    child: TextFormField(
-                  initialValue: draft.countdownFrom,
-                  decoration:
-                      const InputDecoration(labelText: 'Countdown from'),
-                  onChanged: (v) => draft.countdownFrom = v,
-                )),
-              ]),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Announce step name'),
-                value: draft.announceStepName,
-                onChanged: (v) =>
-                    setState(() => draft.announceStepName = v),
-              ),
-            ],
-          ),
-          const SizedBox(height: 40),
-        ],
-      );
-
-  Widget _musicTab(BuildContext context) => ListView(
-        controller: _musicScrollController,
-        padding: const EdgeInsets.all(18),
-        children: [
-          Card(
-            margin: EdgeInsets.zero,
+          const SizedBox(height: 8),
+          _BuilderOptionContainer(
             child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: TextFormField(
+                initialValue: draft.startCountdown,
+                decoration: const InputDecoration(
+                  labelText: 'Start countdown',
+                  prefixIcon: Icon(Icons.timer_outlined),
+                ),
+                onChanged: (v) => draft.startCountdown = v,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const _BuilderSectionTitle('Audio'),
+          const SizedBox(height: 8),
+          _BuilderOptionContainer(
+            child: ExpansionTile(
+              maintainState: true,
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: const EdgeInsets.only(bottom: 8),
+              leading: const Icon(Icons.record_voice_over_outlined),
+              title: const Text(
+                'Voice settings',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              children: [
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: draft.voiceLanguage,
+                  decoration: const InputDecoration(labelText: 'Language'),
+                  items: const [
+                    DropdownMenuItem(value: 'vi', child: Text('Vietnamese')),
+                    DropdownMenuItem(value: 'en', child: Text('English')),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => draft.voiceLanguage = v ?? 'vi'),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  initialValue: draft.voiceMode,
+                  decoration: const InputDecoration(labelText: 'Mode'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'continuous',
+                      child: Text('Continuous'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'interval',
+                      child: Text('Interval'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'ending',
+                      child: Text('Ending countdown'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'combined',
+                      child: Text('Combined'),
+                    ),
+                  ],
+                  onChanged: (v) =>
+                      setState(() => draft.voiceMode = v ?? 'combined'),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: draft.announceEvery,
+                        decoration:
+                            const InputDecoration(labelText: 'Announce every'),
+                        onChanged: (v) => draft.announceEvery = v,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        initialValue: draft.countdownFrom,
+                        decoration:
+                            const InputDecoration(labelText: 'Countdown from'),
+                        onChanged: (v) => draft.countdownFrom = v,
+                      ),
+                    ),
+                  ],
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Announce step name'),
+                  value: draft.announceStepName,
+                  onChanged: (v) =>
+                      setState(() => draft.announceStepName = v),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_editingWorkout case final workout?)
+            WorkoutMusicCard(
+              key: ValueKey('builder-music-${workout.id}'),
+              controller: widget.controller,
+              workout: workout,
+            )
+          else
+            _BuilderOptionContainer(
+              child: ExpansionTile(
+                maintainState: true,
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: const EdgeInsets.only(bottom: 8),
+                leading: const Icon(Icons.music_note_outlined),
+                title: const Text(
+                  'Background music',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  draft.backgroundMusicEnabled
+                      ? 'Enabled · ${(draft.backgroundMusicVolume * 100).round()}%'
+                      : 'Off',
+                ),
                 children: [
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Background music',
-                        style: TextStyle(fontWeight: FontWeight.w700)),
+                    title: const Text('Play background music'),
                     subtitle: const Text(
-                        'Play this track during the workout and duck it while the coach speaks.'),
+                      'Duck the track while the coach speaks.',
+                    ),
                     value: draft.backgroundMusicEnabled,
                     onChanged: (value) => setState(
-                        () => draft.backgroundMusicEnabled = value),
+                      () => draft.backgroundMusicEnabled = value,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   TextFormField(
@@ -410,46 +475,51 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
                     ),
                     onChanged: (value) => draft.backgroundMusicSource = value,
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 14),
                   Text(
-                    'Background music volume ${(draft.backgroundMusicVolume * 100).round()}%',
+                    'Volume ${(draft.backgroundMusicVolume * 100).round()}%',
                     style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
                   Slider(
                     value: draft.backgroundMusicVolume.clamp(0.0, 1.0),
                     divisions: 20,
-                    label:
-                        '${(draft.backgroundMusicVolume * 100).round()}%',
+                    label: '${(draft.backgroundMusicVolume * 100).round()}%',
                     onChanged: (value) => setState(
-                        () => draft.backgroundMusicVolume = value),
+                      () => draft.backgroundMusicVolume = value,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: draft.backgroundMusicDucking,
                     decoration:
                         const InputDecoration(labelText: 'Coach ducking'),
                     items: const [
                       DropdownMenuItem(value: 'off', child: Text('Off')),
-                      DropdownMenuItem(value: 'gentle', child: Text('Gentle')),
-                      DropdownMenuItem(value: 'medium', child: Text('Medium')),
+                      DropdownMenuItem(
+                          value: 'gentle', child: Text('Gentle')),
+                      DropdownMenuItem(
+                          value: 'medium', child: Text('Medium')),
                       DropdownMenuItem(value: 'high', child: Text('High')),
                       DropdownMenuItem(
-                          value: 'very_high', child: Text('Very high')),
+                        value: 'very_high',
+                        child: Text('Very high'),
+                      ),
                     ],
-                    onChanged: (value) => setState(() =>
-                        draft.backgroundMusicDucking = value ?? 'gentle'),
+                    onChanged: (value) => setState(
+                      () => draft.backgroundMusicDucking = value ?? 'gentle',
+                    ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 40),
         ],
       );
 
-  Widget _structureTab(BuildContext context) => ListView(
-        controller: _structureScrollController,
-        padding: const EdgeInsets.all(18),
+  Widget _stepsTab(BuildContext context) => ListView(
+        key: const PageStorageKey('builder-steps-tab'),
+        controller: _stepsScrollController,
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
           _NodeList(
             nodes: draft.steps,
@@ -473,22 +543,25 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
             resolveUri: widget.controller.resolveMediaUri,
             resolveRecording: widget.controller.resolveAudioSource,
           ),
-          Row(children: [
-            Expanded(
+          Row(
+            children: [
+              Expanded(
                 child: OutlinedButton.icon(
-              onPressed: () => _addStep(draft.steps),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Step'),
-            )),
-            const SizedBox(width: 8),
-            Expanded(
+                  onPressed: () => _addStep(draft.steps),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Step'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
                 child: OutlinedButton.icon(
-              onPressed: () => _addRepeat(draft.steps),
-              icon: const Icon(Icons.repeat),
-              label: const Text('Add Repeat'),
-            )),
-          ]),
-          const SizedBox(height: 40),
+                  onPressed: () => _addRepeat(draft.steps),
+                  icon: const Icon(Icons.repeat),
+                  label: const Text('Add Repeat'),
+                ),
+              ),
+            ],
+          ),
         ],
       );
 
@@ -496,7 +569,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workout Builder'),
+        title: Text(widget.workoutId == null ? 'New workout' : 'Edit workout'),
         actions: [
           TextButton.icon(
             onPressed: () => Navigator.push(
@@ -513,41 +586,37 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           ),
           TextButton(onPressed: _save, child: const Text('Save')),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          onTap: (index) => setState(() => _selectedTab = index),
-          tabs: const [
-            Tab(text: 'Introduction'),
-            Tab(text: 'Music'),
-            Tab(text: 'Structure'),
-          ],
-        ),
       ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 820),
           child: Column(
             children: [
               if (error != null)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                  child: Card(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Text(error!),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      borderRadius: BorderRadius.circular(14),
                     ),
+                    child: Text(error!),
                   ),
                 ),
+              TabBar(
+                controller: _tabController,
+                onTap: (index) => setState(() => _selectedTab = index),
+                tabs: const [
+                  Tab(text: 'Overview'),
+                  Tab(text: 'Steps'),
+                ],
+              ),
               Expanded(
-                child: IndexedStack(
-                  index: _selectedTab,
-                  children: [
-                    _introductionTab(context),
-                    _musicTab(context),
-                    _structureTab(context),
-                  ],
-                ),
+                child: _selectedTab == 0
+                    ? _overviewTab(context)
+                    : _stepsTab(context),
               ),
             ],
           ),
@@ -555,6 +624,36 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
       ),
     );
   }
+}
+
+class _BuilderSectionTitle extends StatelessWidget {
+  final String text;
+
+  const _BuilderSectionTitle(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+      );
+}
+
+class _BuilderOptionContainer extends StatelessWidget {
+  final Widget child;
+
+  const _BuilderOptionContainer({required this.child});
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          child: child,
+        ),
+      );
 }
 
 class _NodeList extends StatelessWidget {
@@ -575,23 +674,24 @@ class _NodeList extends StatelessWidget {
   final String Function(String source) resolveRecording;
   final String pathPrefix;
 
-  const _NodeList(
-      {required this.nodes,
-      required this.depth,
-      required this.changed,
-      required this.move,
-      required this.duplicate,
-      required this.delete,
-      required this.addStep,
-      required this.addRepeat,
-      required this.exerciseFor,
-      required this.chooseMedia,
-      required this.removeMedia,
-      required this.recordStep,
-      required this.resolveAsset,
-      required this.resolveUri,
-      required this.resolveRecording,
-      this.pathPrefix = ''});
+  const _NodeList({
+    required this.nodes,
+    required this.depth,
+    required this.changed,
+    required this.move,
+    required this.duplicate,
+    required this.delete,
+    required this.addStep,
+    required this.addRepeat,
+    required this.exerciseFor,
+    required this.chooseMedia,
+    required this.removeMedia,
+    required this.recordStep,
+    required this.resolveAsset,
+    required this.resolveUri,
+    required this.resolveRecording,
+    this.pathPrefix = '',
+  });
 
   @override
   Widget build(BuildContext context) => Column(children: [
@@ -659,129 +759,147 @@ class _StepCard extends StatelessWidget {
   final Future<MediaAsset?> Function(String id) resolveAsset;
   final Future<Uri?> Function(String id) resolveUri;
   final String Function(String source) resolveRecording;
-  const _StepCard(
-      {required this.step,
-      required this.changed,
-      required this.up,
-      required this.down,
-      required this.copy,
-      required this.remove,
-      required this.exercise,
-      required this.chooseMedia,
-      required this.removeMedia,
-      required this.record,
-      required this.resolveAsset,
-      required this.resolveUri,
-      required this.resolveRecording});
+
+  const _StepCard({
+    required this.step,
+    required this.changed,
+    required this.up,
+    required this.down,
+    required this.copy,
+    required this.remove,
+    required this.exercise,
+    required this.chooseMedia,
+    required this.removeMedia,
+    required this.record,
+    required this.resolveAsset,
+    required this.resolveUri,
+    required this.resolveRecording,
+  });
 
   @override
   Widget build(BuildContext context) => Card(
-          child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(children: [
-          Row(children: [
-            const Expanded(
-                child: Text('Step',
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-            IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
-            IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
-            IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
-            IconButton(
-                onPressed: remove, icon: const Icon(Icons.delete_outline)),
-          ]),
-          Row(children: [
-            Expanded(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(children: [
+            Row(children: [
+              const Expanded(
+                child: Text(
+                  'Step',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ),
+              IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
+              IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
+              IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
+              IconButton(
+                onPressed: remove,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ]),
+            Row(children: [
+              Expanded(
                 flex: 3,
                 child: TextFormField(
-                    initialValue: step.name,
-                    decoration: const InputDecoration(labelText: 'Name'),
-                    onChanged: (v) => step.name = v)),
-            const SizedBox(width: 8),
-            Expanded(
+                  initialValue: step.name,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  onChanged: (v) => step.name = v,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
                 child: TextFormField(
-                    initialValue: step.duration,
-                    decoration: const InputDecoration(labelText: 'Duration'),
-                    onChanged: (v) => step.duration = v)),
-          ]),
-          const SizedBox(height: 8),
-          TextFormField(
+                  initialValue: step.duration,
+                  decoration: const InputDecoration(labelText: 'Duration'),
+                  onChanged: (v) => step.duration = v,
+                ),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            TextFormField(
               initialValue: step.guide,
               minLines: 1,
               maxLines: 4,
               decoration: const InputDecoration(labelText: 'Guide (optional)'),
-              onChanged: (v) => step.guide = v),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              if (step.recording.isEmpty)
-                IconButton.filledTonal(
-                  tooltip: 'Record step cue',
-                  onPressed: () => record(),
-                  icon: const Icon(Icons.mic_none_outlined),
-                )
-              else
-                StepRecordingMiniPlayer(
-                  audioPath: resolveRecording(step.recording),
-                  onManage: () => record(),
-                ),
-              const SizedBox(width: 6),
-              if (exercise?.demoMediaId == null)
-                IconButton.filledTonal(
-                  tooltip: 'Add demonstration media',
-                  onPressed: () => chooseMedia(),
-                  icon: const Icon(Icons.add_photo_alternate_outlined),
-                )
-              else
-                StepDemonstrationButton(
-                  key: ValueKey(exercise!.demoMediaId),
-                  mediaId: exercise!.demoMediaId!,
-                  resolveAsset: resolveAsset,
-                  resolveUri: resolveUri,
-                  onReplace: chooseMedia,
-                  onRemove: () async => removeMedia(),
-                ),
-            ],
-          ),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: const Text('Voice timing'),
-            subtitle: const Text('Interval / continuous / final countdown'),
-            value: step.countdown,
-            onChanged: (v) {
-              step.countdown = v;
-              changed();
-            },
-          ),
-        ]),
-      ));
+              onChanged: (v) => step.guide = v,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (step.recording.isEmpty)
+                  IconButton.filledTonal(
+                    tooltip: 'Record step cue',
+                    onPressed: () => record(),
+                    icon: const Icon(Icons.mic_none_outlined),
+                  )
+                else
+                  StepRecordingMiniPlayer(
+                    audioPath: resolveRecording(step.recording),
+                    onManage: () => record(),
+                  ),
+                const SizedBox(width: 6),
+                if (exercise?.demoMediaId == null)
+                  IconButton.filledTonal(
+                    tooltip: 'Add demonstration media',
+                    onPressed: () => chooseMedia(),
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                  )
+                else
+                  StepDemonstrationButton(
+                    key: ValueKey(exercise!.demoMediaId),
+                    mediaId: exercise!.demoMediaId!,
+                    resolveAsset: resolveAsset,
+                    resolveUri: resolveUri,
+                    onReplace: chooseMedia,
+                    onRemove: () async => removeMedia(),
+                  ),
+              ],
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Voice timing'),
+              subtitle: const Text('Interval / continuous / final countdown'),
+              value: step.countdown,
+              onChanged: (v) {
+                step.countdown = v;
+                changed();
+              },
+            ),
+          ]),
+        ),
+      );
 }
 
 class _RepeatCard extends StatelessWidget {
   final RepeatDraft group;
   final Widget children;
   final VoidCallback up, down, copy, remove, addStep, addRepeat;
-  const _RepeatCard(
-      {required this.group,
-      required this.children,
-      required this.up,
-      required this.down,
-      required this.copy,
-      required this.remove,
-      required this.addStep,
-      required this.addRepeat});
+
+  const _RepeatCard({
+    required this.group,
+    required this.children,
+    required this.up,
+    required this.down,
+    required this.copy,
+    required this.remove,
+    required this.addStep,
+    required this.addRepeat,
+  });
 
   @override
   Widget build(BuildContext context) => Card(
-          child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(children: [
-          Row(children: [
-            const Icon(Icons.repeat),
-            const SizedBox(width: 6),
-            const Text('Repeat', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(width: 10),
-            SizedBox(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(children: [
+            Row(children: [
+              const Icon(Icons.repeat),
+              const SizedBox(width: 6),
+              const Text(
+                'Repeat',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(width: 10),
+              SizedBox(
                 width: 80,
                 child: TextFormField(
                   initialValue: '${group.repeat}',
@@ -791,26 +909,32 @@ class _RepeatCard extends StatelessWidget {
                     final n = int.tryParse(v);
                     if (n != null) group.repeat = n;
                   },
-                )),
-            const Spacer(),
-            IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
-            IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
-            IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
-            IconButton(
-                onPressed: remove, icon: const Icon(Icons.delete_outline)),
-          ]),
-          const SizedBox(height: 8),
-          children,
-          Row(children: [
-            TextButton.icon(
+                ),
+              ),
+              const Spacer(),
+              IconButton(onPressed: up, icon: const Icon(Icons.arrow_upward)),
+              IconButton(onPressed: down, icon: const Icon(Icons.arrow_downward)),
+              IconButton(onPressed: copy, icon: const Icon(Icons.copy_outlined)),
+              IconButton(
+                onPressed: remove,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ]),
+            const SizedBox(height: 8),
+            children,
+            Row(children: [
+              TextButton.icon(
                 onPressed: addStep,
                 icon: const Icon(Icons.add),
-                label: const Text('Step')),
-            TextButton.icon(
+                label: const Text('Step'),
+              ),
+              TextButton.icon(
                 onPressed: addRepeat,
                 icon: const Icon(Icons.repeat),
-                label: const Text('Repeat')),
+                label: const Text('Repeat'),
+              ),
+            ]),
           ]),
-        ]),
-      ));
+        ),
+      );
 }

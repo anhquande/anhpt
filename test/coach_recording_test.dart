@@ -146,19 +146,30 @@ steps:
       ),
     ));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('Steps'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byTooltip('Record step cue'),
       300,
-      scrollable: find.byType(Scrollable).first,
+      scrollable: find.descendant(
+        of: find.byKey(const PageStorageKey('steps-tab')),
+        matching: find.byType(Scrollable),
+      ),
     );
     await tester.tap(find.byTooltip('Record step cue'));
     await tester.pumpAndSettle();
 
-    expect(find.byType(Dialog), findsOneWidget);
+    final dialog = find.byType(Dialog);
+    expect(dialog, findsOneWidget);
     expect(find.text('Step recording: Plank'), findsOneWidget);
     expect(find.text('Guide to read'), findsOneWidget);
-    expect(find.text('Keep your back straight and breathe evenly.'),
-        findsOneWidget);
+    expect(
+      find.descendant(
+        of: dialog,
+        matching: find.text('Keep your back straight and breathe evenly.'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Open microphone settings'), findsNothing);
     expect(find.textContaining('Windows does not show'), findsNothing);
     expect(find.text('Ready to record.'), findsNothing);

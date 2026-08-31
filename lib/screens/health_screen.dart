@@ -663,11 +663,6 @@ class _HealthScreenState extends State<HealthScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _editMeasurement(),
-        icon: const Icon(Icons.add),
-        label: const Text('Add weight'),
-      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 900),
