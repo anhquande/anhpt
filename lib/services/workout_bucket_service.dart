@@ -6,6 +6,11 @@ import 'package:http/http.dart' as http;
 
 import '../models/workout_bucket.dart';
 
+typedef BucketDownloadProgress = void Function(
+  int receivedBytes,
+  int? totalBytes,
+);
+
 class BucketRefreshResult {
   final WorkoutBucketCatalog catalog;
   final String rawJson;
@@ -60,7 +65,10 @@ class WorkoutBucketService {
     }
   }
 
-  Future<Uint8List> downloadPackage(WorkoutBucketEntry entry) async {
+  Future<Uint8List> downloadPackage(
+    WorkoutBucketEntry entry, {
+    BucketDownloadProgress? onProgress,
+  }) async {
     if (entry.size != null && entry.size! > maxPackageBytes) {
       throw StateError('Workout package exceeds the 100 MB marketplace limit.');
     }
@@ -68,6 +76,7 @@ class WorkoutBucketService {
       entry.packageUri,
       maxBytes: maxPackageBytes,
       expectedBytes: entry.size,
+      onProgress: onProgress,
     );
     final actual = sha256.convert(bytes).toString();
     if (actual.toLowerCase() != entry.sha256.toLowerCase()) {
@@ -80,6 +89,7 @@ class WorkoutBucketService {
     Uri uri, {
     required int maxBytes,
     required int? expectedBytes,
+    BucketDownloadProgress? onProgress,
   }) async {
     requirePublicHttpsUri(uri.toString());
     final request = http.Request('GET', uri)
@@ -103,6 +113,8 @@ class WorkoutBucketService {
     }
     final builder = BytesBuilder(copy: false);
     var total = 0;
+    final progressTotal = expectedBytes ?? declared;
+    onProgress?.call(0, progressTotal);
     await for (final chunk
         in response.stream.timeout(const Duration(seconds: 30))) {
       total += chunk.length;
@@ -110,6 +122,7 @@ class WorkoutBucketService {
         throw StateError('Download exceeds the allowed size.');
       }
       builder.add(chunk);
+      onProgress?.call(total, progressTotal);
     }
     if (expectedBytes != null && total != expectedBytes) {
       throw StateError('Download size does not match the catalog.');
