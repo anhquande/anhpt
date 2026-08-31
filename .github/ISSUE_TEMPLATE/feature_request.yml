@@ -1,0 +1,102 @@
+name: Feature Request
+description: Propose a new capability or product improvement for AnhPT
+title: "feat: "
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the user problem first, then the proposed solution and acceptance criteria.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user need or limitation should this feature address?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the desired behavior or capability.
+    validations:
+      required: true
+
+  - type: textarea
+    id: user_flow
+    attributes:
+      label: User flow
+      description: Describe how a user would interact with this feature.
+
+  - type: textarea
+    id: ui_ux
+    attributes:
+      label: UI / UX notes
+      description: Add layout, interaction, accessibility, or visual requirements if relevant.
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Define observable conditions that must be true for this feature to be complete.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      multiple: true
+      options:
+        - UI
+        - Workout
+        - Voice / Audio
+        - Health
+        - Catalog
+        - Storage
+        - CI / Release
+        - Documentation
+        - Other
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Suggested priority
+      options:
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical_notes
+    attributes:
+      label: Technical notes
+      description: Add implementation notes if known.
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and did not find an equivalent request.
+          required: true
+        - label: I described the user problem separately from the proposed implementation.
+          required: true

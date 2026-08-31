@@ -77,3 +77,192 @@ speech/audio is permitted; the Start button provides that interaction.
 - audio ducking of Spotify/Apple Music
 - Live Activity / Dynamic Island
 - Lock Screen Pause/Resume
+
+---
+
+# Project Management
+
+## Repository language
+
+English is the standard language for development and project-management content in this repository.
+
+Use English for:
+
+- Issues and issue templates
+- Pull requests
+- Commit messages
+- Branch names
+- GitHub Projects
+- Labels
+- Source-code comments
+- Test descriptions
+- README and technical documentation
+- Configuration and schema field names
+
+The AnhPT application itself may support multiple user-facing languages. Localized UI strings and workout content may use supported application languages.
+
+## GitHub Projects
+
+AnhPT uses three GitHub Projects with different responsibilities.
+
+### Roadmap
+
+Use **Roadmap** for medium- and long-term product planning, major features, architecture changes, and release goals.
+
+Recommended lifecycle:
+
+`Ideas -> Research -> Planned -> Ready -> In Progress -> Testing -> Released`
+
+Use `Dropped` when an item is intentionally abandoned.
+
+### Sprint Board
+
+Use **Sprint Board** for active implementation work and short-term planning.
+
+Recommended lifecycle:
+
+`Backlog -> Ready -> In Progress -> Review -> Testing -> Done`
+
+Use `Blocked` whenever work cannot continue because of a dependency or unresolved problem.
+
+### Bug Tracking
+
+Use **Bug Tracking** for defects and regressions.
+
+Recommended lifecycle:
+
+`New -> Needs Reproduction -> Confirmed -> Investigating -> Ready to Fix -> Fixing -> Ready to Verify -> Verified -> Closed`
+
+Use `Won't Fix` for confirmed problems that will intentionally remain unresolved.
+
+Severity describes impact. Priority describes how soon the issue should be addressed.
+
+## Labels
+
+Use labels consistently across issues and pull requests.
+
+### Type
+
+| Label | Purpose |
+| --- | --- |
+| `bug` | Defect or regression |
+| `feature` | New user-facing capability |
+| `enhancement` | Improvement to existing behavior |
+| `refactor` | Internal restructuring without intended behavior change |
+| `documentation` | Documentation work |
+
+### Priority
+
+| Label | Purpose |
+| --- | --- |
+| `priority: high` | Important or urgent work |
+| `priority: medium` | Normal planned work |
+| `priority: low` | Nice-to-have or non-urgent work |
+
+### Area
+
+| Label | Purpose |
+| --- | --- |
+| `frontend` | UI and client-side behavior |
+| `backend` | Data, services, repositories, persistence, or server-side concerns |
+
+Project fields may use more specific product areas such as UI, Workout, Voice / Audio, Health, Catalog, Storage, CI / Release, and Documentation.
+
+## Issue Templates
+
+Create new issues using one of the repository Issue Forms:
+
+- **Bug Report** for defects and regressions
+- **Feature Request** for new capabilities and product improvements
+- **Task** for refactoring, maintenance, documentation, testing, research, CI, and other technical work
+
+Every issue should describe the problem or objective, define its scope, and include verifiable acceptance criteria whenever applicable.
+
+## Development Workflow
+
+### 1. Create an issue
+
+Create an issue before implementation when the work is significant enough to track independently.
+
+Use a concise conventional title where applicable:
+
+- `feat: add ...`
+- `fix: correct ...`
+- `refactor: simplify ...`
+- `docs: document ...`
+
+### 2. Classify the issue
+
+Apply the appropriate type, priority, and area labels. Add the issue to the relevant GitHub Project.
+
+### 3. Move work to Ready
+
+Before implementation, the issue should have enough context and acceptance criteria to avoid major ambiguity.
+
+### 4. Create a branch
+
+Use short descriptive branch names:
+
+- `feat/<short-description>`
+- `fix/<short-description>`
+- `refactor/<short-description>`
+- `docs/<short-description>`
+
+### 5. Implement and verify
+
+Keep the change focused on the issue scope. Before opening or merging a pull request, run the relevant checks, normally:
+
+```powershell
+flutter analyze
+flutter test
+```
+
+### 6. Open a pull request
+
+Use conventional PR titles such as:
+
+- `feat: ...`
+- `fix: ...`
+- `refactor: ...`
+- `docs: ...`
+
+Reference the issue in the PR body when appropriate:
+
+```text
+Closes #123
+```
+
+Move the related Sprint Board item to `Review` while the pull request is under review.
+
+### 7. Merge and test
+
+After CI and review succeed, merge the pull request. Move the item to `Testing` when post-merge verification is still required.
+
+### 8. Complete the work
+
+Move the item to `Done`, `Released`, `Verified`, or `Closed` according to the project workflow only after the applicable verification is complete.
+
+## Definition of Ready
+
+An issue is ready for implementation when:
+
+- The problem or objective is clear.
+- Scope is sufficiently defined.
+- Acceptance criteria are testable where applicable.
+- Important dependencies are known.
+- Major unresolved product or technical questions are addressed.
+
+## Definition of Done
+
+Work is done when:
+
+- The implementation or documentation is complete.
+- Relevant tests or verification steps pass.
+- `flutter analyze` and `flutter test` pass when applicable.
+- Documentation is updated when behavior or developer workflow changes.
+- The pull request is merged.
+- Post-merge verification is complete when required.
+
+## Recommended lifecycle
+
+`Idea -> Issue -> Labels -> Project -> Ready -> Branch -> Implementation -> Pull Request -> CI / Review -> Merge -> Testing -> Release -> Done`
