@@ -219,6 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const Divider(height: 1),
                 Expanded(
                   child: ReorderableListView.builder(
+                    buildDefaultDragHandles: false,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: draftOrder.length,
                     onReorder: (oldIndex, newIndex) {
@@ -234,7 +235,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       final visible = !draftHidden.contains(key);
                       return SwitchListTile(
                         key: ValueKey(key),
-                        secondary: const Icon(Icons.drag_handle),
+                        secondary: ReorderableDragStartListener(
+                          index: index,
+                          child: const Padding(
+                            padding: EdgeInsets.all(8),
+                            child: Icon(Icons.drag_handle),
+                          ),
+                        ),
                         title: Text(label),
                         value: visible,
                         onChanged: (value) => setSheetState(() {
