@@ -1,18 +1,20 @@
-# AnhPT Integrated MVP v0.6.0
+# AnhPT 0.8.2
 
-Adds real Text-to-Speech and cue sounds for Web and Windows.
+AnhPT is a Flutter voice-guided personal workout trainer with structured YAML workouts, local coach recordings, background music, demonstration media, downloadable workout buckets, local health profiles, and automated Android releases.
 
 ## Voice behavior
 
-- Announces workout start
-- Announces each step name
-- continuous: counts elapsed seconds upward
-- interval: speaks remaining time at configured interval
-- ending: counts down final seconds
-- combined: interval + final countdown
-- speaks Pause / Resume
-- announces completion
-- drops/cancels obsolete speech at step changes
+- Announces workout start and optional description.
+- Announces each step name and guide.
+- Uses a local coach recording when available and falls back to TTS.
+- Supports independent elapsed-time announcements.
+- Supports independent periodic remaining-time announcements.
+- Supports an independent final countdown.
+- Announces Pause / Resume.
+- Announces workout completion.
+- Cancels obsolete speech when session state changes.
+
+Current voice timing is configured with independent YAML flags under `voice.timing`; there is no combined timing mode.
 
 ## Sound
 
@@ -43,13 +45,13 @@ Use the in-app **Open microphone settings** button when recording does not
 start, and make sure both **Microphone access** and **Let desktop apps access
 your microphone** are enabled and an input device is selected.
 
-## Offline background music (Windows MVP)
+## Offline background music
 
 Open **Settings > Offline Music Library** to preview bundled tracks or import
 personal audio. Personal files are copied into the app documents directory and
 can be renamed, tagged by mood, or deleted. Open a workout to select a track,
-set volume, and choose Off/Gentle/Medium coach ducking. Music loops and follows
-workout pause/resume/end. Everything stays local; there is no upload or stream.
+set volume, and choose a coach ducking level. Music loops and follows workout
+pause/resume/end. Everything stays local; there is no upload or stream.
 
 ## Run
 
@@ -67,6 +69,22 @@ flutter run -d windows
 
 For Web, click Start Workout normally. Browsers often require a user gesture before
 speech/audio is permitted; the Start button provides that interaction.
+
+## Architecture and code documentation
+
+The documentation under [`docs/architecture/`](docs/architecture/README.md) is maintained as a map of the current implementation.
+
+Start with:
+
+- [`Codebase Overview`](docs/architecture/codebase-overview.md) — source structure, state ownership, screens and dependencies.
+- [`Workout Domain Model`](docs/architecture/workout-domain.md) — workout tree, repeats, voice config, exercises/media and YAML parsing.
+- [`Workout Runtime`](docs/architecture/workout-runtime.md) — `SessionEngine`, voice/audio coordination and session state.
+- [`Storage, Audio and Media`](docs/architecture/storage-and-media.md) — persistence, files and migrations.
+- [`Bucket Catalogs and Packages`](docs/architecture/catalog-and-packages.md) — remote catalogs, install/update provenance and packages.
+- [`Health and Local Profiles`](docs/architecture/health-and-profiles.md) — profile-scoped health data and migration.
+- [`CI and Release Automation`](docs/architecture/ci-and-release.md) — verification, APK releases and documentation rendering.
+
+C4/PlantUML diagrams and their generated SVG previews are also available in the architecture directory. UI/navigation documentation lives under [`docs/ux/`](docs/ux/README.md).
 
 ## Still pending for iPhone-native completion
 
