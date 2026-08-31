@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+
 import '../app/app_controller.dart';
 import '../models/local_profile.dart';
 import '../models/workout.dart';
 import '../services/health_store.dart';
+import '../services/workout_update_service.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
 import 'health_screen.dart';
@@ -37,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadProfiles();
     _loadTagPreferences();
+    controller.refreshAllBucketSources();
   }
 
   Future<void> _loadTagPreferences() async {
@@ -95,10 +98,13 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             const ListTile(
-              title: Text('Active profile',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle:
-                  Text('Health data and future workout history stay separate.'),
+              title: Text(
+                'Active profile',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                'Health data and future workout history stay separate.',
+              ),
             ),
             for (final profile in _profiles)
               ListTile(
@@ -206,8 +212,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const ListTile(
                   leading: Icon(Icons.tune),
-                  title: Text('Manage tags',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
+                  title: Text(
+                    'Manage tags',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
                   subtitle: Text('Drag to reorder. Hide tags you do not need.'),
                 ),
                 const Divider(height: 1),
@@ -308,8 +316,10 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Workouts',
-            style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          'Workouts',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           TextButton.icon(
             onPressed: _chooseActiveProfile,
@@ -332,9 +342,11 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: 'Settings',
             onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (_) => SettingsScreen(controller: controller))),
+              context,
+              MaterialPageRoute(
+                builder: (_) => SettingsScreen(controller: controller),
+              ),
+            ),
             icon: const Icon(Icons.settings_outlined),
           ),
         ],
@@ -475,7 +487,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 label: const Text('Favors'),
                                 selected: _selectedFilter == 'favorites',
                                 onSelected: (_) => setState(
-                                    () => _selectedFilter = 'favorites'),
+                                  () => _selectedFilter = 'favorites',
+                                ),
                               ),
                               for (final tag in visibleTags) ...[
                                 const SizedBox(width: 8),
@@ -506,6 +519,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       workout: workout,
                       sourceName: _sourceNameFor(workout),
                       originalName: _originalNameFor(workout),
+                      availableUpdateVersion:
+                          controller.updateForWorkout(workout.id)?.availableVersion,
                       onStart: () => _openWorkout(context, workout),
                       onFavorite: () => controller.toggleFavorite(workout.id),
                     ),
