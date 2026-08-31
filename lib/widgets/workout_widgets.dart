@@ -73,12 +73,12 @@ class WorkoutCard extends StatelessWidget {
       child: InkWell(
         onTap: onStart,
         child: SizedBox(
-          height: displayLastUsed ? 96 : 82,
+          height: 96,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Container(
-                width: displayLastUsed ? 96 : 82,
+                width: 96,
                 color: cs.surfaceContainerHighest,
                 alignment: Alignment.center,
                 child: Icon(
@@ -110,18 +110,36 @@ class WorkoutCard extends StatelessWidget {
                             color: cs.onSurfaceVariant,
                           ),
                     ),
-                    if (displayLastUsed) ...[
-                      const SizedBox(height: 3),
-                      Text(
-                        _formatLastUsed(workout.lastUsedAt!),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: cs.primary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ],
+                    const SizedBox(height: 3),
+                    SizedBox(
+                      height: 18,
+                      child: displayLastUsed
+                          ? Row(
+                              children: [
+                                Icon(
+                                  Icons.history_rounded,
+                                  size: 14,
+                                  color: cs.primary,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    _formatLastUsed(workout.lastUsedAt!),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: cs.primary,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : null,
+                    ),
                   ],
                 ),
               ),
