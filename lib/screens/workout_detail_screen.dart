@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout.dart';
+import '../models/workout_bucket.dart';
+import '../services/workout_update_service.dart';
 import '../widgets/coach_recording_card.dart';
 import '../widgets/common.dart';
 import '../widgets/demo_media_source_sheet.dart';
@@ -10,6 +12,7 @@ import '../widgets/step_recording_mini_player.dart';
 import '../widgets/workout_music_card.dart';
 import '../widgets/workout_widgets.dart';
 import 'workout_builder_screen.dart';
+import 'workout_download_screen.dart';
 import 'workout_editor_screen.dart';
 import 'workout_player_screen.dart';
 
@@ -46,6 +49,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    widget.controller.refreshAllBucketSources();
   }
 
   @override
@@ -68,6 +72,72 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         ),
       ),
     );
+  }
+
+  Future<void> _updateWorkout(WorkoutUpdateInfo update) async {
+    final resolution = await showModalBottomSheet<BucketInstallConflictResolution>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.system_update_alt),
+              title: const Text(
+                'Update workout',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                'v${update.installedVersion} → v${update.availableVersion}',
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.sync),
+              title: const Text('Replace current workout'),
+              subtitle: const Text(
+                'Install the new bucket version in place of this workout.',
+              ),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                BucketInstallConflictResolution.replace,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy_outlined),
+              title: const Text('Install as copy'),
+              subtitle: const Text(
+                'Keep the current workout and install the update separately.',
+              ),
+              onTap: () => Navigator.pop(
+                sheetContext,
+                BucketInstallConflictResolution.installCopy,
+              ),
+            ),
+            const SizedBox(height: 6),
+          ],
+        ),
+      ),
+    );
+    if (resolution == null || !mounted) return;
+
+    await _musicCardKey.currentState?.stopPreview();
+    if (!mounted) return;
+
+    final route = MaterialPageRoute(
+      builder: (_) => WorkoutDownloadScreen(
+        controller: widget.controller,
+        entry: update.available,
+        sourceName: widget.controller.bucketSourceName(update.installed),
+        resolution: resolution,
+      ),
+    );
+
+    if (resolution == BucketInstallConflictResolution.replace) {
+      await Navigator.pushReplacement(context, route);
+    } else {
+      await Navigator.push(context, route);
+    }
   }
 
   Future<void> _handleWorkoutAction(
@@ -149,6 +219,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                 ),
                 const SizedBox(height: 8),
                 Text('Workout ID: ${provenance.entryId}'),
+                Text('Installed version: ${provenance.version}'),
                 if (widget.controller.bucketOriginalName(provenance)
                     case final originalName?) ...[
                   const SizedBox(height: 8),
@@ -372,6 +443,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
 
         collectRecordings(workout.steps);
         final provenance = controller.bucketProvenanceFor(workout.id);
+        final update = controller.updateForWorkout(workout.id);
         final sourceName =
             provenance == null ? null : controller.bucketSourceName(provenance);
         final originalName = provenance == null
@@ -432,6 +504,11 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
               child: Column(
                 children: [
                   _CompactWorkoutHeader(workout: workout),
+                  if (update != null)
+                    _WorkoutUpdateBanner(
+                      update: update,
+                      onUpdate: () => _updateWorkout(update),
+                    ),
                   TabBar(
                     controller: _tabController,
                     tabs: const [
@@ -610,6 +687,60 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
           ),
         );
       },
+    );
+  }
+}
+
+class _WorkoutUpdateBanner extends StatelessWidget {
+  final WorkoutUpdateInfo update;
+  final VoidCallback onUpdate;
+
+  const _WorkoutUpdateBanner({
+    required this.update,
+    required this.onUpdate,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: colors.primaryContainer,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.system_update_alt, color: colors.onPrimaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Update available',
+                    style: TextStyle(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'v${update.installedVersion} → v${update.availableVersion}',
+                    style: TextStyle(color: colors.onPrimaryContainer),
+                  ),
+                ],
+              ),
+            ),
+            TextButton(
+              onPressed: onUpdate,
+              child: const Text('Update'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
