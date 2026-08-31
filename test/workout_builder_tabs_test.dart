@@ -33,14 +33,9 @@ void main() {
     final overviewList =
         find.byKey(const PageStorageKey('builder-overview-tab'));
     expect(overviewList, findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('Voice settings'),
-      300,
-      scrollable: find.descendant(
-        of: overviewList,
-        matching: find.byType(Scrollable),
-      ),
-    );
+    await tester.drag(overviewList, const Offset(0, -700));
+    await tester.pumpAndSettle();
+    expect(find.text('Voice settings'), findsOneWidget);
     await tester.tap(find.text('Voice settings'));
     await tester.pumpAndSettle();
     expect(find.text('Announce every'), findsOneWidget);
