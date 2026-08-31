@@ -327,87 +327,129 @@ class _NodeView extends StatelessWidget {
     final indent = depth * 18.0;
     if (node is WorkoutStep) {
       final step = node as WorkoutStep;
+      final mediaId = demoMediaIdForStep?.call(step);
       return Padding(
         padding: EdgeInsets.only(left: indent, bottom: 8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: cs.surfaceContainerLow,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      step.name,
-                      style: const TextStyle(fontWeight: FontWeight.w600),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          margin: EdgeInsets.zero,
+          child: SizedBox(
+            height: 76,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: 76,
+                  child: mediaId != null &&
+                          onBrowseStepMedia != null &&
+                          onRemoveStepMedia != null &&
+                          resolveMediaAsset != null &&
+                          resolveMediaUri != null
+                      ? StepDemonstrationButton(
+                          mediaId: mediaId,
+                          resolveAsset: resolveMediaAsset!,
+                          resolveUri: resolveMediaUri!,
+                          width: 76,
+                          height: 76,
+                          borderRadius: 0,
+                          onReplace: () async =>
+                              onBrowseStepMedia!(context, step, stepKey),
+                          onRemove: () async =>
+                              onRemoveStepMedia!(context, step, stepKey),
+                        )
+                      : Material(
+                          color: cs.surfaceContainerHighest,
+                          child: InkWell(
+                            onTap: onBrowseStepMedia == null
+                                ? null
+                                : () => onBrowseStepMedia!(
+                                      context,
+                                      step,
+                                      stepKey,
+                                    ),
+                            child: Center(
+                              child: Icon(
+                                onBrowseStepMedia == null
+                                    ? Icons.directions_run_outlined
+                                    : Icons.add_photo_alternate_outlined,
+                                size: 28,
+                                color: cs.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 9),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          step.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          formatDuration(step.duration),
+                          maxLines: 1,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        if (step.guide.trim().isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            step.guide.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: cs.onSurfaceVariant,
+                                    ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (onRecordStep != null && step.recording == null)
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: recordedStepKeys.contains(stepKey)
-                          ? 'Edit step recording'
-                          : 'Record step cue',
-                      onPressed: () =>
-                          onRecordStep!(context, step, stepKey),
-                      icon: Icon(
-                        recordedStepKeys.contains(stepKey)
-                            ? Icons.mic
-                            : Icons.mic_none_outlined,
-                        color: recordedStepKeys.contains(stepKey)
-                            ? cs.primary
-                            : cs.onSurfaceVariant,
+                ),
+                if (onRecordStep != null && step.recording == null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    tooltip: recordedStepKeys.contains(stepKey)
+                        ? 'Edit step recording'
+                        : 'Record step cue',
+                    onPressed: () => onRecordStep!(context, step, stepKey),
+                    icon: Icon(
+                      recordedStepKeys.contains(stepKey)
+                          ? Icons.mic
+                          : Icons.mic_none_outlined,
+                      color: recordedStepKeys.contains(stepKey)
+                          ? cs.primary
+                          : cs.onSurfaceVariant,
+                    ),
+                  )
+                else if (onRecordStep != null &&
+                    step.recording != null &&
+                    resolveStepRecording?.call(step) != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Center(
+                      child: StepRecordingMiniPlayer(
+                        audioPath: resolveStepRecording!(step)!,
+                        onManage: () =>
+                            onRecordStep?.call(context, step, stepKey),
                       ),
                     ),
-                  if (onRecordStep != null &&
-                      step.recording != null &&
-                      resolveStepRecording?.call(step) != null)
-                    StepRecordingMiniPlayer(
-                      audioPath: resolveStepRecording!(step)!,
-                      onManage: () =>
-                          onRecordStep?.call(context, step, stepKey),
-                    ),
-                  if (onBrowseStepMedia != null &&
-                      demoMediaIdForStep?.call(step) == null)
-                    IconButton(
-                      visualDensity: VisualDensity.compact,
-                      tooltip: step.exerciseId == null
-                          ? 'Browse demonstration files'
-                          : 'Replace demonstration media',
-                      onPressed: () =>
-                          onBrowseStepMedia!(context, step, stepKey),
-                      icon: Icon(
-                        step.exerciseId == null
-                            ? Icons.add_photo_alternate_outlined
-                            : Icons.perm_media_outlined,
-                        color: step.exerciseId == null
-                            ? cs.onSurfaceVariant
-                            : cs.primary,
-                      ),
-                    ),
-                  if (onBrowseStepMedia != null &&
-                      onRemoveStepMedia != null &&
-                      resolveMediaAsset != null &&
-                      resolveMediaUri != null &&
-                      demoMediaIdForStep?.call(step) != null)
-                    StepDemonstrationButton(
-                      mediaId: demoMediaIdForStep!(step)!,
-                      resolveAsset: resolveMediaAsset!,
-                      resolveUri: resolveMediaUri!,
-                      onReplace: () async =>
-                          onBrowseStepMedia!(context, step, stepKey),
-                      onRemove: () async =>
-                          onRemoveStepMedia!(context, step, stepKey),
-                    ),
-                  if (onBrowseStepMedia != null) const SizedBox(width: 8),
-                  Text(formatDuration(step.duration)),
-                ],
-              ),
-            ],
+                  ),
+                const SizedBox(width: 4),
+              ],
+            ),
           ),
         ),
       );
