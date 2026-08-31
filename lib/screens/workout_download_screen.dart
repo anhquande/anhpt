@@ -46,9 +46,13 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     _openedAt = DateTime.now();
     _progressSubscription = WorkoutBucketService.packageProgress.listen((event) {
       if (!mounted || event.entryId != widget.entry.id) return;
+      final total = event.totalBytes ?? widget.entry.size;
       setState(() {
         _receivedBytes = event.receivedBytes;
-        _totalBytes = event.totalBytes ?? widget.entry.size;
+        _totalBytes = total;
+        if (total != null && total > 0 && event.receivedBytes >= total) {
+          _phase = _DownloadPhase.installing;
+        }
       });
     });
     _install();
@@ -75,23 +79,10 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     }
 
     try {
-      final installFuture = widget.controller.installBucketEntry(
+      final installed = await widget.controller.installBucketEntry(
         widget.entry,
         resolution: widget.resolution,
       );
-
-      // Once all bytes have arrived, the remaining work is package validation,
-      // extraction, media import and persistence.
-      while (mounted && _phase == _DownloadPhase.downloading) {
-        final total = _totalBytes;
-        if (total != null && total > 0 && _receivedBytes >= total) {
-          setState(() => _phase = _DownloadPhase.installing);
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 80));
-      }
-
-      final installed = await installFuture;
       if (!installed || !mounted) return;
 
       String? workoutId;
@@ -101,15 +92,20 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
           break;
         }
       }
-      workoutId ??= widget.controller.installedBucketWorkouts
-          .where((item) =>
-              item.sourceId == widget.entry.sourceId &&
-              item.entryId == widget.entry.id)
-          .map((item) => item.workoutId)
-          .lastOrNull;
+      if (workoutId == null) {
+        for (final item in widget.controller.installedBucketWorkouts.reversed) {
+          if (item.sourceId == widget.entry.sourceId &&
+              item.entryId == widget.entry.id) {
+            workoutId = item.workoutId;
+            break;
+          }
+        }
+      }
 
       if (workoutId == null) {
-        throw StateError('Workout installed, but the local workout could not be found.');
+        throw StateError(
+          'Workout installed, but the local workout could not be found.',
+        );
       }
 
       setState(() {
@@ -201,11 +197,11 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
               ),
               if (_recommended) ...[
                 const SizedBox(height: 8),
-                Align(
+                const Align(
                   alignment: Alignment.centerLeft,
                   child: Chip(
-                    avatar: const Icon(Icons.auto_awesome, size: 16),
-                    label: const Text('Recommended'),
+                    avatar: Icon(Icons.auto_awesome, size: 16),
+                    label: Text('Recommended'),
                   ),
                 ),
               ],
