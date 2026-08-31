@@ -10,6 +10,7 @@ import 'package:anhpt/services/workout_parser.dart';
 import 'package:anhpt/screens/workout_detail_screen.dart';
 import 'package:anhpt/screens/workout_player_screen.dart';
 import 'package:anhpt/screens/workout_builder_screen.dart';
+import 'package:anhpt/widgets/workout_widgets.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -250,8 +251,8 @@ steps:
     await tester.pumpAndSettle();
 
     expect(find.text('Workouts'), findsOneWidget);
-    expect(find.byType(WorkoutCard), findsNWidgets(2));
     expect(find.text('Browse workouts'), findsNothing);
+    expect(find.byType(WorkoutCard), findsNWidgets(2));
     expect(find.text('Import package'), findsNothing);
     expect(find.text('Import YAML'), findsNothing);
     expect(find.byTooltip('Workout actions'), findsOneWidget);
