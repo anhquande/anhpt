@@ -75,7 +75,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
   }
 
   Future<void> _updateWorkout(WorkoutUpdateInfo update) async {
-    final resolution = await showModalBottomSheet<BucketInstallConflictResolution>(
+    final resolution =
+        await showModalBottomSheet<BucketInstallConflictResolution>(
       context: context,
       builder: (sheetContext) => SafeArea(
         child: Column(
@@ -789,13 +790,13 @@ class _CompactOptionContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(14),
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        child: child,
       ),
-      child: child,
     );
   }
 }
