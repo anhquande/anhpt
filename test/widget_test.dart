@@ -128,11 +128,6 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Stay open after completion'), findsOneWidget);
     expect(find.text('Screen during workout'), findsOneWidget);
     expect(find.text('Keep current display behavior'), findsOneWidget);
-    expect(find.text('Introduction'), findsOneWidget);
-    expect(find.text('Workout introduction recording'), findsOneWidget);
-    expect(find.byTooltip('Record workout introduction'), findsOneWidget);
-    expect(find.text('Audio'), findsOneWidget);
-    expect(find.text('Background music'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(SwitchListTile, 'After workout'));
     await tester.pumpAndSettle();
@@ -152,6 +147,16 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     await tester.tap(find.text('More'));
     await tester.pumpAndSettle();
     expect(find.text('Less'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
+
+    final overviewList = find.byKey(const PageStorageKey('overview-tab'));
+    await tester.drag(overviewList, const Offset(0, -520));
+    await tester.pumpAndSettle();
+    expect(find.text('Introduction'), findsOneWidget);
+    expect(find.text('Workout introduction recording'), findsOneWidget);
+    expect(find.byTooltip('Record workout introduction'), findsOneWidget);
+    expect(find.text('Audio'), findsOneWidget);
+    expect(find.text('Background music'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
 
     await tester.tap(find.text('Steps'));
