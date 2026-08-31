@@ -152,13 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return workout.tags.any((tag) => _normalize(tag) == _selectedFilter);
   }
 
-  List<Workout> _allWorkouts() {
-    final byId = <String, Workout>{};
-    for (final workout in [...controller.favorites, ...controller.others]) {
-      byId[workout.id] = workout;
-    }
-    return byId.values.toList();
-  }
+  List<Workout> _allWorkouts() => List<Workout>.from(controller.workouts);
 
   List<String> _availableTags(List<Workout> workouts) {
     final tagsByKey = <String, String>{};
