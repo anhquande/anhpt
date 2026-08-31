@@ -11,9 +11,12 @@ start_countdown: 5s
 
 voice:
   language: vi
-  mode: combined
-  announce_every: 10s
-  countdown_from: 5s
+  timing:
+    elapsed_time: false
+    interval: true
+    interval_every: 10s
+    final_countdown: true
+    countdown_from: 5s
   announce_step_name: true
   announce_start: true
   announce_finish: true

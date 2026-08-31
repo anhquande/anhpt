@@ -36,9 +36,12 @@ class WorkoutSerializer {
       ..writeln()
       ..writeln('voice:')
       ..writeln('  language: ${draft.voiceLanguage}')
-      ..writeln('  mode: ${draft.voiceMode}')
-      ..writeln('  announce_every: ${draft.announceEvery.trim()}')
-      ..writeln('  countdown_from: ${draft.countdownFrom.trim()}')
+      ..writeln('  timing:')
+      ..writeln('    elapsed_time: ${draft.announceElapsedTime}')
+      ..writeln('    interval: ${draft.announceInterval}')
+      ..writeln('    interval_every: ${draft.announceEvery.trim()}')
+      ..writeln('    final_countdown: ${draft.announceFinalCountdown}')
+      ..writeln('    countdown_from: ${draft.countdownFrom.trim()}')
       ..writeln('  announce_step_name: ${draft.announceStepName}')
       ..writeln('  announce_start: ${draft.announceStart}')
       ..writeln('  announce_finish: ${draft.announceFinish}')
@@ -133,7 +136,8 @@ class WorkoutSerializer {
 
   static String _quote(String value) {
     if (value.isEmpty) return '""';
-    final mustQuote = value.contains(':') ||
+    final mustQuote =
+        value.contains(':') ||
         value.contains('#') ||
         value.startsWith('-') ||
         value.startsWith('[') ||

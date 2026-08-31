@@ -119,18 +119,17 @@ class VoiceGuideController {
           _started = true;
           if (workout.voice.announceStart) {
             final description = workout.description.trim();
-            final recordingPlayed = descriptionRecordingPath != null &&
-                await audio
-                    .playLocalRecordingAndWait(descriptionRecordingPath!);
+            final recordingPlayed =
+                descriptionRecordingPath != null &&
+                await audio.playLocalRecordingAndWait(
+                  descriptionRecordingPath!,
+                );
             if (!recordingPlayed) {
               final introParts = <String>[audio.startPhrase(workout.name)];
               if (description.isNotEmpty) {
                 introParts.add(description);
               }
-              await audio.speakAndWait(
-                introParts.join('. '),
-                interrupt: true,
-              );
+              await audio.speakAndWait(introParts.join('. '), interrupt: true);
             }
           }
         }
@@ -176,7 +175,8 @@ class VoiceGuideController {
 
         final stepRecordingPath =
             stepRecordingPaths[engine.currentExecutableStep.step.id];
-        final recordingPlayed = stepRecordingPath != null &&
+        final recordingPlayed =
+            stepRecordingPath != null &&
             await audio.playLocalRecordingAndWait(stepRecordingPath);
         if (!_isCurrentAnnouncement(
           announcementGeneration,
@@ -186,10 +186,7 @@ class VoiceGuideController {
           return;
         }
         if (!recordingPlayed && parts.isNotEmpty) {
-          await audio.speakAndWait(
-            parts.join('. '),
-            interrupt: true,
-          );
+          await audio.speakAndWait(parts.join('. '), interrupt: true);
         }
       } catch (e) {
         // Voice failure must never block progression permanently.
@@ -229,11 +226,7 @@ class VoiceGuideController {
     }
   }
 
-  bool _isCurrentAnnouncement(
-    int generation,
-    int stepIndex,
-    String stepId,
-  ) {
+  bool _isCurrentAnnouncement(int generation, int stepIndex, String stepId) {
     return !_disposed &&
         !_muted &&
         generation == _generation &&
@@ -274,38 +267,36 @@ class VoiceGuideController {
     if (remainingMs <= 0) return;
 
     final adjustedRemainingMs = remainingMs - speechLeadMs;
-    final remainingSec =
-        adjustedRemainingMs <= 0 ? 0 : ((adjustedRemainingMs - 1) ~/ 1000) + 1;
+    final remainingSec = adjustedRemainingMs <= 0
+        ? 0
+        : ((adjustedRemainingMs - 1) ~/ 1000) + 1;
 
     final elapsedMs = durationMs - remainingMs + speechLeadMs;
     final elapsedSec = elapsedMs <= 0 ? 0 : elapsedMs ~/ 1000;
 
     if (_lastSpokenSecond == remainingSec) return;
 
-    final mode = workout.voice.mode;
     final countdownFrom = workout.voice.countdownFrom.inSeconds;
     final interval = workout.voice.announceEvery.inSeconds;
     final inEnding = remainingSec > 0 && remainingSec <= countdownFrom;
-    final shouldEnding = (mode == 'ending' || mode == 'combined') && inEnding;
 
-    if (shouldEnding) {
+    if (workout.voice.announceFinalCountdown && inEnding) {
       _lastSpokenSecond = remainingSec;
       await audio.speak('$remainingSec', interrupt: true);
       return;
     }
 
-    if (mode == 'interval' || mode == 'combined') {
-      if (remainingSec > 0 &&
-          interval > 0 &&
-          remainingSec < engine.currentStep.duration.inSeconds &&
-          remainingSec % interval == 0) {
-        _lastSpokenSecond = remainingSec;
-        await audio.speak(audio.remainingPhrase(remainingSec));
-      }
+    if (workout.voice.announceInterval &&
+        remainingSec > 0 &&
+        interval > 0 &&
+        remainingSec < engine.currentStep.duration.inSeconds &&
+        remainingSec % interval == 0) {
+      _lastSpokenSecond = remainingSec;
+      await audio.speak(audio.remainingPhrase(remainingSec));
       return;
     }
 
-    if (mode == 'continuous' && elapsedSec > 0) {
+    if (workout.voice.announceElapsedTime && elapsedSec > 0) {
       final spokenElapsedKey = -elapsedSec;
       if (_lastSpokenSecond != spokenElapsedKey) {
         _lastSpokenSecond = spokenElapsedKey;

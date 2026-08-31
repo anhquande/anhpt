@@ -16,9 +16,7 @@ void main() {
     final controller = AppController(LocalStore());
 
     await tester.pumpWidget(
-      MaterialApp(
-        home: WorkoutBuilderScreen(controller: controller),
-      ),
+      MaterialApp(home: WorkoutBuilderScreen(controller: controller)),
     );
     await tester.pumpAndSettle();
 
@@ -30,16 +28,22 @@ void main() {
     expect(find.text('About'), findsOneWidget);
     expect(find.text('Workout options'), findsOneWidget);
 
-    final overviewList =
-        find.byKey(const PageStorageKey('builder-overview-tab'));
+    final overviewList = find.byKey(
+      const PageStorageKey('builder-overview-tab'),
+    );
     expect(overviewList, findsOneWidget);
     await tester.drag(overviewList, const Offset(0, -700));
     await tester.pumpAndSettle();
     expect(find.text('Voice settings'), findsOneWidget);
     await tester.tap(find.text('Voice settings'));
     await tester.pumpAndSettle();
-    expect(find.text('Announce every'), findsOneWidget);
-    expect(find.text('Countdown from'), findsOneWidget);
+    expect(find.text('Voice timing'), findsOneWidget);
+    expect(find.text('Elapsed time'), findsOneWidget);
+    expect(find.text('Periodic time remaining'), findsOneWidget);
+    expect(find.text('Every'), findsOneWidget);
+    expect(find.text('Final countdown'), findsOneWidget);
+    expect(find.text('Start at'), findsOneWidget);
+    expect(find.text('Combined'), findsNothing);
 
     await tester.tap(find.text('Steps'));
     await tester.pumpAndSettle();

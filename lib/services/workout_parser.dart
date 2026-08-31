@@ -1,4 +1,5 @@
 import 'dart:math';
+
 import 'package:yaml/yaml.dart';
 
 import '../core/duration_parser.dart';
@@ -26,16 +27,21 @@ class WorkoutParser {
     'recording',
     'background_music',
     'exercises',
-    'steps'
+    'steps',
   };
   static const _voiceFields = {
     'language',
-    'mode',
-    'announce_every',
-    'countdown_from',
+    'timing',
     'announce_step_name',
     'announce_start',
-    'announce_finish'
+    'announce_finish',
+  };
+  static const _voiceTimingFields = {
+    'elapsed_time',
+    'interval',
+    'interval_every',
+    'final_countdown',
+    'countdown_from',
   };
   static const _feedbackFields = {'sound', 'haptic'};
   static const _audioFields = {'ducking'};
@@ -46,7 +52,7 @@ class WorkoutParser {
     'guide',
     'countdown',
     'recording',
-    'exercise_id'
+    'exercise_id',
   };
   static const _repeatFields = {'repeat', 'steps'};
   static const _backgroundMusicFields = {
@@ -54,15 +60,17 @@ class WorkoutParser {
     'name',
     'enabled',
     'volume',
-    'ducking'
+    'ducking',
   };
   static const _exerciseFields = {'id', 'name', 'demo_media', 'demo_video'};
 
-  static Workout parse(String yamlText,
-      {required String id,
-      required String defaultVoiceLanguage,
-      bool favorite = false,
-      DateTime? createdAt}) {
+  static Workout parse(
+    String yamlText, {
+    required String id,
+    required String defaultVoiceLanguage,
+    bool favorite = false,
+    DateTime? createdAt,
+  }) {
     dynamic loaded;
     try {
       loaded = loadYaml(yamlText);
@@ -77,7 +85,8 @@ class WorkoutParser {
     final version = root['version'];
     if (version != 1 && version != 2) {
       throw const WorkoutValidationException(
-          'version is required and must be 1 or 2.');
+        'version is required and must be 1 or 2.',
+      );
     }
 
     final name = _string(root['name'], 'name', 100);
@@ -87,8 +96,10 @@ class WorkoutParser {
     final tags = _tags(root['tags']);
     final startCountdown = root['start_countdown'] == null
         ? const Duration(seconds: 3)
-        : DurationParser.parseAllowZero(root['start_countdown'],
-            field: 'start_countdown');
+        : DurationParser.parseAllowZero(
+            root['start_countdown'],
+            field: 'start_countdown',
+          );
     final voice = _voice(root['voice'], defaultVoiceLanguage);
     final (sound, haptic) = _feedback(root['feedback']);
     final ducking = _audio(root['audio']);
@@ -100,8 +111,10 @@ class WorkoutParser {
     }
     final screenOffAfterStart = root['screen_off_after_start'] == null
         ? null
-        : DurationParser.parseAllowZero(root['screen_off_after_start'],
-            field: 'screen_off_after_start');
+        : DurationParser.parseAllowZero(
+            root['screen_off_after_start'],
+            field: 'screen_off_after_start',
+          );
     if (screenOffAfterStart != null && screenOffAfterStart <= Duration.zero) {
       throw const WorkoutValidationException(
         'screen_off_after_start must be greater than 0s.',
@@ -114,7 +127,8 @@ class WorkoutParser {
     final rawSteps = root['steps'];
     if (rawSteps is! YamlList || rawSteps.isEmpty) {
       throw const WorkoutValidationException(
-          'Workout must contain at least one step.');
+        'Workout must contain at least one step.',
+      );
     }
     final explicitIds = <String>{};
     _collectExplicitIds(rawSteps, explicitIds, 0);
@@ -126,7 +140,8 @@ class WorkoutParser {
             node.exerciseId != null &&
             !exerciseIds.contains(node.exerciseId)) {
           throw WorkoutValidationException(
-              'Unknown exercise_id "${node.exerciseId}".');
+            'Unknown exercise_id "${node.exerciseId}".',
+          );
         }
         if (node is RepeatGroup) validateExerciseReferences(node.steps);
       }
@@ -135,33 +150,36 @@ class WorkoutParser {
     validateExerciseReferences(steps);
     final now = DateTime.now();
     final workout = Workout(
-        id: id,
-        version: version as int,
-        name: name,
-        description: description,
-        tags: tags,
-        startCountdown: startCountdown,
-        voice: voice,
-        sound: sound,
-        haptic: haptic,
-        ducking: ducking,
-        completionAction: completionAction,
-        screenOffAfterStart: screenOffAfterStart,
-        recording: recording,
-        backgroundMusic: backgroundMusic,
-        exercises: exercises,
-        steps: steps,
-        rawYaml: yamlText,
-        favorite: favorite,
-        createdAt: createdAt ?? now,
-        updatedAt: now);
+      id: id,
+      version: version as int,
+      name: name,
+      description: description,
+      tags: tags,
+      startCountdown: startCountdown,
+      voice: voice,
+      sound: sound,
+      haptic: haptic,
+      ducking: ducking,
+      completionAction: completionAction,
+      screenOffAfterStart: screenOffAfterStart,
+      recording: recording,
+      backgroundMusic: backgroundMusic,
+      exercises: exercises,
+      steps: steps,
+      rawYaml: yamlText,
+      favorite: favorite,
+      createdAt: createdAt ?? now,
+      updatedAt: now,
+    );
     if (workout.totalDuration > const Duration(hours: 24)) {
       throw const WorkoutValidationException(
-          'Total workout duration must not exceed 24 hours.');
+        'Total workout duration must not exceed 24 hours.',
+      );
     }
     if (workout.effectiveStepCount > 100000) {
       throw const WorkoutValidationException(
-          'Workout must not exceed 100,000 effective steps.');
+        'Workout must not exceed 100,000 effective steps.',
+      );
     }
     return workout;
   }
@@ -172,29 +190,60 @@ class WorkoutParser {
     final language = (map['language'] ?? defaultLanguage).toString();
     if (!{'vi', 'en'}.contains(language)) {
       throw const WorkoutValidationException(
-          'voice.language must be vi or en.');
+        'voice.language must be vi or en.',
+      );
     }
-    final mode = (map['mode'] ?? 'combined').toString();
-    if (!{'continuous', 'interval', 'ending', 'combined'}.contains(mode)) {
-      throw const WorkoutValidationException(
-          'voice.mode must be continuous, interval, ending or combined.');
-    }
+
+    final timing = map['timing'] == null
+        ? <String, dynamic>{}
+        : _map(map['timing']);
+    _unknown(timing, _voiceTimingFields, 'voice.timing');
+    final announceElapsedTime = _bool(
+      timing['elapsed_time'],
+      false,
+      'voice.timing.elapsed_time',
+    );
+    final announceInterval = _bool(
+      timing['interval'],
+      true,
+      'voice.timing.interval',
+    );
+    final announceFinalCountdown = _bool(
+      timing['final_countdown'],
+      true,
+      'voice.timing.final_countdown',
+    );
+    final announceEvery = timing['interval_every'] == null
+        ? const Duration(seconds: 10)
+        : DurationParser.parse(
+            timing['interval_every'],
+            field: 'voice.timing.interval_every',
+          );
+    final countdownFrom = timing['countdown_from'] == null
+        ? const Duration(seconds: 5)
+        : DurationParser.parse(
+            timing['countdown_from'],
+            field: 'voice.timing.countdown_from',
+          );
+
     return VoiceConfig(
       language: language,
-      mode: mode,
-      announceEvery: map['announce_every'] == null
-          ? const Duration(seconds: 10)
-          : DurationParser.parse(map['announce_every'],
-              field: 'voice.announce_every'),
-      countdownFrom: map['countdown_from'] == null
-          ? const Duration(seconds: 5)
-          : DurationParser.parse(map['countdown_from'],
-              field: 'voice.countdown_from'),
-      announceStepName:
-          _bool(map['announce_step_name'], true, 'voice.announce_step_name'),
+      announceElapsedTime: announceElapsedTime,
+      announceInterval: announceInterval,
+      announceFinalCountdown: announceFinalCountdown,
+      announceEvery: announceEvery,
+      countdownFrom: countdownFrom,
+      announceStepName: _bool(
+        map['announce_step_name'],
+        true,
+        'voice.announce_step_name',
+      ),
       announceStart: _bool(map['announce_start'], true, 'voice.announce_start'),
-      announceFinish:
-          _bool(map['announce_finish'], true, 'voice.announce_finish'),
+      announceFinish: _bool(
+        map['announce_finish'],
+        true,
+        'voice.announce_finish',
+      ),
     );
   }
 
@@ -205,11 +254,13 @@ class WorkoutParser {
     final haptic = (map['haptic'] ?? 'medium').toString();
     if (!{'beep', 'bell', 'click', 'none'}.contains(sound)) {
       throw const WorkoutValidationException(
-          'feedback.sound must be beep, bell, click or none.');
+        'feedback.sound must be beep, bell, click or none.',
+      );
     }
     if (!{'off', 'light', 'medium', 'strong'}.contains(haptic)) {
       throw const WorkoutValidationException(
-          'feedback.haptic must be off, light, medium or strong.');
+        'feedback.haptic must be off, light, medium or strong.',
+      );
     }
     return (sound, haptic);
   }
@@ -220,7 +271,8 @@ class WorkoutParser {
     final ducking = (map['ducking'] ?? 'medium').toString();
     if (!{'off', 'low', 'medium', 'high'}.contains(ducking)) {
       throw const WorkoutValidationException(
-          'audio.ducking must be off, low, medium or high.');
+        'audio.ducking must be off, low, medium or high.',
+      );
     }
     return ducking;
   }
@@ -245,19 +297,22 @@ class WorkoutParser {
     final volumeValue = map['volume'] ?? .35;
     if (volumeValue is! num || volumeValue < 0 || volumeValue > 1) {
       throw const WorkoutValidationException(
-          'background_music.volume must be a number from 0 to 1.');
+        'background_music.volume must be a number from 0 to 1.',
+      );
     }
     final ducking = (map['ducking'] ?? 'gentle').toString();
     if (!{'off', 'gentle', 'medium', 'high', 'very_high'}.contains(ducking)) {
       throw const WorkoutValidationException(
-          'background_music.ducking must be off, gentle, medium, high or very_high.');
+        'background_music.ducking must be off, gentle, medium, high or very_high.',
+      );
     }
     return BackgroundMusicConfig(
-        source: source,
-        name: name,
-        enabled: enabled,
-        volume: volumeValue.toDouble(),
-        ducking: ducking);
+      source: source,
+      name: name,
+      enabled: enabled,
+      volume: volumeValue.toDouble(),
+      ducking: ducking,
+    );
   }
 
   static void _validateSource(String source, String field) {
@@ -268,15 +323,20 @@ class WorkoutParser {
             normalized.startsWith('/') ||
             normalized.split('/').contains('..'))) {
       throw WorkoutValidationException(
-          '$field must be an asset: reference or a safe relative path.');
+        '$field must be an asset: reference or a safe relative path.',
+      );
     }
   }
 
   static List<WorkoutNode> _nodes(
-      YamlList list, int depth, _StepIdAllocator ids) {
+    YamlList list,
+    int depth,
+    _StepIdAllocator ids,
+  ) {
     if (depth > 10) {
       throw const WorkoutValidationException(
-          'Maximum repeat nesting depth is 10.');
+        'Maximum repeat nesting depth is 10.',
+      );
     }
     final out = <WorkoutNode>[];
     for (final item in list) {
@@ -289,22 +349,27 @@ class WorkoutParser {
         final repeat = map['repeat'];
         if (repeat is! int || repeat < 1 || repeat > 10000) {
           throw const WorkoutValidationException(
-              'repeat must be an integer from 1 to 10,000.');
+            'repeat must be an integer from 1 to 10,000.',
+          );
         }
         final children = map['steps'];
         if (children is! YamlList || children.isEmpty) {
           throw const WorkoutValidationException(
-              'Repeat group steps must not be empty.');
+            'Repeat group steps must not be empty.',
+          );
         }
-        out.add(RepeatGroup(
-            repeat: repeat, steps: _nodes(children, depth + 1, ids)));
+        out.add(
+          RepeatGroup(repeat: repeat, steps: _nodes(children, depth + 1, ids)),
+        );
       } else {
         _unknown(map, _stepFields, 'timed step');
         final name = _string(map['name'], 'step.name', 100);
         final duration = map['duration'] == null
             ? Duration.zero
-            : DurationParser.parseAllowZero(map['duration'],
-                field: 'step.duration');
+            : DurationParser.parseAllowZero(
+                map['duration'],
+                field: 'step.duration',
+              );
         final guide = map['guide'] == null
             ? null
             : _string(map['guide'], 'step.guide', 500);
@@ -314,7 +379,8 @@ class WorkoutParser {
         final exerciseId = map['exercise_id'] == null
             ? null
             : _logicalId(map['exercise_id'], 'step.exercise_id');
-        out.add(WorkoutStep(
+        out.add(
+          WorkoutStep(
             id: ids.allocate(name, explicitId),
             hasExplicitId: explicitId != null,
             name: name,
@@ -322,7 +388,9 @@ class WorkoutParser {
             guide: guide,
             countdown: countdown,
             recording: recording,
-            exerciseId: exerciseId));
+            exerciseId: exerciseId,
+          ),
+        );
       }
     }
     return out;
@@ -331,7 +399,8 @@ class WorkoutParser {
   static void _collectExplicitIds(YamlList list, Set<String> ids, int depth) {
     if (depth > 10) {
       throw const WorkoutValidationException(
-          'Maximum repeat nesting depth is 10.');
+        'Maximum repeat nesting depth is 10.',
+      );
     }
     for (final item in list) {
       if (item is! YamlMap) continue;
@@ -352,7 +421,8 @@ class WorkoutParser {
     final id = _string(value, 'step.id', 40);
     if (!RegExp(r'^[a-zA-Z0-9]+(?:-[a-zA-Z0-9]+)*$').hasMatch(id)) {
       throw const WorkoutValidationException(
-          'step.id must contain only letters, numbers and single hyphens.');
+        'step.id must contain only letters, numbers and single hyphens.',
+      );
     }
     return id;
   }
@@ -361,7 +431,8 @@ class WorkoutParser {
     final id = _string(value, field, 80);
     if (!RegExp(r'^[a-zA-Z0-9]+(?:[-_][a-zA-Z0-9]+)*$').hasMatch(id)) {
       throw WorkoutValidationException(
-          '$field must contain letters, numbers, hyphens or underscores.');
+        '$field must contain letters, numbers, hyphens or underscores.',
+      );
     }
     return id;
   }
@@ -382,17 +453,20 @@ class WorkoutParser {
       }
       if (map['demo_media'] != null && map['demo_video'] != null) {
         throw const WorkoutValidationException(
-            'exercise must not contain both demo_media and demo_video.');
+          'exercise must not contain both demo_media and demo_video.',
+        );
       }
       final rawDemoMedia = map['demo_media'] ?? map['demo_video'];
       final demoMedia = rawDemoMedia == null
           ? null
           : _mediaReference(rawDemoMedia, 'exercise.demo_media');
-      result.add(Exercise(
-        id: id,
-        name: _string(map['name'], 'exercise.name', 100),
-        demoMediaId: demoMedia,
-      ));
+      result.add(
+        Exercise(
+          id: id,
+          name: _string(map['name'], 'exercise.name', 100),
+          demoMediaId: demoMedia,
+        ),
+      );
     }
     return result;
   }
@@ -402,7 +476,8 @@ class WorkoutParser {
     if (reference.startsWith('sha256:')) {
       if (!RegExp(r'^sha256:[a-fA-F0-9]{64}$').hasMatch(reference)) {
         throw WorkoutValidationException(
-            '$field contains an invalid SHA-256 ID.');
+          '$field contains an invalid SHA-256 ID.',
+        );
       }
       return reference.toLowerCase();
     }
@@ -429,7 +504,10 @@ class WorkoutParser {
   }
 
   static void _unknown(
-      Map<String, dynamic> map, Set<String> allowed, String context) {
+    Map<String, dynamic> map,
+    Set<String> allowed,
+    String context,
+  ) {
     for (final key in map.keys) {
       if (!allowed.contains(key)) {
         throw WorkoutValidationException('Unknown field "$key" in $context.');
@@ -437,8 +515,12 @@ class WorkoutParser {
     }
   }
 
-  static String _string(Object? value, String field, int max,
-      {bool allowEmpty = false}) {
+  static String _string(
+    Object? value,
+    String field,
+    int max, {
+    bool allowEmpty = false,
+  }) {
     if (value is! String) {
       throw WorkoutValidationException('$field must be a string.');
     }
@@ -448,7 +530,8 @@ class WorkoutParser {
     }
     if (trimmed.length > max) {
       throw WorkoutValidationException(
-          '$field must be at most $max characters.');
+        '$field must be at most $max characters.',
+      );
     }
     return value;
   }
