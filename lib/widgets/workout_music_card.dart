@@ -213,9 +213,30 @@ class WorkoutMusicCardState extends State<WorkoutMusicCard> {
                       ? null
                       : (value) => _save(config.copyWith(enabled: value))),
               DropdownButtonFormField<String?>(
+                  isExpanded: true,
                   key: ValueKey(config.trackId),
                   initialValue: config.trackId,
                   decoration: const InputDecoration(labelText: 'Track'),
+                  selectedItemBuilder: (context) => [
+                        const Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'No music',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        ...widget.controller.musicTracks.map(
+                          (track) => Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              track.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
                   items: [
                     const DropdownMenuItem(
                         value: null, child: Text('No music')),
@@ -296,9 +317,36 @@ class _DuckingControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dropdown = DropdownButtonFormField<String>(
+      isExpanded: true,
       key: ValueKey(config.duckingMode),
       initialValue: config.duckingMode,
       decoration: const InputDecoration(labelText: 'Coach ducking'),
+      selectedItemBuilder: (context) => const [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Off', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            'Gentle (recommended)',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Medium', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('High', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Very high', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ],
       items: const [
         DropdownMenuItem(value: 'off', child: Text('Off')),
         DropdownMenuItem(value: 'gentle', child: Text('Gentle (recommended)')),
