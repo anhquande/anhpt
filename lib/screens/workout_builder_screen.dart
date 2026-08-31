@@ -118,6 +118,49 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
 
   Future<void> _save() async => _persistDraft();
 
+  Future<void> _recordDescription() async {
+    if (widget.workoutId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Save the workout before recording.')),
+      );
+      return;
+    }
+    final saved = await _persistDraft(close: false);
+    if (saved == null || !mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        insetPadding: const EdgeInsets.all(24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
+          child: SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              16,
+              16,
+              16 + MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: CoachRecordingCard(
+              controller: widget.controller,
+              workout: saved,
+              scope: 'description',
+              title: 'Description recording',
+              cueDescription: 'Record the spoken description for this workout.',
+              scriptText: saved.description,
+              showCloseButton: true,
+              closeAfterSave: true,
+            ),
+          ),
+        ),
+      ),
+    );
+    final latest = widget.controller.byId(saved.id);
+    if (latest != null && mounted) {
+      _editingWorkout = latest;
+      setState(() => draft = WorkoutDraft.fromWorkout(latest));
+    }
+  }
+
   Future<void> _recordStep(StepDraft step, String stepKey) async {
     if (widget.workoutId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -279,6 +322,43 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
             decoration: const InputDecoration(labelText: 'Description'),
             onChanged: (v) => draft.description = v,
           ),
+          if (_editingWorkout case final workout?) ...[
+            const SizedBox(height: 8),
+            _BuilderOptionContainer(
+              child: Row(
+                children: [
+                  const Icon(Icons.mic_none_outlined),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Description recording',
+                          style: TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        SizedBox(height: 2),
+                        Text('Spoken version of the workout description'),
+                      ],
+                    ),
+                  ),
+                  if (workout.recording == null)
+                    IconButton(
+                      visualDensity: VisualDensity.compact,
+                      tooltip: 'Record description',
+                      onPressed: _recordDescription,
+                      icon: const Icon(Icons.add_circle_outline),
+                    )
+                  else
+                    StepRecordingMiniPlayer(
+                      audioPath:
+                          widget.controller.resolveAudioSource(workout.recording!),
+                      onManage: _recordDescription,
+                    ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           TextFormField(
             initialValue: draft.tags.join(', '),

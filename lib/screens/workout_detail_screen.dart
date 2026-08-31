@@ -321,39 +321,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
     );
   }
 
-  Future<void> _openIntroductionRecording(
-    BuildContext context,
-    Workout workout,
-  ) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) => Dialog(
-        insetPadding: const EdgeInsets.all(24),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 680, maxHeight: 720),
-          child: SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              16,
-              16,
-              16 + MediaQuery.viewInsetsOf(context).bottom,
-            ),
-            child: CoachRecordingCard(
-              controller: widget.controller,
-              workout: workout,
-              scope: 'description',
-              title: 'Workout introduction recording',
-              cueDescription:
-                  'Record the spoken introduction for this workout.',
-              showCloseButton: true,
-              closeAfterSave: true,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Future<void> _browseStepMedia(String stepKey) async {
     try {
       final asset = await pickDemoMedia(context, widget.controller);
@@ -377,46 +344,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         workoutId: widget.workoutId,
         stepKey: stepKey,
       );
-
-  Widget _introductionOption(
-    BuildContext context,
-    AppController controller,
-    Workout workout,
-  ) {
-    return _CompactOptionContainer(
-      child: Row(
-        children: [
-          const Icon(Icons.mic_none_outlined),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Introduction',
-                  style: TextStyle(fontWeight: FontWeight.w700),
-                ),
-                SizedBox(height: 2),
-                Text('Workout introduction recording'),
-              ],
-            ),
-          ),
-          if (workout.recording == null)
-            IconButton(
-              visualDensity: VisualDensity.compact,
-              tooltip: 'Record workout introduction',
-              onPressed: () => _openIntroductionRecording(context, workout),
-              icon: const Icon(Icons.add_circle_outline),
-            )
-          else
-            StepRecordingMiniPlayer(
-              audioPath: controller.resolveAudioSource(workout.recording!),
-              onManage: () => _openIntroductionRecording(context, workout),
-            ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -606,8 +533,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            _introductionOption(context, controller, workout),
                             const SizedBox(height: 20),
                             const _SectionTitle('Audio'),
                             const SizedBox(height: 8),
