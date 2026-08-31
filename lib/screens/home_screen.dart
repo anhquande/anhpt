@@ -145,6 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _matchesFilter(Workout workout) {
     if (_selectedFilter == 'all') return true;
+    if (_selectedFilter == 'recent') return workout.lastUsedAt != null;
     if (_selectedFilter == 'favorites') {
       return controller.favorites.any((favorite) => favorite.id == workout.id);
     }
@@ -229,6 +230,11 @@ class _HomeScreenState extends State<HomeScreen> {
               .where(_matchesSearch)
               .where(_matchesFilter)
               .toList();
+          if (_selectedFilter == 'recent') {
+            visibleWorkouts.sort(
+              (a, b) => b.lastUsedAt!.compareTo(a.lastUsedAt!),
+            );
+          }
           final noResults = visibleWorkouts.isEmpty;
 
           return Center(
@@ -335,6 +341,13 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 8),
                         ChoiceChip(
+                          label: const Text('Recent'),
+                          selected: _selectedFilter == 'recent',
+                          onSelected: (_) =>
+                              setState(() => _selectedFilter = 'recent'),
+                        ),
+                        const SizedBox(width: 8),
+                        ChoiceChip(
                           label: const Text('Favors'),
                           selected: _selectedFilter == 'favorites',
                           onSelected: (_) =>
@@ -359,6 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       workout: workout,
                       sourceName: _sourceNameFor(workout),
                       originalName: _originalNameFor(workout),
+                      showLastUsed: _selectedFilter == 'recent',
                       onStart: () => _start(context, workout),
                       onFavorite: () => controller.toggleFavorite(workout.id),
                     ),
