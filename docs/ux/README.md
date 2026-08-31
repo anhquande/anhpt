@@ -28,9 +28,14 @@ flowchart LR
     UXReview -->|Needs changes| Wireframe
 ```
 
-## Wireframe files
+## Wireframe gallery
 
-- [`workout-detail.puml`](workout-detail.puml) — Workout Detail screen.
+### Workout Detail
+
+Source: [`workout-detail.puml`](workout-detail.puml)  
+Design notes: [`workout-detail-notes.md`](workout-detail-notes.md)
+
+![Workout Detail wireframe](workout-detail.svg)
 
 ## Conventions
 
@@ -39,19 +44,23 @@ Wireframes describe structure, hierarchy, important controls, and interaction in
 When a UI change affects layout or interaction significantly:
 
 1. Update the corresponding wireframe first.
-2. Review the intended UX.
+2. Review the intended UX in this Markdown gallery or the screen-specific notes.
 3. Implement the Flutter change.
 4. Compare the running application with the wireframe.
 5. Update the wireframe if the final accepted design differs.
 
 ## Rendering PlantUML Salt
 
-A `.puml` file can be rendered with a PlantUML-capable IDE extension, the PlantUML CLI, or a compatible preview service.
+The source of truth is the `.puml` file. GitHub Actions automatically renders PlantUML sources under `docs/` to SVG and commits the generated SVG files back to the repository.
 
-Example with the PlantUML CLI:
+For example:
 
 ```text
-plantuml docs/ux/workout-detail.puml
+docs/ux/workout-detail.puml
+        ↓
+docs/ux/workout-detail.svg
+        ↓
+embedded in docs/ux/README.md and workout-detail-notes.md
 ```
 
-The generated image is only a preview artifact. The `.puml` source remains the canonical wireframe stored in Git.
+The generated SVG is committed for convenient viewing and embedding, but changes should be made to the `.puml` source rather than editing the SVG directly.
