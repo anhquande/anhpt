@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -10,6 +11,18 @@ typedef BucketDownloadProgress = void Function(
   int receivedBytes,
   int? totalBytes,
 );
+
+class BucketPackageProgressEvent {
+  final String entryId;
+  final int receivedBytes;
+  final int? totalBytes;
+
+  const BucketPackageProgressEvent({
+    required this.entryId,
+    required this.receivedBytes,
+    required this.totalBytes,
+  });
+}
 
 class BucketRefreshResult {
   final WorkoutBucketCatalog catalog;
@@ -26,6 +39,12 @@ class BucketRefreshResult {
 class WorkoutBucketService {
   static const maxCatalogBytes = 2 * 1024 * 1024;
   static const maxPackageBytes = 100 * 1024 * 1024;
+  static final _packageProgressController =
+      StreamController<BucketPackageProgressEvent>.broadcast();
+
+  static Stream<BucketPackageProgressEvent> get packageProgress =>
+      _packageProgressController.stream;
+
   final http.Client _client;
 
   WorkoutBucketService({http.Client? client})
@@ -72,11 +91,21 @@ class WorkoutBucketService {
     if (entry.size != null && entry.size! > maxPackageBytes) {
       throw StateError('Workout package exceeds the 100 MB marketplace limit.');
     }
+
+    void report(int received, int? total) {
+      onProgress?.call(received, total);
+      _packageProgressController.add(BucketPackageProgressEvent(
+        entryId: entry.id,
+        receivedBytes: received,
+        totalBytes: total,
+      ));
+    }
+
     final bytes = await _download(
       entry.packageUri,
       maxBytes: maxPackageBytes,
       expectedBytes: entry.size,
-      onProgress: onProgress,
+      onProgress: report,
     );
     final actual = sha256.convert(bytes).toString();
     if (actual.toLowerCase() != entry.sha256.toLowerCase()) {
