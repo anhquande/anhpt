@@ -394,15 +394,20 @@ class _NodeView extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          formatDuration(step.duration),
-                          maxLines: 1,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
+                        if (step.duration > Duration.zero) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            formatDuration(step.duration),
+                            maxLines: 1,
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: cs.onSurfaceVariant,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ],
                         if (guide.isNotEmpty) ...[
                           const SizedBox(height: 2),
                           Text(
