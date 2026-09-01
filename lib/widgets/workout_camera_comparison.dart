@@ -5,6 +5,7 @@ import 'workout_camera_preview.dart';
 
 class WorkoutCameraComparison extends StatefulWidget {
   final bool cameraEnabled;
+  final bool demonstrationEnabled;
   final WorkoutCameraLayout layout;
   final Widget? demonstration;
   final ValueChanged<String?>? onCameraErrorChanged;
@@ -12,6 +13,7 @@ class WorkoutCameraComparison extends StatefulWidget {
   const WorkoutCameraComparison({
     super.key,
     required this.cameraEnabled,
+    this.demonstrationEnabled = true,
     required this.layout,
     this.demonstration,
     this.onCameraErrorChanged,
@@ -35,6 +37,10 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
       enabled: true,
       onErrorChanged: widget.onCameraErrorChanged,
     );
+
+    if (!widget.demonstrationEnabled) {
+      return _frame(camera);
+    }
 
     return Stack(
       fit: StackFit.expand,
