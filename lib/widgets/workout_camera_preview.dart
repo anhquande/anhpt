@@ -4,13 +4,17 @@ import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../app/workout_camera_preference.dart';
+
 class WorkoutCameraPreview extends StatefulWidget {
   final bool enabled;
+  final WorkoutCameraFacing facing;
   final ValueChanged<String?>? onErrorChanged;
 
   const WorkoutCameraPreview({
     super.key,
     required this.enabled,
+    this.facing = WorkoutCameraFacing.front,
     this.onErrorChanged,
   });
 
@@ -51,12 +55,17 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   @override
   void didUpdateWidget(covariant WorkoutCameraPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.enabled == widget.enabled) return;
-    if (widget.enabled) {
+    if (oldWidget.enabled != widget.enabled) {
+      if (widget.enabled) {
+        unawaited(_initialize());
+      } else {
+        unawaited(_disposeController());
+        _setError(null);
+      }
+      return;
+    }
+    if (widget.enabled && oldWidget.facing != widget.facing) {
       unawaited(_initialize());
-    } else {
-      unawaited(_disposeController());
-      _setError(null);
     }
   }
 
@@ -117,10 +126,6 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       await _openCamera(camera, generation: generation);
     } on TimeoutException {
       if (!mounted || generation != _generation || !widget.enabled) rethrow;
-
-      // Some camera drivers/plugins can stall on the first open. Explicitly
-      // release the stalled controller, then retry once. This mirrors the
-      // manual off/on sequence that previously made the camera start.
       await _disposeControllerForRetry(generation);
       if (!mounted || generation != _generation || !widget.enabled) return;
       await Future<void>.delayed(_retryDelay);
@@ -138,8 +143,11 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
         if (camera.name == preferred.name) return camera;
       }
     }
+    final requestedDirection = widget.facing == WorkoutCameraFacing.front
+        ? CameraLensDirection.front
+        : CameraLensDirection.back;
     for (final camera in cameras) {
-      if (camera.lensDirection == CameraLensDirection.front) return camera;
+      if (camera.lensDirection == requestedDirection) return camera;
     }
     return cameras.first;
   }
@@ -243,11 +251,6 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     final safeRatio = reportedAspectRatio.isFinite && reportedAspectRatio > 0
         ? reportedAspectRatio
         : 4 / 3;
-
-    // camera reports the sensor/preview ratio independently from the current
-    // screen orientation on some platforms. Normalize it before constraining
-    // CameraPreview, otherwise a landscape ratio gets forced into portrait and
-    // the image appears stretched.
     if (orientation == Orientation.portrait && safeRatio > 1) {
       return 1 / safeRatio;
     }
@@ -294,6 +297,14 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       controller.value.aspectRatio,
       MediaQuery.orientationOf(context),
     );
+    final preview = CameraPreview(controller);
+    final cameraView = _selectedCamera?.lensDirection == CameraLensDirection.front
+        ? Transform(
+            alignment: Alignment.center,
+            transform: Matrix4.diagonal3Values(-1, 1, 1),
+            child: preview,
+          )
+        : preview;
 
     return Stack(
       fit: StackFit.expand,
@@ -303,13 +314,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
           child: Center(
             child: AspectRatio(
               aspectRatio: previewAspectRatio,
-              child: ClipRect(
-                child: Transform(
-                  alignment: Alignment.center,
-                  transform: Matrix4.diagonal3Values(-1, 1, 1),
-                  child: CameraPreview(controller),
-                ),
-              ),
+              child: ClipRect(child: cameraView),
             ),
           ),
         ),
