@@ -65,7 +65,9 @@ class SettingsScreen extends StatelessWidget {
       case UpdateStatus.error:
         return updater.errorMessage ?? 'Update check failed';
       case UpdateStatus.idle:
-        return 'Automatically checks GitHub Releases once per day';
+        return updater.autoUpdateEnabled
+            ? 'Checks and installs updates before the app starts'
+            : 'Off by default; enable to update before startup';
     }
   }
 
