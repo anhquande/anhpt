@@ -433,6 +433,84 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           ),
         ),
       ),
+      const SizedBox(height: 8),
+      _BuilderOptionContainer(
+        child: ExpansionTile(
+          maintainState: true,
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 8),
+          leading: const Icon(Icons.videocam_outlined),
+          title: const Text(
+            'Video / Camera',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(
+            draft.videoSettingsEnabled
+                ? '${draft.videoAutoEnable ? 'Auto on' : 'Manual'} · ${draft.videoCamera} · ${draft.videoLayout.replaceAll('_', ' ')}'
+                : 'Use global workout camera defaults',
+          ),
+          children: [
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Use workout-specific video settings'),
+              subtitle: const Text('Save camera behavior in this workout YAML.'),
+              value: draft.videoSettingsEnabled,
+              onChanged: (value) => setState(() {
+                draft.videoSettingsEnabled = value;
+              }),
+            ),
+            if (draft.videoSettingsEnabled) ...[
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Automatically enable user video'),
+                subtitle: const Text('Open the selected camera when the workout starts.'),
+                value: draft.videoAutoEnable,
+                onChanged: (value) => setState(() {
+                  draft.videoAutoEnable = value;
+                }),
+              ),
+              const SizedBox(height: 6),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: draft.videoLayout,
+                decoration: const InputDecoration(labelText: 'Video layout'),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'picture_in_picture',
+                    child: Text('Demo main / Camera PiP'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'camera_picture_in_picture',
+                    child: Text('Camera main / Demo PiP'),
+                  ),
+                  DropdownMenuItem(value: 'split', child: Text('Split')),
+                  DropdownMenuItem(value: 'overlay', child: Text('Overlay')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => draft.videoLayout = value);
+                  }
+                },
+              ),
+              const SizedBox(height: 10),
+              DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: draft.videoCamera,
+                decoration: const InputDecoration(labelText: 'Preferred camera'),
+                items: const [
+                  DropdownMenuItem(value: 'front', child: Text('Front camera')),
+                  DropdownMenuItem(value: 'back', child: Text('Rear camera')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => draft.videoCamera = value);
+                  }
+                },
+              ),
+            ],
+          ],
+        ),
+      ),
       const SizedBox(height: 20),
       const _BuilderSectionTitle('Audio'),
       const SizedBox(height: 8),

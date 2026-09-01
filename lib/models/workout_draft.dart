@@ -1,4 +1,5 @@
 import 'workout.dart';
+import 'workout_video_settings.dart';
 
 sealed class WorkoutDraftNode {
   WorkoutDraftNode clone();
@@ -75,6 +76,10 @@ class WorkoutDraft {
   bool backgroundMusicEnabled;
   double backgroundMusicVolume;
   String backgroundMusicDucking;
+  bool videoSettingsEnabled;
+  bool videoAutoEnable;
+  String videoLayout;
+  String videoCamera;
   final List<WorkoutDraftNode> steps;
   final List<Exercise> exercises;
 
@@ -103,42 +108,53 @@ class WorkoutDraft {
     this.backgroundMusicEnabled = true,
     this.backgroundMusicVolume = .35,
     this.backgroundMusicDucking = 'gentle',
+    this.videoSettingsEnabled = false,
+    this.videoAutoEnable = false,
+    this.videoLayout = WorkoutVideoSettings.defaultLayout,
+    this.videoCamera = WorkoutVideoSettings.defaultCamera,
     List<WorkoutDraftNode>? steps,
     List<Exercise>? exercises,
   }) : tags = tags ?? <String>[],
        steps = steps ?? <WorkoutDraftNode>[],
        exercises = exercises ?? <Exercise>[];
 
-  factory WorkoutDraft.fromWorkout(Workout workout) => WorkoutDraft(
-    name: workout.name,
-    description: workout.description,
-    tags: List<String>.from(workout.tags),
-    startCountdown: _duration(workout.startCountdown),
-    voiceLanguage: workout.voice.language,
-    announceElapsedTime: workout.voice.announceElapsedTime,
-    announceInterval: workout.voice.announceInterval,
-    announceFinalCountdown: workout.voice.announceFinalCountdown,
-    announceEvery: _duration(workout.voice.announceEvery),
-    countdownFrom: _duration(workout.voice.countdownFrom),
-    announceStepName: workout.voice.announceStepName,
-    announceStart: workout.voice.announceStart,
-    announceFinish: workout.voice.announceFinish,
-    sound: workout.sound,
-    haptic: workout.haptic,
-    ducking: workout.ducking,
-    completionAction: workout.completionAction,
-    screenOffAfterStart: workout.screenOffAfterStart == null
-        ? ''
-        : _duration(workout.screenOffAfterStart!),
-    recording: workout.recording ?? '',
-    backgroundMusicSource: workout.backgroundMusic?.source ?? '',
-    backgroundMusicName: workout.backgroundMusic?.name ?? '',
-    backgroundMusicEnabled: workout.backgroundMusic?.enabled ?? true,
-    backgroundMusicVolume: workout.backgroundMusic?.volume ?? .35,
-    backgroundMusicDucking: workout.backgroundMusic?.ducking ?? 'gentle',
-    steps: workout.steps.map(_node).toList(),
-    exercises: List<Exercise>.from(workout.exercises),
-  );
+  factory WorkoutDraft.fromWorkout(Workout workout) {
+    final video = WorkoutVideoSettings.fromYaml(workout.rawYaml);
+    return WorkoutDraft(
+      name: workout.name,
+      description: workout.description,
+      tags: List<String>.from(workout.tags),
+      startCountdown: _duration(workout.startCountdown),
+      voiceLanguage: workout.voice.language,
+      announceElapsedTime: workout.voice.announceElapsedTime,
+      announceInterval: workout.voice.announceInterval,
+      announceFinalCountdown: workout.voice.announceFinalCountdown,
+      announceEvery: _duration(workout.voice.announceEvery),
+      countdownFrom: _duration(workout.voice.countdownFrom),
+      announceStepName: workout.voice.announceStepName,
+      announceStart: workout.voice.announceStart,
+      announceFinish: workout.voice.announceFinish,
+      sound: workout.sound,
+      haptic: workout.haptic,
+      ducking: workout.ducking,
+      completionAction: workout.completionAction,
+      screenOffAfterStart: workout.screenOffAfterStart == null
+          ? ''
+          : _duration(workout.screenOffAfterStart!),
+      recording: workout.recording ?? '',
+      backgroundMusicSource: workout.backgroundMusic?.source ?? '',
+      backgroundMusicName: workout.backgroundMusic?.name ?? '',
+      backgroundMusicEnabled: workout.backgroundMusic?.enabled ?? true,
+      backgroundMusicVolume: workout.backgroundMusic?.volume ?? .35,
+      backgroundMusicDucking: workout.backgroundMusic?.ducking ?? 'gentle',
+      videoSettingsEnabled: video != null,
+      videoAutoEnable: video?.autoEnable ?? false,
+      videoLayout: video?.layout ?? WorkoutVideoSettings.defaultLayout,
+      videoCamera: video?.camera ?? WorkoutVideoSettings.defaultCamera,
+      steps: workout.steps.map(_node).toList(),
+      exercises: List<Exercise>.from(workout.exercises),
+    );
+  }
 
   static WorkoutDraftNode _node(WorkoutNode node) {
     if (node is WorkoutStep) {

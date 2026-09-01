@@ -1,12 +1,16 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/workout_video_settings.dart';
+
 enum WorkoutCameraLayout {
   split,
   pictureInPicture,
   cameraPictureInPicture,
   overlay,
 }
+
+enum WorkoutCameraFacing { front, back }
 
 extension WorkoutCameraLayoutLabel on WorkoutCameraLayout {
   String get label => switch (this) {
@@ -33,9 +37,18 @@ class WorkoutCameraPreference extends ChangeNotifier {
   WorkoutCameraLayout _layout = WorkoutCameraLayout.pictureInPicture;
 
   bool get initialized => _initialized;
-  bool get autoStart => _autoStart;
+  bool get autoStart => WorkoutVideoRuntime.current?.autoEnable ?? _autoStart;
   bool get demonstrationEnabled => _demonstrationEnabled;
-  WorkoutCameraLayout get layout => _layout;
+  WorkoutCameraLayout get layout {
+    final configured = WorkoutVideoRuntime.current?.layout;
+    return switch (configured) {
+      'split' => WorkoutCameraLayout.split,
+      'camera_picture_in_picture' => WorkoutCameraLayout.cameraPictureInPicture,
+      'overlay' => WorkoutCameraLayout.overlay,
+      'picture_in_picture' => WorkoutCameraLayout.pictureInPicture,
+      _ => _layout,
+    };
+  }
 
   Future<void> initialize() async {
     if (_initialized) return;
