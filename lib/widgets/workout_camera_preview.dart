@@ -38,7 +38,9 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.enabled) unawaited(_initialize());
+    if (widget.enabled) {
+      unawaited(_initialize());
+    }
   }
 
   @override
@@ -70,6 +72,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     final generation = ++_generation;
     if (mounted) setState(() => _loading = true);
     _setError(null);
+
     try {
       final cameras = await availableCameras();
       if (!mounted || generation != _generation || !widget.enabled) return;
@@ -77,6 +80,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
         _setError('No camera was found on this device.');
         return;
       }
+
       final chosen = _chooseCamera(cameras, preferred: preferred);
       await _openCamera(chosen, generation: generation);
       if (!mounted || generation != _generation) return;
@@ -119,6 +123,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     final oldController = _controller;
     _controller = null;
     await oldController?.dispose();
+
     if (!mounted || generation != _generation || !widget.enabled) return;
     final controller = CameraController(
       camera,
@@ -163,11 +168,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     ++_generation;
     final controller = _controller;
     _controller = null;
-    if (mounted) {
-      setState(() => _loading = false);
-    } else {
-      _loading = false;
-    }
+    if (mounted) setState(() {});
     await controller?.dispose();
   }
 
@@ -214,18 +215,34 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
         ),
       );
     }
+
     final controller = _controller;
     if (_loading || controller == null || !controller.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
+
+    final reportedAspectRatio = controller.value.aspectRatio;
+    final previewAspectRatio =
+        reportedAspectRatio.isFinite && reportedAspectRatio > 0
+            ? reportedAspectRatio
+            : 4 / 3;
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        ClipRect(
-          child: Transform(
-            alignment: Alignment.center,
-            transform: Matrix4.diagonal3Values(-1, 1, 1),
-            child: CameraPreview(controller),
+        ColoredBox(
+          color: Colors.black,
+          child: Center(
+            child: AspectRatio(
+              aspectRatio: previewAspectRatio,
+              child: ClipRect(
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.diagonal3Values(-1, 1, 1),
+                  child: CameraPreview(controller),
+                ),
+              ),
+            ),
           ),
         ),
         if (_cameras.length > 1)
@@ -233,7 +250,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
             top: 8,
             right: 8,
             child: Material(
-              color: Theme.of(context).colorScheme.surface.withOpacity(.82),
+              color: Theme.of(context).colorScheme.surface.withValues(alpha: .82),
               borderRadius: BorderRadius.circular(24),
               child: PopupMenuButton<CameraDescription>(
                 tooltip: 'Choose camera',
