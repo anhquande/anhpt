@@ -30,6 +30,15 @@ class WorkoutSerializer {
       b.writeln('screen_off_after_start: ${draft.screenOffAfterStart.trim()}');
     }
 
+    if (draft.videoSettingsEnabled) {
+      b
+        ..writeln()
+        ..writeln('video:')
+        ..writeln('  auto_enable: ${draft.videoAutoEnable}')
+        ..writeln('  layout: ${draft.videoLayout}')
+        ..writeln('  camera: ${draft.videoCamera}');
+    }
+
     b
       ..writeln()
       ..writeln('start_countdown: ${draft.startCountdown.trim()}')
