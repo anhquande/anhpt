@@ -20,6 +20,10 @@ class WorkoutCameraPreview extends StatefulWidget {
 
 class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     with WidgetsBindingObserver {
+  static const _cameraDiscoveryTimeout = Duration(seconds: 8);
+  static const _cameraInitializationTimeout = Duration(seconds: 10);
+  static const _retryDelay = Duration(milliseconds: 300);
+
   CameraController? _controller;
   List<CameraDescription> _cameras = const [];
   CameraDescription? _selectedCamera;
@@ -74,7 +78,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     _setError(null);
 
     try {
-      final cameras = await availableCameras();
+      final cameras = await availableCameras().timeout(_cameraDiscoveryTimeout);
       if (!mounted || generation != _generation || !widget.enabled) return;
       if (cameras.isEmpty) {
         _setError('No camera was found on this device.');
@@ -82,12 +86,15 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       }
 
       final chosen = _chooseCamera(cameras, preferred: preferred);
-      await _openCamera(chosen, generation: generation);
-      if (!mounted || generation != _generation) return;
+      await _openCameraWithRecovery(chosen, generation: generation);
+      if (!mounted || generation != _generation || !widget.enabled) return;
       setState(() {
         _cameras = cameras;
         _selectedCamera = chosen;
       });
+    } on TimeoutException {
+      if (!mounted || generation != _generation) return;
+      _setError('Camera took too long to start. Please try again.');
     } on CameraException catch (error) {
       if (!mounted || generation != _generation) return;
       _setError(_cameraErrorMessage(error));
@@ -98,6 +105,26 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       if (mounted && generation == _generation) {
         setState(() => _loading = false);
       }
+    }
+  }
+
+  Future<void> _openCameraWithRecovery(
+    CameraDescription camera, {
+    required int generation,
+  }) async {
+    try {
+      await _openCamera(camera, generation: generation);
+    } on TimeoutException {
+      if (!mounted || generation != _generation || !widget.enabled) rethrow;
+
+      // Some camera drivers/plugins can stall on the first open. Explicitly
+      // release the stalled controller, then retry once. This mirrors the
+      // manual off/on sequence that previously made the camera start.
+      await _disposeControllerForRetry(generation);
+      if (!mounted || generation != _generation || !widget.enabled) return;
+      await Future<void>.delayed(_retryDelay);
+      if (!mounted || generation != _generation || !widget.enabled) return;
+      await _openCamera(camera, generation: generation);
     }
   }
 
@@ -131,7 +158,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       enableAudio: false,
     );
     try {
-      await controller.initialize();
+      await controller.initialize().timeout(_cameraInitializationTimeout);
     } catch (_) {
       await controller.dispose();
       rethrow;
@@ -143,6 +170,13 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     setState(() => _controller = controller);
   }
 
+  Future<void> _disposeControllerForRetry(int generation) async {
+    final controller = _controller;
+    _controller = null;
+    await controller?.dispose();
+    if (mounted && generation == _generation) setState(() {});
+  }
+
   Future<void> _selectCamera(CameraDescription camera) async {
     if (_selectedCamera?.name == camera.name) return;
     final generation = ++_generation;
@@ -152,7 +186,9 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     });
     _setError(null);
     try {
-      await _openCamera(camera, generation: generation);
+      await _openCameraWithRecovery(camera, generation: generation);
+    } on TimeoutException {
+      _setError('Camera took too long to start. Please try again.');
     } on CameraException catch (error) {
       _setError(_cameraErrorMessage(error));
     } catch (error) {
