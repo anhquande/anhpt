@@ -127,14 +127,12 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     });
   }
 
-  Future<void> _toggleDemonstration() async {
-    final enabled = !_demonstrationEnabled;
-    setState(() => _demonstrationEnabled = enabled);
-    await WorkoutCameraPreference.instance.setDemonstrationEnabled(enabled);
-  }
-
   Future<void> _setCameraLayout(WorkoutCameraLayout layout) async {
-    setState(() => _cameraLayout = layout);
+    setState(() {
+      _cameraLayout = layout;
+      _demonstrationEnabled = true;
+    });
+    await WorkoutCameraPreference.instance.setDemonstrationEnabled(true);
     await WorkoutCameraPreference.instance.setLayout(layout);
   }
 
@@ -471,6 +469,108 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     );
   }
 
+  Widget _layoutPreview(
+    WorkoutCameraLayout layout,
+    ColorScheme cs, {
+    double width = 68,
+    double height = 44,
+  }) {
+    final demoColor = cs.primaryContainer;
+    final cameraColor = cs.tertiaryContainer;
+    final border = Border.all(color: cs.outlineVariant);
+
+    Widget tile(Color color, {BorderRadius? radius}) => Container(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: radius ?? BorderRadius.circular(4),
+            border: border,
+          ),
+        );
+
+    Widget preview;
+    switch (layout) {
+      case WorkoutCameraLayout.split:
+        preview = Row(
+          children: [
+            Expanded(child: tile(demoColor)),
+            const SizedBox(width: 3),
+            Expanded(child: tile(cameraColor)),
+          ],
+        );
+      case WorkoutCameraLayout.pictureInPicture:
+        preview = Stack(
+          children: [
+            Positioned.fill(child: tile(demoColor)),
+            Positioned(
+              right: 4,
+              bottom: 4,
+              width: width * .34,
+              height: height * .40,
+              child: tile(cameraColor),
+            ),
+          ],
+        );
+      case WorkoutCameraLayout.cameraPictureInPicture:
+        preview = Stack(
+          children: [
+            Positioned.fill(child: tile(cameraColor)),
+            Positioned(
+              right: 4,
+              bottom: 4,
+              width: width * .34,
+              height: height * .40,
+              child: tile(demoColor),
+            ),
+          ],
+        );
+      case WorkoutCameraLayout.overlay:
+        preview = Stack(
+          children: [
+            Positioned.fill(child: tile(demoColor)),
+            Positioned(
+              left: width * .18,
+              top: height * .14,
+              right: width * .18,
+              bottom: height * .14,
+              child: tile(cameraColor),
+            ),
+          ],
+        );
+    }
+
+    return Semantics(
+      label: '${layout.label} layout preview',
+      child: SizedBox(width: width, height: height, child: preview),
+    );
+  }
+
+  Widget _buildLayoutMenuItem(
+    WorkoutCameraLayout layout,
+    ColorScheme cs,
+  ) {
+    final selected = layout == _cameraLayout;
+    return SizedBox(
+      width: 250,
+      child: Row(
+        children: [
+          _layoutPreview(layout, cs),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              layout.label,
+              maxLines: 2,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTopControls({
     required bool hasDemo,
     required ColorScheme cs,
@@ -500,17 +600,6 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
           onPressed: audioReady || music.started ? _toggleSound : null,
           icon: Icon(soundMuted ? Icons.volume_off : Icons.volume_up),
         ),
-        IconButton(
-          tooltip: _demonstrationEnabled
-              ? 'Hide demonstration'
-              : 'Show demonstration',
-          onPressed: _toggleDemonstration,
-          icon: Icon(
-            _demonstrationEnabled
-                ? Icons.visibility_outlined
-                : Icons.visibility_off_outlined,
-          ),
-        ),
         if (_cameraSupported)
           IconButton(
             tooltip: _cameraEnabled ? 'Turn camera off' : 'Turn camera on',
@@ -519,25 +608,18 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               _cameraEnabled ? Icons.videocam : Icons.videocam_outlined,
             ),
           ),
-        if (_cameraEnabled && hasDemo && _demonstrationEnabled)
+        if (_cameraEnabled && hasDemo)
           PopupMenuButton<WorkoutCameraLayout>(
-            tooltip: 'Video layout',
+            tooltip: 'Change video layout',
             initialValue: _cameraLayout,
             onSelected: _setCameraLayout,
-            icon: const Icon(Icons.view_quilt_outlined),
+            icon: const Icon(Icons.grid_view_rounded),
             itemBuilder: (_) => [
               for (final layout in WorkoutCameraLayout.values)
                 PopupMenuItem(
                   value: layout,
-                  child: Row(
-                    children: [
-                      if (layout == _cameraLayout) ...[
-                        const Icon(Icons.check, size: 18),
-                        const SizedBox(width: 8),
-                      ],
-                      Text(layout.label),
-                    ],
-                  ),
+                  height: 66,
+                  child: _buildLayoutMenuItem(layout, cs),
                 ),
             ],
           ),
