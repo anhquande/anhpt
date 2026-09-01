@@ -608,7 +608,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               _cameraEnabled ? Icons.videocam : Icons.videocam_outlined,
             ),
           ),
-        if (_cameraEnabled && hasDemo)
+        if (_cameraSupported)
           PopupMenuButton<WorkoutCameraLayout>(
             tooltip: 'Change video layout',
             initialValue: _cameraLayout,
