@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../app/workout_camera_preference.dart';
 import 'workout_camera_preview.dart';
 
-class WorkoutCameraComparison extends StatelessWidget {
+class WorkoutCameraComparison extends StatefulWidget {
   final bool cameraEnabled;
   final WorkoutCameraLayout layout;
   final Widget? demonstration;
@@ -18,23 +18,33 @@ class WorkoutCameraComparison extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final demo = demonstration;
-    if (!cameraEnabled) return demo ?? const SizedBox.shrink();
+  State<WorkoutCameraComparison> createState() =>
+      _WorkoutCameraComparisonState();
+}
 
-    // Keep the camera as the same child in the same Stack for every step/layout.
-    // This prevents its State (and CameraController) from being disposed when a
-    // step gains/loses demonstration media or when the layout changes.
+class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
+  // The camera moves between full-size, split, PiP and overlay containers as
+  // steps/layouts change. A stable GlobalKey lets Flutter re-parent the same
+  // WorkoutCameraPreview State instead of disposing and recreating its
+  // CameraController when that happens.
+  final GlobalKey _cameraKey = GlobalKey(debugLabel: 'workout-camera-preview');
+
+  @override
+  Widget build(BuildContext context) {
+    final demo = widget.demonstration;
+    if (!widget.cameraEnabled) return demo ?? const SizedBox.shrink();
+
     final camera = WorkoutCameraPreview(
-      enabled: cameraEnabled,
-      onErrorChanged: onCameraErrorChanged,
+      key: _cameraKey,
+      enabled: true,
+      onErrorChanged: widget.onCameraErrorChanged,
     );
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (demo != null) _buildDemo(layout, demo),
-        _buildCamera(layout, camera, hasDemo: demo != null),
+        if (demo != null) _buildDemo(widget.layout, demo),
+        _buildCamera(widget.layout, camera, hasDemo: demo != null),
       ],
     );
   }
