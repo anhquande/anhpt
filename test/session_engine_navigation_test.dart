@@ -48,6 +48,9 @@ void main() {
     duration: Duration(seconds: 30),
   );
 
+  int workoutPositionMs(SessionEngine engine) =>
+      engine.workoutPositionElapsed.inMilliseconds;
+
   test('manual navigation moves one resolved step and updates timeline progress', () {
     final engine = SessionEngine(workoutWith(const [first, second, third]));
     addTearDown(engine.dispose);
@@ -55,19 +58,19 @@ void main() {
     expect(engine.stepIndex, 0);
     expect(engine.previousStep, isNull);
     expect(engine.nextStep?.id, 'second');
-    expect(engine.workoutPositionElapsed, Duration.zero);
+    expect(workoutPositionMs(engine), 0);
     expect(engine.progress, 0);
 
     expect(engine.goToNextStep(), isTrue);
     expect(engine.stepIndex, 1);
     expect(engine.currentStep.id, 'second');
     expect(engine.previousStep?.id, 'first');
-    expect(engine.workoutPositionElapsed, const Duration(seconds: 10));
+    expect(workoutPositionMs(engine), 10000);
     expect(engine.progress, closeTo(1 / 6, 0.0001));
 
     expect(engine.goToPreviousStep(), isTrue);
     expect(engine.stepIndex, 0);
-    expect(engine.workoutPositionElapsed, Duration.zero);
+    expect(workoutPositionMs(engine), 0);
     expect(engine.goToPreviousStep(), isFalse);
   });
 
@@ -85,19 +88,19 @@ void main() {
 
     expect(engine.goToNextStep(), isTrue);
     expect(engine.currentStep.id, 'second');
-    expect(engine.workoutPositionElapsed, const Duration(seconds: 10));
+    expect(workoutPositionMs(engine), 10000);
 
     expect(engine.goToNextStep(), isTrue);
     expect(engine.currentStep.id, 'first');
-    expect(engine.workoutPositionElapsed, const Duration(seconds: 30));
+    expect(workoutPositionMs(engine), 30000);
 
     expect(engine.goToNextStep(), isTrue);
     expect(engine.currentStep.id, 'second');
-    expect(engine.workoutPositionElapsed, const Duration(seconds: 40));
+    expect(workoutPositionMs(engine), 40000);
 
     expect(engine.goToNextStep(), isTrue);
     expect(engine.currentStep.id, 'third');
-    expect(engine.workoutPositionElapsed, const Duration(seconds: 60));
+    expect(workoutPositionMs(engine), 60000);
     expect(engine.goToNextStep(), isFalse);
   });
 
