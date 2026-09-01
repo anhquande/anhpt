@@ -188,6 +188,27 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     return 'Camera could not start: ${error.description ?? error.code}';
   }
 
+  double _previewAspectRatio(
+    double reportedAspectRatio,
+    Orientation orientation,
+  ) {
+    final safeRatio = reportedAspectRatio.isFinite && reportedAspectRatio > 0
+        ? reportedAspectRatio
+        : 4 / 3;
+
+    // camera reports the sensor/preview ratio independently from the current
+    // screen orientation on some platforms. Normalize it before constraining
+    // CameraPreview, otherwise a landscape ratio gets forced into portrait and
+    // the image appears stretched.
+    if (orientation == Orientation.portrait && safeRatio > 1) {
+      return 1 / safeRatio;
+    }
+    if (orientation == Orientation.landscape && safeRatio < 1) {
+      return 1 / safeRatio;
+    }
+    return safeRatio;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_platformSupported) {
@@ -221,11 +242,10 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       return const Center(child: CircularProgressIndicator());
     }
 
-    final reportedAspectRatio = controller.value.aspectRatio;
-    final previewAspectRatio =
-        reportedAspectRatio.isFinite && reportedAspectRatio > 0
-            ? reportedAspectRatio
-            : 4 / 3;
+    final previewAspectRatio = _previewAspectRatio(
+      controller.value.aspectRatio,
+      MediaQuery.orientationOf(context),
+    );
 
     return Stack(
       fit: StackFit.expand,
