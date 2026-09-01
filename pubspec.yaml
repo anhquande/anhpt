@@ -24,6 +24,11 @@ dependencies:
   video_player: ^2.10.0
   video_player_win: ^3.2.2
   camera: 0.11.0+2
+  # camera 0.11.x allows camera_android_camerax 0.6.x. Version 0.6.30
+  # upgrades CameraX to 1.5.3, which fails to compile with Gradle 9 because
+  # concurrent-futures is missing from the compile classpath. Keep 0.6.29
+  # until we upgrade to a camera_android_camerax release containing the fix.
+  camera_android_camerax: 0.6.29
   camera_windows: 0.2.6+1
   win32: ^5.15.0
 
