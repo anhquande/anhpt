@@ -7,6 +7,7 @@ class WorkoutCameraComparison extends StatefulWidget {
   final bool cameraEnabled;
   final bool demonstrationEnabled;
   final WorkoutCameraLayout layout;
+  final WorkoutCameraFacing cameraFacing;
   final Widget? demonstration;
   final ValueChanged<String?>? onCameraErrorChanged;
 
@@ -15,6 +16,7 @@ class WorkoutCameraComparison extends StatefulWidget {
     required this.cameraEnabled,
     this.demonstrationEnabled = true,
     required this.layout,
+    this.cameraFacing = WorkoutCameraFacing.front,
     this.demonstration,
     this.onCameraErrorChanged,
   });
@@ -35,6 +37,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
     final camera = WorkoutCameraPreview(
       key: _cameraKey,
       enabled: true,
+      facing: widget.cameraFacing,
       onErrorChanged: widget.onCameraErrorChanged,
     );
 
