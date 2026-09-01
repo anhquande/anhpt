@@ -97,8 +97,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       stepRecordingPaths: {
         for (final executable in workout.expand())
           if (executable.step.recording != null)
-            executable.step.id: widget.controller
-                .resolveAudioSource(executable.step.recording!),
+            executable.step.id:
+                widget.controller.resolveAudioSource(executable.step.recording!),
       },
     );
     engine.addListener(_changed);
@@ -246,9 +246,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     await voiceGuide.cancelCurrentWork();
     if (_disposed) return;
     final changed = next ? engine.goToNextStep() : engine.goToPreviousStep();
-    if (changed && mounted) {
-      HapticFeedback.selectionClick();
-    }
+    if (changed && mounted) HapticFeedback.selectionClick();
   }
 
   KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
@@ -417,58 +415,6 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     );
   }
 
-  Widget _buildProgress(ColorScheme cs) {
-    final progress = engine.progress.clamp(0.0, 1.0);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) => SizedBox(
-            height: 12,
-            child: Stack(
-              alignment: Alignment.centerLeft,
-              children: [
-                LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 3,
-                  backgroundColor: cs.surfaceContainerHighest,
-                ),
-                Positioned(
-                  left: math.max(0, (constraints.maxWidth - 10) * progress),
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: cs.primary,
-                      border: Border.all(color: cs.surface, width: 2),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          child: Row(
-            children: [
-              Text(
-                formatDuration(engine.workoutPositionElapsed),
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-              const Spacer(),
-              Text(
-                formatDuration(engine.workout.totalDuration),
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
   Widget _layoutPreview(
     WorkoutCameraLayout layout,
     ColorScheme cs, {
@@ -479,26 +425,23 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     final cameraColor = cs.tertiaryContainer;
     final border = Border.all(color: cs.outlineVariant);
 
-    Widget tile(Color color, {BorderRadius? radius}) => Container(
+    Widget tile(Color color) => Container(
           decoration: BoxDecoration(
             color: color,
-            borderRadius: radius ?? BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(4),
             border: border,
           ),
         );
 
-    Widget preview;
-    switch (layout) {
-      case WorkoutCameraLayout.split:
-        preview = Row(
+    final preview = switch (layout) {
+      WorkoutCameraLayout.split => Row(
           children: [
             Expanded(child: tile(demoColor)),
             const SizedBox(width: 3),
             Expanded(child: tile(cameraColor)),
           ],
-        );
-      case WorkoutCameraLayout.pictureInPicture:
-        preview = Stack(
+        ),
+      WorkoutCameraLayout.pictureInPicture => Stack(
           children: [
             Positioned.fill(child: tile(demoColor)),
             Positioned(
@@ -509,9 +452,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               child: tile(cameraColor),
             ),
           ],
-        );
-      case WorkoutCameraLayout.cameraPictureInPicture:
-        preview = Stack(
+        ),
+      WorkoutCameraLayout.cameraPictureInPicture => Stack(
           children: [
             Positioned.fill(child: tile(cameraColor)),
             Positioned(
@@ -522,9 +464,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               child: tile(demoColor),
             ),
           ],
-        );
-      case WorkoutCameraLayout.overlay:
-        preview = Stack(
+        ),
+      WorkoutCameraLayout.overlay => Stack(
           children: [
             Positioned.fill(child: tile(demoColor)),
             Positioned(
@@ -535,8 +476,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               child: tile(cameraColor),
             ),
           ],
-        );
-    }
+        ),
+    };
 
     return Semantics(
       label: '${layout.label} layout preview',
@@ -544,10 +485,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     );
   }
 
-  Widget _buildLayoutMenuItem(
-    WorkoutCameraLayout layout,
-    ColorScheme cs,
-  ) {
+  Widget _buildLayoutMenuItem(WorkoutCameraLayout layout, ColorScheme cs) {
     final selected = layout == _cameraLayout;
     return SizedBox(
       width: 250,
@@ -571,18 +509,85 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     );
   }
 
-  Widget _buildTopControls({
-    required bool hasDemo,
-    required ColorScheme cs,
-  }) {
+  Widget _buildOverlayProgress(ColorScheme cs) {
+    final progress = engine.progress.clamp(0.0, 1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 12,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: cs.surface.withValues(alpha: .30),
+                ),
+                Positioned(
+                  left: math.max(0, (constraints.maxWidth - 10) * progress),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: cs.primary,
+                      border: Border.all(color: cs.surface, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Text(
+                formatDuration(engine.workoutPositionElapsed),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              Text(
+                formatDuration(engine.workout.totalDuration),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlayControls(ColorScheme cs) {
+    Widget overlayButton({
+      required String tooltip,
+      required Widget icon,
+      required VoidCallback? onPressed,
+    }) => Material(
+          color: cs.surface.withValues(alpha: .68),
+          shape: const CircleBorder(),
+          child: IconButton(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: icon,
+            visualDensity: VisualDensity.compact,
+          ),
+        );
+
     return Row(
       children: [
-        IconButton(
+        overlayButton(
           tooltip: 'End workout',
           onPressed: _end,
           icon: const Icon(Icons.close),
         ),
-        const SizedBox(width: 4),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             engine.status == SessionStatus.preparing
@@ -591,38 +596,47 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                  shadows: const [Shadow(blurRadius: 8)],
                 ),
           ),
         ),
-        IconButton(
+        const SizedBox(width: 6),
+        overlayButton(
           tooltip: soundMuted ? 'Turn sound on' : 'Mute sound',
           onPressed: audioReady || music.started ? _toggleSound : null,
           icon: Icon(soundMuted ? Icons.volume_off : Icons.volume_up),
         ),
-        if (_cameraSupported)
-          IconButton(
+        if (_cameraSupported) ...[
+          const SizedBox(width: 4),
+          overlayButton(
             tooltip: _cameraEnabled ? 'Turn camera off' : 'Turn camera on',
             onPressed: _toggleCamera,
             icon: Icon(
               _cameraEnabled ? Icons.videocam : Icons.videocam_outlined,
             ),
           ),
-        if (_cameraSupported)
-          PopupMenuButton<WorkoutCameraLayout>(
-            tooltip: 'Change video layout',
-            initialValue: _cameraLayout,
-            onSelected: _setCameraLayout,
-            icon: const Icon(Icons.grid_view_rounded),
-            itemBuilder: (_) => [
-              for (final layout in WorkoutCameraLayout.values)
-                PopupMenuItem(
-                  value: layout,
-                  height: 66,
-                  child: _buildLayoutMenuItem(layout, cs),
-                ),
-            ],
+          const SizedBox(width: 4),
+          Material(
+            color: cs.surface.withValues(alpha: .68),
+            shape: const CircleBorder(),
+            child: PopupMenuButton<WorkoutCameraLayout>(
+              tooltip: 'Change video layout',
+              initialValue: _cameraLayout,
+              onSelected: _setCameraLayout,
+              icon: const Icon(Icons.grid_view_rounded),
+              itemBuilder: (_) => [
+                for (final layout in WorkoutCameraLayout.values)
+                  PopupMenuItem(
+                    value: layout,
+                    height: 66,
+                    child: _buildLayoutMenuItem(layout, cs),
+                  ),
+              ],
+            ),
           ),
+        ],
       ],
     );
   }
@@ -631,7 +645,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     final next = engine.nextStep;
     if (next == null) {
       return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
             Icon(Icons.flag_outlined, color: cs.onSurfaceVariant),
@@ -645,10 +659,9 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     final nextExercise = _exerciseForStep(next);
     final preview = _demonstrationForExercise(nextExercise, paused: true);
     return InkWell(
-      borderRadius: BorderRadius.circular(12),
       onTap: () => unawaited(_navigateStep(true)),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         child: Row(
           children: [
             ClipRRect(
@@ -703,157 +716,160 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     final hasDemo = !preparing && exercise?.demoMediaId != null;
     final demonstration =
         hasDemo ? _demonstrationForExercise(exercise, paused: paused) : null;
-    final isLandscape =
-        MediaQuery.orientationOf(context) == Orientation.landscape;
 
     return Scaffold(
       body: SafeArea(
         child: Focus(
           autofocus: true,
           onKeyEvent: _handleKeyEvent,
-          child: Padding(
-            padding: EdgeInsets.fromLTRB(
-              isLandscape ? 12 : 16,
-              6,
-              isLandscape ? 12 : 16,
-              8,
-            ),
-            child: Column(
-              children: [
-                _buildProgress(cs),
-                const SizedBox(height: 2),
-                _buildTopControls(hasDemo: hasDemo, cs: cs),
-                const SizedBox(height: 4),
-                Expanded(
-                  child: Semantics(
-                    button: true,
-                    label: paused
-                        ? 'Workout paused. Activate to resume.'
-                        : 'Workout running. Activate to pause.',
+          child: Column(
+            children: [
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  label: paused
+                      ? 'Workout paused. Activate to resume.'
+                      : 'Workout running. Activate to pause.',
+                  onTap: _togglePauseFromMedia,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
                     onTap: _togglePauseFromMedia,
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: _togglePauseFromMedia,
-                      onVerticalDragStart: (_) => _dragDistance = 0,
-                      onVerticalDragUpdate: (details) {
-                        _dragDistance += details.delta.dy;
-                      },
-                      onVerticalDragEnd: (_) {
-                        final distance = _dragDistance;
-                        _dragDistance = 0;
-                        if (distance <= -_swipeThreshold) {
-                          unawaited(_navigateStep(true));
-                        } else if (distance >= _swipeThreshold) {
-                          unawaited(_navigateStep(false));
-                        }
-                      },
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(18),
+                    onVerticalDragStart: (_) => _dragDistance = 0,
+                    onVerticalDragUpdate: (details) {
+                      _dragDistance += details.delta.dy;
+                    },
+                    onVerticalDragEnd: (_) {
+                      final distance = _dragDistance;
+                      _dragDistance = 0;
+                      if (distance <= -_swipeThreshold) {
+                        unawaited(_navigateStep(true));
+                      } else if (distance >= _swipeThreshold) {
+                        unawaited(_navigateStep(false));
+                      }
+                    },
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ColoredBox(
+                          color: cs.surfaceContainerLowest,
+                          child: WorkoutCameraComparison(
+                            cameraEnabled: _cameraEnabled,
+                            demonstrationEnabled: _demonstrationEnabled,
+                            layout: _cameraLayout,
+                            demonstration: demonstration,
+                            onCameraErrorChanged: _cameraErrorChanged,
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: IgnorePointer(
                             child: Container(
-                              color: cs.surfaceContainerLowest,
-                              child: WorkoutCameraComparison(
-                                cameraEnabled: _cameraEnabled,
-                                demonstrationEnabled: _demonstrationEnabled,
-                                layout: _cameraLayout,
-                                demonstration: demonstration,
-                                onCameraErrorChanged: _cameraErrorChanged,
+                              height: 104,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    cs.surface.withValues(alpha: .72),
+                                    cs.surface.withValues(alpha: 0),
+                                  ],
+                                ),
                               ),
                             ),
                           ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          left: 12,
+                          right: 12,
+                          child: _buildOverlayProgress(cs),
+                        ),
+                        Positioned(
+                          top: 30,
+                          left: 8,
+                          right: 8,
+                          child: _buildOverlayControls(cs),
+                        ),
+                        Positioned(
+                          top: 88,
+                          left: 12,
+                          right: 12,
+                          child: Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cs.surface.withValues(alpha: .72),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  waitingForGuide
+                                      ? 'FINISHING GUIDE'
+                                      : preparing
+                                          ? 'READY ${formatDuration(engine.remaining)}'
+                                          : paused
+                                              ? 'PAUSED · ${formatDuration(engine.remaining)}'
+                                              : formatDuration(engine.remaining),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (!preparing)
                           Positioned(
-                            top: 12,
-                            left: 12,
-                            right: 12,
-                            child: Center(
-                              child: DecoratedBox(
-                                decoration: BoxDecoration(
-                                  color: cs.surface.withValues(alpha: .78),
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 6,
+                            left: 14,
+                            right: 14,
+                            bottom: 12,
+                            child: Text(
+                              engine.currentStep.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                    shadows: const [Shadow(blurRadius: 8)],
                                   ),
-                                  child: Text(
-                                    waitingForGuide
-                                        ? 'FINISHING GUIDE'
-                                        : preparing
-                                            ? 'READY ${formatDuration(engine.remaining)}'
-                                            : paused
-                                                ? 'PAUSED · ${formatDuration(engine.remaining)}'
-                                                : formatDuration(engine.remaining),
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          fontWeight: FontWeight.w900,
-                                        ),
-                                  ),
-                                ),
+                            ),
+                          ),
+                        if (_centerFeedbackIcon != null)
+                          Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cs.surface.withValues(alpha: .72),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Icon(_centerFeedbackIcon, size: 48),
                               ),
                             ),
                           ),
-                          if (!preparing)
-                            Positioned(
-                              left: 14,
-                              right: 14,
-                              bottom: 12,
-                              child: Text(
-                                engine.currentStep.name,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                      shadows: const [
-                                        Shadow(blurRadius: 8),
-                                      ],
-                                    ),
-                              ),
-                            ),
-                          if (_centerFeedbackIcon != null)
-                            Center(
-                              child: AnimatedOpacity(
-                                opacity: _centerFeedbackIcon == null ? 0 : 1,
-                                duration: const Duration(milliseconds: 120),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    color: cs.surface.withValues(alpha: .72),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(18),
-                                    child: Icon(
-                                      _centerFeedbackIcon,
-                                      size: 48,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
-                if (!preparing) ...[
-                  const SizedBox(height: 7),
-                  Divider(
-                    height: 1,
-                    thickness: 1,
-                    color: cs.outlineVariant,
-                  ),
-                  _buildNextStepPreview(cs),
-                ],
+              ),
+              if (!preparing) ...[
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: cs.outlineVariant,
+                ),
+                _buildNextStepPreview(cs),
               ],
-            ),
+            ],
           ),
         ),
       ),
