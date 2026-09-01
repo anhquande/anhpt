@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../app/theme_preference.dart';
+import '../app/workout_camera_preference.dart';
 import '../services/coach_recording_service.dart';
 import 'bucket_sources_screen.dart';
 import 'music_library_screen.dart';
@@ -33,8 +34,22 @@ class SettingsScreen extends StatelessWidget {
         ThemeMode.dark => Icons.dark_mode_outlined,
       };
 
+  bool get _cameraSupported => !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.windows);
+
+  String get _cameraSubtitle => switch (defaultTargetPlatform) {
+        TargetPlatform.windows =>
+          'Use a built-in or USB webcam for live workout comparison.',
+        TargetPlatform.android || TargetPlatform.iOS =>
+          'Use the front camera for live workout comparison.',
+        _ => 'Workout camera is not supported on this platform.',
+      };
+
   @override
   Widget build(BuildContext context) {
+    WorkoutCameraPreference.instance.initialize();
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: Center(
@@ -75,6 +90,49 @@ class SettingsScreen extends StatelessWidget {
                           ),
                         ],
                       ),
+                    );
+                  },
+                ),
+                const Divider(),
+                AnimatedBuilder(
+                  animation: WorkoutCameraPreference.instance,
+                  builder: (context, _) {
+                    final preference = WorkoutCameraPreference.instance;
+                    return Column(
+                      children: [
+                        SwitchListTile(
+                          secondary: const Icon(Icons.videocam_outlined),
+                          title: const Text('Start workout camera automatically'),
+                          subtitle: Text(_cameraSubtitle),
+                          value: _cameraSupported && preference.autoStart,
+                          onChanged: _cameraSupported
+                              ? preference.setAutoStart
+                              : null,
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.view_quilt_outlined),
+                          title: const Text('Default camera layout'),
+                          subtitle: const Text(
+                              'Used when camera and demonstration are both visible.'),
+                          trailing: DropdownButton<WorkoutCameraLayout>(
+                            value: preference.layout,
+                            onChanged: _cameraSupported
+                                ? (value) {
+                                    if (value != null) {
+                                      preference.setLayout(value);
+                                    }
+                                  }
+                                : null,
+                            items: [
+                              for (final layout in WorkoutCameraLayout.values)
+                                DropdownMenuItem(
+                                  value: layout,
+                                  child: Text(layout.label),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
                     );
                   },
                 ),
