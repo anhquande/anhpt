@@ -46,12 +46,19 @@ class SessionEngine extends ChangeNotifier {
   WorkoutStep get currentStep => currentExecutableStep.step;
   RepeatContext? get currentRepeat => currentExecutableStep.repeat;
 
+  WorkoutStep? get previousStep {
+    final previousIndex = stepIndex - 1;
+    return previousIndex >= 0 ? _steps[previousIndex].step : null;
+  }
+
   WorkoutStep? get nextStep {
     final nextIndex = stepIndex + 1;
     return nextIndex < _steps.length ? _steps[nextIndex].step : null;
   }
 
   int get totalEffectiveSteps => _steps.length;
+  bool get canGoPrevious => stepIndex > 0;
+  bool get canGoNext => stepIndex + 1 < _steps.length;
 
   bool get announcementComplete => _announcementComplete;
   bool get timerFinished => _timerFinished;
@@ -68,6 +75,18 @@ class SessionEngine extends ChangeNotifier {
       (status == SessionStatus.running && !_timerFinished
           ? _stepWatch.elapsed
           : Duration.zero);
+
+  Duration get workoutPositionElapsed {
+    var elapsed = Duration.zero;
+    for (var index = 0; index < stepIndex; index++) {
+      elapsed += _steps[index].step.duration;
+    }
+    if (status != SessionStatus.preparing) {
+      elapsed += stepElapsed;
+    }
+    if (elapsed > workout.totalDuration) return workout.totalDuration;
+    return elapsed;
+  }
 
   Duration get remaining {
     if (status == SessionStatus.preparing) {
@@ -86,7 +105,7 @@ class SessionEngine extends ChangeNotifier {
     if (totalMs <= 0) {
       return status == SessionStatus.completed ? 1.0 : 0.0;
     }
-    return (activeElapsed.inMilliseconds / totalMs).clamp(0.0, 1.0);
+    return (workoutPositionElapsed.inMilliseconds / totalMs).clamp(0.0, 1.0);
   }
 
   void start() {
@@ -152,7 +171,7 @@ class SessionEngine extends ChangeNotifier {
     if (_timerFinished) return;
 
     _timerFinished = true;
-    _activeElapsedBefore += currentStep.duration;
+    _activeElapsedBefore += _activeWatch.elapsed;
     _stepElapsedBefore = currentStep.duration;
 
     _activeWatch
@@ -197,13 +216,52 @@ class SessionEngine extends ChangeNotifier {
   }
 
   void _completeWorkout() {
-    _activeElapsedBefore = workout.totalDuration;
     _activeWatch.stop();
     _stepWatch.stop();
     status = SessionStatus.completed;
     _ticker?.cancel();
     _ticker = null;
     notifyListeners();
+  }
+
+  bool goToNextStep() => jumpToStep(stepIndex + 1);
+
+  bool goToPreviousStep() => jumpToStep(stepIndex - 1);
+
+  bool jumpToStep(int index) {
+    if (status == SessionStatus.preparing ||
+        status == SessionStatus.completed ||
+        status == SessionStatus.incomplete ||
+        index < 0 ||
+        index >= _steps.length ||
+        index == stepIndex) {
+      return false;
+    }
+
+    final wasRunning = status == SessionStatus.running;
+    if (wasRunning && !_timerFinished) {
+      _activeElapsedBefore += _activeWatch.elapsed;
+    }
+
+    _activeWatch
+      ..stop()
+      ..reset();
+    _stepWatch
+      ..stop()
+      ..reset();
+
+    stepIndex = index;
+    _announcementComplete = false;
+    _stepElapsedBefore = Duration.zero;
+    _timerFinished = currentStep.duration <= Duration.zero;
+
+    if (wasRunning && !_timerFinished) {
+      _activeWatch.start();
+      _stepWatch.start();
+    }
+
+    notifyListeners();
+    return true;
   }
 
   void pause() {
@@ -227,8 +285,10 @@ class SessionEngine extends ChangeNotifier {
     if (status != SessionStatus.paused) return;
 
     status = SessionStatus.running;
-    _activeWatch.start();
-    _stepWatch.start();
+    if (!_timerFinished) {
+      _activeWatch.start();
+      _stepWatch.start();
+    }
     notifyListeners();
   }
 

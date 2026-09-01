@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -7,17 +9,44 @@ import 'package:flutter/services.dart';
 import '../app/app_controller.dart';
 import '../app/workout_camera_preference.dart';
 import '../core/session_engine.dart';
+import '../models/background_music.dart';
+import '../models/workout.dart';
 import '../services/audio_feedback_service.dart';
 import '../services/background_music_service.dart';
 import '../services/device_action_service.dart';
 import '../services/voice_guide_controller.dart';
 import '../widgets/common.dart';
-import '../models/background_music.dart';
-import '../models/workout.dart';
 import '../widgets/demonstration_media.dart';
 import '../widgets/workout_camera_comparison.dart';
 
 enum CompletionDeviceAction { shutdownWindows, exitAndroid }
+
+enum _VideoDisplayMode {
+  demonstrationOnly,
+  split,
+  pictureInPicture,
+  cameraPictureInPicture,
+  overlay,
+}
+
+extension on _VideoDisplayMode {
+  String get label => switch (this) {
+        _VideoDisplayMode.demonstrationOnly => 'Demonstration only',
+        _VideoDisplayMode.split => 'Split',
+        _VideoDisplayMode.pictureInPicture => 'Demo main / Camera PiP',
+        _VideoDisplayMode.cameraPictureInPicture => 'Camera main / Demo PiP',
+        _VideoDisplayMode.overlay => 'Overlay',
+      };
+
+  WorkoutCameraLayout? get cameraLayout => switch (this) {
+        _VideoDisplayMode.demonstrationOnly => null,
+        _VideoDisplayMode.split => WorkoutCameraLayout.split,
+        _VideoDisplayMode.pictureInPicture => WorkoutCameraLayout.pictureInPicture,
+        _VideoDisplayMode.cameraPictureInPicture =>
+          WorkoutCameraLayout.cameraPictureInPicture,
+        _VideoDisplayMode.overlay => WorkoutCameraLayout.overlay,
+      };
+}
 
 CompletionDeviceAction? completionDeviceActionFor(
   TargetPlatform platform, {
@@ -50,30 +79,44 @@ class WorkoutPlayerScreen extends StatefulWidget {
 }
 
 class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
+  static const _swipeThreshold = 64.0;
+
   late final SessionEngine engine;
   late final AudioFeedbackService audio;
   late final BackgroundMusicService music;
   late final VoiceGuideController voiceGuide;
   final DeviceActionService deviceActions = DeviceActionService();
   Timer? _screenOffTimer;
+  Timer? _centerFeedbackTimer;
 
   bool summaryShown = false;
   bool audioReady = false;
-  bool voiceMuted = false;
-  double voiceVolume = 1.0;
+  bool soundMuted = false;
   String? musicNotice;
-  String musicStatus = 'Music off';
   SessionStatus? _musicStatus;
   bool _disposed = false;
   bool _cameraEnabled = false;
   bool _demonstrationEnabled = true;
   WorkoutCameraLayout _cameraLayout = WorkoutCameraLayout.pictureInPicture;
   String? _cameraNotice;
+  double _dragDistance = 0;
+  IconData? _centerFeedbackIcon;
 
   bool get _cameraSupported => !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.windows);
+
+  _VideoDisplayMode get _displayMode {
+    if (!_cameraEnabled) return _VideoDisplayMode.demonstrationOnly;
+    return switch (_cameraLayout) {
+      WorkoutCameraLayout.split => _VideoDisplayMode.split,
+      WorkoutCameraLayout.pictureInPicture => _VideoDisplayMode.pictureInPicture,
+      WorkoutCameraLayout.cameraPictureInPicture =>
+        _VideoDisplayMode.cameraPictureInPicture,
+      WorkoutCameraLayout.overlay => _VideoDisplayMode.overlay,
+    };
+  }
 
   @override
   void initState() {
@@ -92,8 +135,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       stepRecordingPaths: {
         for (final executable in workout.expand())
           if (executable.step.recording != null)
-            executable.step.id: widget.controller
-                .resolveAudioSource(executable.step.recording!),
+            executable.step.id:
+                widget.controller.resolveAudioSource(executable.step.recording!),
       },
     );
     engine.addListener(_changed);
@@ -114,23 +157,22 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     });
   }
 
-  void _toggleCamera() {
-    if (!_cameraSupported) return;
+  Future<void> _setVideoDisplayMode(_VideoDisplayMode mode) async {
+    final layout = mode.cameraLayout;
     setState(() {
-      _cameraEnabled = !_cameraEnabled;
-      if (!_cameraEnabled) _cameraNotice = null;
+      _demonstrationEnabled = true;
+      if (layout == null) {
+        _cameraEnabled = false;
+        _cameraNotice = null;
+      } else {
+        _cameraEnabled = _cameraSupported;
+        _cameraLayout = layout;
+      }
     });
-  }
-
-  Future<void> _toggleDemonstration() async {
-    final enabled = !_demonstrationEnabled;
-    setState(() => _demonstrationEnabled = enabled);
-    await WorkoutCameraPreference.instance.setDemonstrationEnabled(enabled);
-  }
-
-  Future<void> _setCameraLayout(WorkoutCameraLayout layout) async {
-    setState(() => _cameraLayout = layout);
-    await WorkoutCameraPreference.instance.setLayout(layout);
+    await WorkoutCameraPreference.instance.setDemonstrationEnabled(true);
+    if (layout != null) {
+      await WorkoutCameraPreference.instance.setLayout(layout);
+    }
   }
 
   void _cameraErrorChanged(String? error) {
@@ -179,21 +221,13 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       if (track == null || !await music.start(track, config)) {
         musicNotice =
             'Background music failed: ${track == null ? 'selected track is not in the library' : music.lastError ?? 'unknown playback error'}. Workout continues without music.';
-        musicStatus = 'Music failed';
-      } else {
-        musicStatus = 'Playing: ${track.name}';
       }
-    } else {
-      musicStatus = config.trackId == null
-          ? 'Music off: no track selected'
-          : 'Music off: disabled';
     }
     if (_disposed) return;
     try {
       await voiceGuide.initialize();
       if (_disposed) return;
       audioReady = true;
-      voiceVolume = audio.voiceVolume;
     } catch (e) {
       debugPrint('Audio initialization failed: $e');
     }
@@ -211,16 +245,65 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _toggleVoice() async {
-    final muted = !voiceMuted;
-    setState(() => voiceMuted = muted);
+  Future<void> _toggleSound() async {
+    final muted = !soundMuted;
+    setState(() => soundMuted = muted);
+    music.setMuted(muted);
     await voiceGuide.setMuted(muted);
     if (mounted) setState(() {});
   }
 
-  Future<void> _setVoiceVolume(double value) async {
-    setState(() => voiceVolume = value);
-    await audio.setVoiceVolume(value);
+  void _showCenterFeedback(IconData icon) {
+    _centerFeedbackTimer?.cancel();
+    setState(() => _centerFeedbackIcon = icon);
+    _centerFeedbackTimer = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) setState(() => _centerFeedbackIcon = null);
+    });
+  }
+
+  void _togglePauseFromMedia() {
+    if (engine.status == SessionStatus.paused) {
+      engine.resume();
+      _showCenterFeedback(Icons.play_arrow_rounded);
+      return;
+    }
+    if (engine.status == SessionStatus.running && !engine.timerFinished) {
+      engine.pause();
+      _showCenterFeedback(Icons.pause_rounded);
+    }
+  }
+
+  Future<void> _navigateStep(bool next) async {
+    if (engine.status == SessionStatus.preparing ||
+        engine.status == SessionStatus.completed ||
+        engine.status == SessionStatus.incomplete) {
+      return;
+    }
+    if (next && !engine.canGoNext) return;
+    if (!next && !engine.canGoPrevious) return;
+
+    await voiceGuide.cancelCurrentWork();
+    if (_disposed) return;
+    final changed = next ? engine.goToNextStep() : engine.goToPreviousStep();
+    if (changed && mounted) HapticFeedback.selectionClick();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    if (event.logicalKey == LogicalKeyboardKey.space ||
+        event.logicalKey == LogicalKeyboardKey.enter) {
+      _togglePauseFromMedia();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      unawaited(_navigateStep(true));
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      unawaited(_navigateStep(false));
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _changed() {
@@ -233,6 +316,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       if (_musicStatus == SessionStatus.paused &&
           status == SessionStatus.running) {
         unawaited(music.resume());
+        music.setMuted(soundMuted);
       }
       if (status == SessionStatus.completed ||
           status == SessionStatus.incomplete) {
@@ -350,239 +434,473 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     if (ok == true) engine.endEarly();
   }
 
+  Exercise? _exerciseForStep(WorkoutStep? step) {
+    final exerciseId = step?.exerciseId;
+    if (exerciseId == null) return null;
+    for (final exercise in engine.workout.exercises) {
+      if (exercise.id == exerciseId) return exercise;
+    }
+    return null;
+  }
+
+  Widget? _demonstrationForExercise(Exercise? exercise, {required bool paused}) {
+    if (!_demonstrationEnabled || exercise?.demoMediaId == null) return null;
+    return DemonstrationMedia(
+      key: ValueKey('${exercise!.demoMediaId}-${paused ? 'preview' : 'main'}'),
+      mediaId: exercise.demoMediaId!,
+      paused: paused,
+      resolveAsset: () => widget.controller.mediaAsset(exercise.demoMediaId!),
+      resolveUri: () => widget.controller.resolveMediaUri(exercise.demoMediaId!),
+    );
+  }
+
+  Widget _layoutPreview(
+    _VideoDisplayMode mode,
+    ColorScheme cs, {
+    double width = 68,
+    double height = 44,
+  }) {
+    final demoColor = cs.primaryContainer;
+    final cameraColor = cs.tertiaryContainer;
+    final border = Border.all(color: cs.outlineVariant);
+
+    Widget tile(Color color) => Container(
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: border,
+          ),
+        );
+
+    final preview = switch (mode) {
+      _VideoDisplayMode.demonstrationOnly => tile(demoColor),
+      _VideoDisplayMode.split => Row(
+          children: [
+            Expanded(child: tile(demoColor)),
+            const SizedBox(width: 3),
+            Expanded(child: tile(cameraColor)),
+          ],
+        ),
+      _VideoDisplayMode.pictureInPicture => Stack(
+          children: [
+            Positioned.fill(child: tile(demoColor)),
+            Positioned(
+              right: 4,
+              bottom: 4,
+              width: width * .34,
+              height: height * .40,
+              child: tile(cameraColor),
+            ),
+          ],
+        ),
+      _VideoDisplayMode.cameraPictureInPicture => Stack(
+          children: [
+            Positioned.fill(child: tile(cameraColor)),
+            Positioned(
+              right: 4,
+              bottom: 4,
+              width: width * .34,
+              height: height * .40,
+              child: tile(demoColor),
+            ),
+          ],
+        ),
+      _VideoDisplayMode.overlay => Stack(
+          children: [
+            Positioned.fill(child: tile(demoColor)),
+            Positioned(
+              left: width * .18,
+              top: height * .14,
+              right: width * .18,
+              bottom: height * .14,
+              child: tile(cameraColor),
+            ),
+          ],
+        ),
+    };
+
+    return Semantics(
+      label: '${mode.label} layout preview',
+      child: SizedBox(width: width, height: height, child: preview),
+    );
+  }
+
+  Widget _buildLayoutMenuItem(_VideoDisplayMode mode, ColorScheme cs) {
+    final selected = mode == _displayMode;
+    return SizedBox(
+      width: 250,
+      child: Row(
+        children: [
+          _layoutPreview(mode, cs),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              mode.label,
+              maxLines: 2,
+              style: TextStyle(
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          if (selected) Icon(Icons.check_circle, color: cs.primary, size: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlayProgress(ColorScheme cs) {
+    final progress = engine.progress.clamp(0.0, 1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            height: 12,
+            child: Stack(
+              alignment: Alignment.centerLeft,
+              children: [
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: cs.surface.withValues(alpha: .30),
+                ),
+                Positioned(
+                  left: math.max(0, (constraints.maxWidth - 10) * progress),
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: cs.primary,
+                      border: Border.all(color: cs.surface, width: 2),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Text(
+                formatDuration(engine.workoutPositionElapsed),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              Text(
+                formatDuration(engine.workout.totalDuration),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverlayControls(ColorScheme cs) {
+    Widget overlayButton({
+      required String tooltip,
+      required Widget icon,
+      required VoidCallback? onPressed,
+    }) => Material(
+          color: cs.surface.withValues(alpha: .68),
+          shape: const CircleBorder(),
+          child: IconButton(
+            tooltip: tooltip,
+            onPressed: onPressed,
+            icon: icon,
+            visualDensity: VisualDensity.compact,
+          ),
+        );
+
+    return Row(
+      children: [
+        overlayButton(
+          tooltip: 'End workout',
+          onPressed: _end,
+          icon: const Icon(Icons.close),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            engine.status == SessionStatus.preparing
+                ? engine.workout.name
+                : engine.currentStep.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: cs.onSurface,
+                  shadows: const [Shadow(blurRadius: 8)],
+                ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        overlayButton(
+          tooltip: soundMuted ? 'Turn sound on' : 'Mute sound',
+          onPressed: audioReady || music.started ? _toggleSound : null,
+          icon: Icon(soundMuted ? Icons.volume_off : Icons.volume_up),
+        ),
+        if (_cameraSupported) ...[
+          const SizedBox(width: 4),
+          Material(
+            color: cs.surface.withValues(alpha: .68),
+            shape: const CircleBorder(),
+            child: PopupMenuButton<_VideoDisplayMode>(
+              tooltip: 'Video layout',
+              initialValue: _displayMode,
+              onSelected: _setVideoDisplayMode,
+              icon: const Icon(Icons.grid_view_rounded),
+              itemBuilder: (_) => [
+                for (final mode in _VideoDisplayMode.values)
+                  PopupMenuItem(
+                    value: mode,
+                    height: 66,
+                    child: _buildLayoutMenuItem(mode, cs),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildNextStepPreview(ColorScheme cs) {
+    final next = engine.nextStep;
+    if (next == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Icon(Icons.flag_outlined, color: cs.onSurfaceVariant),
+            const SizedBox(width: 10),
+            Text('Finish', style: Theme.of(context).textTheme.titleSmall),
+          ],
+        ),
+      );
+    }
+
+    final nextExercise = _exerciseForStep(next);
+    final preview = _demonstrationForExercise(nextExercise, paused: true);
+    return InkWell(
+      onTap: () => unawaited(_navigateStep(true)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: 76,
+                height: 52,
+                color: cs.surfaceContainerHighest,
+                child: preview == null
+                    ? Icon(Icons.fitness_center, color: cs.onSurfaceVariant)
+                    : FittedBox(fit: BoxFit.cover, child: preview),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    next.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    formatDuration(next.duration),
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_up_rounded),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final preparing = engine.status == SessionStatus.preparing;
     final paused = engine.status == SessionStatus.paused;
     final waitingForGuide = engine.waitingForAnnouncement;
-    final canPause =
-        engine.status == SessionStatus.running && !engine.timerFinished;
     final cs = Theme.of(context).colorScheme;
-    Exercise? exercise;
-    final exerciseId = preparing ? null : engine.currentStep.exerciseId;
-    if (exerciseId != null) {
-      for (final candidate in engine.workout.exercises) {
-        if (candidate.id == exerciseId) {
-          exercise = candidate;
-          break;
-        }
-      }
-    }
+    final exercise = preparing ? null : _exerciseForStep(engine.currentStep);
     final hasDemo = !preparing && exercise?.demoMediaId != null;
-    final demonstration = hasDemo && _demonstrationEnabled
-        ? DemonstrationMedia(
-            key: ValueKey(exercise!.demoMediaId),
-            mediaId: exercise.demoMediaId!,
-            paused: paused,
-            resolveAsset: () =>
-                widget.controller.mediaAsset(exercise!.demoMediaId!),
-            resolveUri: () =>
-                widget.controller.resolveMediaUri(exercise!.demoMediaId!),
-          )
-        : null;
+    final demonstration =
+        hasDemo ? _demonstrationForExercise(exercise, paused: paused) : null;
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(22),
+        child: Focus(
+          autofocus: true,
+          onKeyEvent: _handleKeyEvent,
           child: Column(
             children: [
-              Row(
-                children: [
-                  const Text(
-                    'AnhPT',
-                    style: TextStyle(fontWeight: FontWeight.w900),
-                  ),
-                  const Spacer(),
-                  if (widget.profileName != null) ...[
-                    Chip(
-                      avatar: const Icon(Icons.person_outline, size: 16),
-                      label: Text(widget.profileName!),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  IconButton(
-                    tooltip: _demonstrationEnabled
-                        ? 'Hide demonstration video'
-                        : 'Show demonstration video',
-                    onPressed: _toggleDemonstration,
-                    icon: Icon(
-                      _demonstrationEnabled
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                    ),
-                  ),
-                  if (_cameraSupported)
-                    IconButton(
-                      tooltip: _cameraEnabled
-                          ? 'Turn workout camera off'
-                          : 'Turn workout camera on',
-                      onPressed: _toggleCamera,
-                      icon: Icon(
-                        _cameraEnabled
-                            ? Icons.videocam
-                            : Icons.videocam_outlined,
-                      ),
-                    ),
-                  if (_cameraEnabled && hasDemo && _demonstrationEnabled)
-                    PopupMenuButton<WorkoutCameraLayout>(
-                      tooltip: 'Camera layout',
-                      initialValue: _cameraLayout,
-                      onSelected: _setCameraLayout,
-                      icon: const Icon(Icons.view_quilt_outlined),
-                      itemBuilder: (_) => [
-                        for (final layout in WorkoutCameraLayout.values)
-                          PopupMenuItem(
-                            value: layout,
-                            child: Row(
-                              children: [
-                                if (layout == _cameraLayout) ...[
-                                  const Icon(Icons.check, size: 18),
-                                  const SizedBox(width: 8),
-                                ],
-                                Text(layout.label),
-                              ],
+              Expanded(
+                child: Semantics(
+                  button: true,
+                  label: paused
+                      ? 'Workout paused. Activate to resume.'
+                      : 'Workout running. Activate to pause.',
+                  onTap: _togglePauseFromMedia,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: _togglePauseFromMedia,
+                    onVerticalDragStart: (_) => _dragDistance = 0,
+                    onVerticalDragUpdate: (details) {
+                      _dragDistance += details.delta.dy;
+                    },
+                    onVerticalDragEnd: (_) {
+                      final distance = _dragDistance;
+                      _dragDistance = 0;
+                      if (distance <= -_swipeThreshold) {
+                        unawaited(_navigateStep(true));
+                      } else if (distance >= _swipeThreshold) {
+                        unawaited(_navigateStep(false));
+                      }
+                    },
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ColoredBox(
+                          color: cs.surfaceContainerLowest,
+                          child: WorkoutCameraComparison(
+                            cameraEnabled: _cameraEnabled,
+                            demonstrationEnabled: _demonstrationEnabled,
+                            layout: _cameraLayout,
+                            demonstration: demonstration,
+                            onCameraErrorChanged: _cameraErrorChanged,
+                          ),
+                        ),
+                        Positioned(
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          child: IgnorePointer(
+                            child: Container(
+                              height: 104,
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    cs.surface.withValues(alpha: .72),
+                                    cs.surface.withValues(alpha: 0),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          top: 4,
+                          left: 12,
+                          right: 12,
+                          child: _buildOverlayProgress(cs),
+                        ),
+                        Positioned(
+                          top: 30,
+                          left: 8,
+                          right: 8,
+                          child: _buildOverlayControls(cs),
+                        ),
+                        Positioned(
+                          top: 88,
+                          left: 12,
+                          right: 12,
+                          child: Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cs.surface.withValues(alpha: .72),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 6,
+                                ),
+                                child: Text(
+                                  waitingForGuide
+                                      ? 'FINISHING GUIDE'
+                                      : preparing
+                                          ? 'READY ${formatDuration(engine.remaining)}'
+                                          : paused
+                                              ? 'PAUSED · ${formatDuration(engine.remaining)}'
+                                              : formatDuration(engine.remaining),
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleMedium
+                                      ?.copyWith(fontWeight: FontWeight.w900),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (!preparing)
+                          Positioned(
+                            left: 14,
+                            right: 14,
+                            bottom: 12,
+                            child: Text(
+                              engine.currentStep.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w900,
+                                    shadows: const [Shadow(blurRadius: 8)],
+                                  ),
+                            ),
+                          ),
+                        if (_centerFeedbackIcon != null)
+                          Center(
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: cs.surface.withValues(alpha: .72),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.all(18),
+                                child: Icon(_centerFeedbackIcon, size: 48),
+                              ),
                             ),
                           ),
                       ],
                     ),
-                  IconButton(
-                    tooltip: voiceMuted ? 'Turn voice on' : 'Mute voice',
-                    onPressed: audioReady ? _toggleVoice : null,
-                    icon: Icon(
-                      audioReady && !voiceMuted
-                          ? Icons.volume_up
-                          : Icons.volume_off,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    tooltip: 'End workout',
-                    onPressed: _end,
-                    icon: const Icon(Icons.close),
-                  ),
-                ],
-              ),
-              Chip(
-                avatar: Icon(
-                  music.started ? Icons.music_note : Icons.music_off,
-                  size: 16,
-                ),
-                label: Text(musicStatus),
-              ),
-              const SizedBox(height: 6),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 360),
-                child: Row(
-                  children: [
-                    Icon(
-                      voiceMuted || voiceVolume == 0
-                          ? Icons.volume_off
-                          : voiceVolume < 0.5
-                              ? Icons.volume_down
-                              : Icons.volume_up,
-                      size: 20,
-                      color: cs.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Slider(
-                        value: voiceVolume,
-                        onChanged: audioReady ? _setVoiceVolume : null,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 42,
-                      child: Text(
-                        '${(voiceVolume * 100).round()}%',
-                        textAlign: TextAlign.end,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Spacer(),
-              if (waitingForGuide) const Chip(label: Text('FINISHING GUIDE')),
-              if (paused) const Chip(label: Text('PAUSED')),
-              const SizedBox(height: 16),
-              Text(
-                preparing ? 'READY' : engine.currentStep.name,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-              ),
-              if (_cameraEnabled || demonstration != null) ...[
-                const SizedBox(height: 16),
-                SizedBox(
-                  height: 240,
-                  child: WorkoutCameraComparison(
-                    cameraEnabled: _cameraEnabled,
-                    demonstrationEnabled: _demonstrationEnabled,
-                    layout: _cameraLayout,
-                    demonstration: demonstration,
-                    onCameraErrorChanged: _cameraErrorChanged,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-              FittedBox(
-                child: Text(
-                  formatDuration(engine.remaining),
-                  style: TextStyle(
-                    fontSize: 104,
-                    fontWeight: FontWeight.w900,
-                    color: cs.primary,
-                    height: .95,
                   ),
                 ),
               ),
               if (!preparing) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Step ${engine.stepIndex + 1} / ${engine.totalEffectiveSteps}',
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: cs.outlineVariant,
                 ),
-                const SizedBox(height: 12),
-                LinearProgressIndicator(
-                  value: engine.progress,
-                  minHeight: 10,
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  engine.nextStep == null
-                      ? 'Next: Finish'
-                      : 'Next: ${engine.nextStep!.name}',
-                ),
-                const SizedBox(height: 28),
-                if (waitingForGuide)
-                  const Text('Timer finished. Waiting for the voice guide.')
-                else if (paused || canPause)
-                  SizedBox(
-                    width: 240,
-                    height: 58,
-                    child: FilledButton.icon(
-                      onPressed: paused ? engine.resume : engine.pause,
-                      icon: Icon(
-                        paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-                      ),
-                      label: Text(paused ? 'RESUME' : 'PAUSE'),
-                    ),
-                  ),
+                _buildNextStepPreview(cs),
               ],
-              const Spacer(),
-              Text(
-                voiceMuted
-                    ? 'Voice muted • volume ${(voiceVolume * 100).round()}%'
-                    : 'Voice volume ${(voiceVolume * 100).round()}%',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
             ],
           ),
         ),
@@ -594,6 +912,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   void dispose() {
     _disposed = true;
     _screenOffTimer?.cancel();
+    _centerFeedbackTimer?.cancel();
     engine.removeListener(_changed);
     engine.dispose();
     voiceGuide.dispose();

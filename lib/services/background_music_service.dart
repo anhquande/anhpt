@@ -41,9 +41,6 @@ class BackgroundMusicService {
       fade: false,
     );
     try {
-      // Android must not own audio focus for the background player. Coach TTS
-      // and recordings play on top while AnhPT performs ducking explicitly via
-      // setVolume(). Without this, Android can pause the music completely.
       await _player.setAudioContext(mixingAudioContext());
       await _player.setReleaseMode(ReleaseMode.loop);
       await _player.setPlayerMode(PlayerMode.mediaPlayer);
@@ -74,6 +71,10 @@ class BackgroundMusicService {
     _duckingController.setCoachActive(active);
   }
 
+  void setMuted(bool muted) {
+    _duckingController.setMuted(muted);
+  }
+
   void updateSettings(
       {required double baseVolume, required String duckingMode}) {
     _duckingController.update(baseVolume: baseVolume, duckingMode: duckingMode);
@@ -91,7 +92,6 @@ class BackgroundMusicService {
   }
 }
 
-/// Shared ducking curve used by workout playback and the settings preview.
 class AudioDuckingController {
   final Future<void> Function(double volume) setVolume;
   Timer? _fade;
@@ -99,6 +99,7 @@ class AudioDuckingController {
   String _duckingMode;
   double _currentVolume;
   bool _coachActive = false;
+  bool _muted = false;
 
   AudioDuckingController({
     required this.setVolume,
@@ -108,9 +109,10 @@ class AudioDuckingController {
         _duckingMode = duckingMode,
         _currentVolume = baseVolume.clamp(0.0, 1.0);
 
-  double get targetVolume =>
-      _baseVolume *
-      (_coachActive ? BackgroundMusicService.duckFactor(_duckingMode) : 1);
+  double get targetVolume => _muted
+      ? 0
+      : _baseVolume *
+          (_coachActive ? BackgroundMusicService.duckFactor(_duckingMode) : 1);
 
   void syncCurrentVolume() => _currentVolume = targetVolume;
 
@@ -133,6 +135,12 @@ class AudioDuckingController {
     _fadeTo(targetVolume);
   }
 
+  void setMuted(bool muted) {
+    if (_muted == muted) return;
+    _muted = muted;
+    _fadeTo(targetVolume);
+  }
+
   void _fadeTo(double target) {
     _fade?.cancel();
     const steps = 8;
@@ -150,5 +158,6 @@ class AudioDuckingController {
     _fade?.cancel();
     _fade = null;
     _coachActive = false;
+    _muted = false;
   }
 }
