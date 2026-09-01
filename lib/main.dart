@@ -28,8 +28,19 @@ Future<void> main() async {
 
   final updater = UpdateService.instance;
   if (updater.supported && updater.autoUpdateEnabled) {
-    runApp(const UpdateStartupApp());
-    await updater.checkOnStartup();
+    final skipped = Completer<void>();
+    runApp(
+      UpdateStartupApp(
+        onDoItLater: () {
+          updater.cancelCurrentUpdate();
+          if (!skipped.isCompleted) skipped.complete();
+        },
+      ),
+    );
+    await Future.any([
+      updater.checkOnStartup(),
+      skipped.future,
+    ]);
   }
 
   runApp(AnhPtApp(controller: controller));
@@ -43,7 +54,12 @@ class UpdateStartupMessage {
 }
 
 class UpdateStartupApp extends StatefulWidget {
-  const UpdateStartupApp({super.key});
+  final VoidCallback onDoItLater;
+
+  const UpdateStartupApp({
+    super.key,
+    required this.onDoItLater,
+  });
 
   @override
   State<UpdateStartupApp> createState() => _UpdateStartupAppState();
@@ -147,6 +163,10 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
         UpdateStatus.idle => 'Preparing update check…',
       };
 
+  bool _canDefer(UpdateService updater) =>
+      updater.status != UpdateStatus.installing &&
+      updater.status != UpdateStatus.ready;
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -162,6 +182,7 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
               final updater = UpdateService.instance;
               final message = _messages[_messageIndex];
               final downloading = updater.status == UpdateStatus.downloading;
+              final canDefer = _canDefer(updater);
               return Padding(
                 padding: const EdgeInsets.all(28),
                 child: Column(
@@ -207,6 +228,13 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
+                          if (canDefer) ...[
+                            const SizedBox(height: 12),
+                            TextButton(
+                              onPressed: widget.onDoItLater,
+                              child: Text(downloading ? 'Cancel and do it later' : 'Do it later'),
+                            ),
+                          ],
                         ],
                       ),
                     ),

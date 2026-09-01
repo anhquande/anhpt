@@ -56,6 +56,8 @@ class UpdateService extends ChangeNotifier {
   String? errorMessage;
   AppRelease? _pendingRelease;
   bool _initialized = false;
+  bool _cancelRequested = false;
+  http.Client? _downloadClient;
 
   bool get supported => !kIsWeb && (Platform.isAndroid || Platform.isWindows);
   bool get updateAvailable => _pendingRelease != null;
@@ -79,6 +81,16 @@ class UpdateService extends ChangeNotifier {
     notifyListeners();
   }
 
+  void cancelCurrentUpdate() {
+    _cancelRequested = true;
+    _downloadClient?.close();
+    _downloadClient = null;
+    downloadProgress = 0;
+    status = UpdateStatus.idle;
+    errorMessage = null;
+    notifyListeners();
+  }
+
   Future<void> checkOnStartup() async {
     await initialize();
     if (!supported || !autoUpdateEnabled) return;
@@ -88,6 +100,7 @@ class UpdateService extends ChangeNotifier {
   Future<bool> checkForUpdates({bool autoInstall = false}) async {
     await initialize();
     if (!supported) return false;
+    _cancelRequested = false;
     status = UpdateStatus.checking;
     errorMessage = null;
     notifyListeners();
@@ -101,6 +114,7 @@ class UpdateService extends ChangeNotifier {
             },
           )
           .timeout(const Duration(seconds: 15));
+      if (_cancelRequested) return false;
       if (response.statusCode != 200) {
         throw HttpException('GitHub returned HTTP ${response.statusCode}.');
       }
@@ -111,6 +125,7 @@ class UpdateService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt(_lastCheckKey, lastChecked!.millisecondsSinceEpoch);
 
+      if (_cancelRequested) return false;
       if (release == null || compareVersions(release.version, currentVersion) <= 0) {
         _pendingRelease = null;
         status = UpdateStatus.upToDate;
@@ -121,11 +136,12 @@ class UpdateService extends ChangeNotifier {
       _pendingRelease = release;
       status = UpdateStatus.available;
       notifyListeners();
-      if (autoInstall && autoUpdateEnabled) {
+      if (autoInstall && autoUpdateEnabled && !_cancelRequested) {
         await downloadAndInstall();
       }
       return true;
     } catch (error) {
+      if (_cancelRequested) return false;
       status = UpdateStatus.error;
       errorMessage = error.toString();
       notifyListeners();
@@ -135,24 +151,30 @@ class UpdateService extends ChangeNotifier {
 
   Future<void> downloadAndInstall() async {
     final release = _pendingRelease;
-    if (release == null) return;
+    if (release == null || _cancelRequested) return;
     status = UpdateStatus.downloading;
     downloadProgress = 0;
     errorMessage = null;
     notifyListeners();
 
+    final client = http.Client();
+    _downloadClient = client;
+    File? file;
+    IOSink? sink;
     try {
       final request = http.Request('GET', release.asset.downloadUrl);
-      final response = await http.Client().send(request);
+      final response = await client.send(request);
+      if (_cancelRequested) return;
       if (response.statusCode != 200) {
         throw HttpException('Update download returned HTTP ${response.statusCode}.');
       }
       final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}${Platform.pathSeparator}${release.asset.name}');
-      final sink = file.openWrite();
+      file = File('${dir.path}${Platform.pathSeparator}${release.asset.name}');
+      sink = file.openWrite();
       final expected = response.contentLength ?? 0;
       var received = 0;
       await for (final bytes in response.stream) {
+        if (_cancelRequested) return;
         received += bytes.length;
         sink.add(bytes);
         if (expected > 0) {
@@ -161,6 +183,8 @@ class UpdateService extends ChangeNotifier {
         }
       }
       await sink.close();
+      sink = null;
+      if (_cancelRequested) return;
 
       final expectedHash = release.asset.sha256;
       if (expectedHash != null && expectedHash.isNotEmpty) {
@@ -171,18 +195,34 @@ class UpdateService extends ChangeNotifier {
         }
       }
 
+      if (_cancelRequested) return;
       status = UpdateStatus.ready;
       downloadProgress = 1;
       notifyListeners();
       await _install(file);
     } catch (error) {
+      if (_cancelRequested) return;
       status = UpdateStatus.error;
       errorMessage = error.toString();
       notifyListeners();
+    } finally {
+      await sink?.close();
+      client.close();
+      if (identical(_downloadClient, client)) {
+        _downloadClient = null;
+      }
+      if (_cancelRequested && file != null && await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {
+          // Best-effort cleanup of a partially downloaded update.
+        }
+      }
     }
   }
 
   Future<void> _install(File file) async {
+    if (_cancelRequested) return;
     status = UpdateStatus.installing;
     notifyListeners();
     if (Platform.isAndroid) {
