@@ -66,7 +66,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   SessionStatus? _musicStatus;
   bool _disposed = false;
   bool _cameraEnabled = false;
-  WorkoutCameraLayout _cameraLayout = WorkoutCameraLayout.split;
+  bool _demonstrationEnabled = true;
+  WorkoutCameraLayout _cameraLayout = WorkoutCameraLayout.pictureInPicture;
   String? _cameraNotice;
 
   bool get _cameraSupported => !kIsWeb &&
@@ -107,6 +108,8 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     setState(() {
       _cameraEnabled =
           _cameraSupported && WorkoutCameraPreference.instance.autoStart;
+      _demonstrationEnabled =
+          WorkoutCameraPreference.instance.demonstrationEnabled;
       _cameraLayout = WorkoutCameraPreference.instance.layout;
     });
   }
@@ -117,6 +120,12 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       _cameraEnabled = !_cameraEnabled;
       if (!_cameraEnabled) _cameraNotice = null;
     });
+  }
+
+  Future<void> _toggleDemonstration() async {
+    final enabled = !_demonstrationEnabled;
+    setState(() => _demonstrationEnabled = enabled);
+    await WorkoutCameraPreference.instance.setDemonstrationEnabled(enabled);
   }
 
   Future<void> _setCameraLayout(WorkoutCameraLayout layout) async {
@@ -360,7 +369,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       }
     }
     final hasDemo = !preparing && exercise?.demoMediaId != null;
-    final demonstration = hasDemo
+    final demonstration = hasDemo && _demonstrationEnabled
         ? DemonstrationMedia(
             key: ValueKey(exercise!.demoMediaId),
             mediaId: exercise.demoMediaId!,
@@ -392,6 +401,17 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                     ),
                     const SizedBox(width: 8),
                   ],
+                  IconButton(
+                    tooltip: _demonstrationEnabled
+                        ? 'Hide demonstration video'
+                        : 'Show demonstration video',
+                    onPressed: _toggleDemonstration,
+                    icon: Icon(
+                      _demonstrationEnabled
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
                   if (_cameraSupported)
                     IconButton(
                       tooltip: _cameraEnabled
@@ -404,7 +424,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                             : Icons.videocam_outlined,
                       ),
                     ),
-                  if (_cameraEnabled && hasDemo)
+                  if (_cameraEnabled && hasDemo && _demonstrationEnabled)
                     PopupMenuButton<WorkoutCameraLayout>(
                       tooltip: 'Camera layout',
                       initialValue: _cameraLayout,
@@ -502,6 +522,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                   height: 240,
                   child: WorkoutCameraComparison(
                     cameraEnabled: _cameraEnabled,
+                    demonstrationEnabled: _demonstrationEnabled,
                     layout: _cameraLayout,
                     demonstration: demonstration,
                     onCameraErrorChanged: _cameraErrorChanged,
