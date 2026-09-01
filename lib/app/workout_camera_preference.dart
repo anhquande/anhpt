@@ -27,7 +27,7 @@ class WorkoutCameraPreference extends ChangeNotifier {
 
   bool _initialized = false;
   bool _autoStart = false;
-  WorkoutCameraLayout _layout = WorkoutCameraLayout.split;
+  WorkoutCameraLayout _layout = WorkoutCameraLayout.pictureInPicture;
 
   bool get initialized => _initialized;
   bool get autoStart => _autoStart;
@@ -40,7 +40,7 @@ class WorkoutCameraPreference extends ChangeNotifier {
     final storedLayout = preferences.getString(_layoutKey);
     _layout = WorkoutCameraLayout.values.firstWhere(
       (value) => value.name == storedLayout,
-      orElse: () => WorkoutCameraLayout.split,
+      orElse: () => WorkoutCameraLayout.pictureInPicture,
     );
     _initialized = true;
     notifyListeners();
