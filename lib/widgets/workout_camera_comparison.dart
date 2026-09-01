@@ -23,10 +23,6 @@ class WorkoutCameraComparison extends StatefulWidget {
 }
 
 class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
-  // The camera moves between full-size, split, PiP and overlay containers as
-  // steps/layouts change. A stable GlobalKey lets Flutter re-parent the same
-  // WorkoutCameraPreview State instead of disposing and recreating its
-  // CameraController when that happens.
   final GlobalKey _cameraKey = GlobalKey(debugLabel: 'workout-camera-preview');
 
   @override
@@ -64,6 +60,18 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
         ),
       WorkoutCameraLayout.pictureInPicture || WorkoutCameraLayout.overlay =>
         _frame(demo),
+      WorkoutCameraLayout.cameraPictureInPicture => Positioned(
+          right: 10,
+          bottom: 10,
+          width: 150,
+          height: 112,
+          child: Material(
+            elevation: 4,
+            borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: demo,
+          ),
+        ),
     };
   }
 
@@ -98,6 +106,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
             child: camera,
           ),
         ),
+      WorkoutCameraLayout.cameraPictureInPicture => _frame(camera),
       WorkoutCameraLayout.overlay => Opacity(
           opacity: .48,
           child: _frame(camera),
