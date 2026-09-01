@@ -4,6 +4,7 @@ import '../app/app_controller.dart';
 import '../app/theme_preference.dart';
 import '../app/workout_camera_preference.dart';
 import '../services/coach_recording_service.dart';
+import '../services/update_service.dart';
 import 'bucket_sources_screen.dart';
 import 'music_library_screen.dart';
 
@@ -47,9 +48,31 @@ class SettingsScreen extends StatelessWidget {
         _ => 'Workout camera is not supported on this platform.',
       };
 
+  String _updateStatus(UpdateService updater) {
+    switch (updater.status) {
+      case UpdateStatus.checking:
+        return 'Checking for updates…';
+      case UpdateStatus.downloading:
+        return 'Downloading ${(updater.downloadProgress * 100).round()}%';
+      case UpdateStatus.ready:
+        return 'Update downloaded';
+      case UpdateStatus.installing:
+        return 'Starting installer…';
+      case UpdateStatus.available:
+        return 'Version ${updater.latestVersion} is available';
+      case UpdateStatus.upToDate:
+        return 'You are up to date';
+      case UpdateStatus.error:
+        return updater.errorMessage ?? 'Update check failed';
+      case UpdateStatus.idle:
+        return 'Automatically checks GitHub Releases once per day';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     WorkoutCameraPreference.instance.initialize();
+    UpdateService.instance.initialize();
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: Center(
@@ -76,18 +99,9 @@ class SettingsScreen extends StatelessWidget {
                           }
                         },
                         items: const [
-                          DropdownMenuItem(
-                            value: ThemeMode.system,
-                            child: Text('System'),
-                          ),
-                          DropdownMenuItem(
-                            value: ThemeMode.light,
-                            child: Text('Light'),
-                          ),
-                          DropdownMenuItem(
-                            value: ThemeMode.dark,
-                            child: Text('Dark'),
-                          ),
+                          DropdownMenuItem(value: ThemeMode.system, child: Text('System')),
+                          DropdownMenuItem(value: ThemeMode.light, child: Text('Light')),
+                          DropdownMenuItem(value: ThemeMode.dark, child: Text('Dark')),
                         ],
                       ),
                     );
@@ -105,33 +119,70 @@ class SettingsScreen extends StatelessWidget {
                           title: const Text('Start workout camera automatically'),
                           subtitle: Text(_cameraSubtitle),
                           value: _cameraSupported && preference.autoStart,
-                          onChanged: _cameraSupported
-                              ? preference.setAutoStart
-                              : null,
+                          onChanged: _cameraSupported ? preference.setAutoStart : null,
                         ),
                         ListTile(
                           leading: const Icon(Icons.view_quilt_outlined),
                           title: const Text('Default camera layout'),
-                          subtitle: const Text(
-                              'Used when camera and demonstration are both visible.'),
+                          subtitle: const Text('Used when camera and demonstration are both visible.'),
                           trailing: DropdownButton<WorkoutCameraLayout>(
                             value: preference.layout,
                             onChanged: _cameraSupported
                                 ? (value) {
-                                    if (value != null) {
-                                      preference.setLayout(value);
-                                    }
+                                    if (value != null) preference.setLayout(value);
                                   }
                                 : null,
                             items: [
                               for (final layout in WorkoutCameraLayout.values)
-                                DropdownMenuItem(
-                                  value: layout,
-                                  child: Text(layout.label),
-                                ),
+                                DropdownMenuItem(value: layout, child: Text(layout.label)),
                             ],
                           ),
                         ),
+                      ],
+                    );
+                  },
+                ),
+                const Divider(),
+                AnimatedBuilder(
+                  animation: UpdateService.instance,
+                  builder: (context, _) {
+                    final updater = UpdateService.instance;
+                    if (!updater.supported) return const SizedBox.shrink();
+                    final busy = updater.status == UpdateStatus.checking ||
+                        updater.status == UpdateStatus.downloading ||
+                        updater.status == UpdateStatus.installing;
+                    return Column(
+                      children: [
+                        SwitchListTile(
+                          secondary: const Icon(Icons.system_update_alt),
+                          title: const Text('Automatic updates'),
+                          subtitle: Text(_updateStatus(updater)),
+                          value: updater.autoUpdateEnabled,
+                          onChanged: updater.setAutoUpdateEnabled,
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.info_outline),
+                          title: Text('Current version ${updater.currentVersion.isEmpty ? '…' : updater.currentVersion}'),
+                          subtitle: Text(updater.latestVersion == null
+                              ? 'Latest version not checked yet'
+                              : 'Latest release ${updater.latestVersion}'),
+                          trailing: updater.status == UpdateStatus.available
+                              ? FilledButton(
+                                  onPressed: busy ? null : updater.downloadAndInstall,
+                                  child: const Text('Update now'),
+                                )
+                              : OutlinedButton(
+                                  onPressed: busy
+                                      ? null
+                                      : () => updater.checkForUpdates(autoInstall: false),
+                                  child: const Text('Check now'),
+                                ),
+                        ),
+                        if (updater.status == UpdateStatus.downloading)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: LinearProgressIndicator(value: updater.downloadProgress),
+                          ),
                       ],
                     );
                   },
@@ -144,28 +195,23 @@ class SettingsScreen extends StatelessWidget {
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          BucketSourcesScreen(controller: controller),
-                    ),
+                    MaterialPageRoute(builder: (_) => BucketSourcesScreen(controller: controller)),
                   ),
                 ),
                 const Divider(),
                 ListTile(
                   leading: const Icon(Icons.mic_outlined),
                   title: const Text('Microphone access'),
-                  subtitle: Text(!kIsWeb &&
-                          defaultTargetPlatform == TargetPlatform.windows
+                  subtitle: Text(!kIsWeb && defaultTargetPlatform == TargetPlatform.windows
                       ? 'Coach recording requires microphone access for desktop apps. Manage it in Windows Privacy settings.'
                       : 'Enable microphone access for AnhPT in your system or browser settings.'),
-                  trailing:
-                      !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
-                          ? OutlinedButton.icon(
-                              onPressed: () => _openMicrophoneSettings(context),
-                              icon: const Icon(Icons.open_in_new, size: 18),
-                              label: const Text('Open settings'),
-                            )
-                          : null,
+                  trailing: !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+                      ? OutlinedButton.icon(
+                          onPressed: () => _openMicrophoneSettings(context),
+                          icon: const Icon(Icons.open_in_new, size: 18),
+                          label: const Text('Open settings'),
+                        )
+                      : null,
                 ),
                 const Divider(),
                 ListTile(
@@ -174,19 +220,11 @@ class SettingsScreen extends StatelessWidget {
                   trailing: DropdownButton<String>(
                     value: controller.defaultVoiceLanguage,
                     items: const [
-                      DropdownMenuItem(
-                        value: 'vi',
-                        child: Text('Vietnamese'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'en',
-                        child: Text('English'),
-                      ),
+                      DropdownMenuItem(value: 'vi', child: Text('Vietnamese')),
+                      DropdownMenuItem(value: 'en', child: Text('English')),
                     ],
                     onChanged: (value) {
-                      if (value != null) {
-                        controller.updateDefaultVoiceLanguage(value);
-                      }
+                      if (value != null) controller.updateDefaultVoiceLanguage(value);
                     },
                   ),
                 ),
@@ -197,16 +235,18 @@ class SettingsScreen extends StatelessWidget {
                   subtitle: const Text('Bundled and personal tracks'),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) =>
-                              MusicLibraryScreen(controller: controller))),
+                    context,
+                    MaterialPageRoute(builder: (_) => MusicLibraryScreen(controller: controller)),
+                  ),
                 ),
                 const Divider(),
-                const ListTile(
-                  leading: Icon(Icons.info_outline),
-                  title: Text('About'),
-                  subtitle: Text('AnhPT Integrated MVP v0.6'),
+                AnimatedBuilder(
+                  animation: UpdateService.instance,
+                  builder: (context, _) => ListTile(
+                    leading: const Icon(Icons.info_outline),
+                    title: const Text('About'),
+                    subtitle: Text('AnhPT ${UpdateService.instance.currentVersion}'),
+                  ),
                 ),
               ],
             ),
