@@ -1,12 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-enum WorkoutCameraLayout { split, pictureInPicture, overlay }
+enum WorkoutCameraLayout {
+  split,
+  pictureInPicture,
+  cameraPictureInPicture,
+  overlay,
+}
 
 extension WorkoutCameraLayoutLabel on WorkoutCameraLayout {
   String get label => switch (this) {
         WorkoutCameraLayout.split => 'Split',
-        WorkoutCameraLayout.pictureInPicture => 'Picture in Picture',
+        WorkoutCameraLayout.pictureInPicture => 'Demo main / Camera PiP',
+        WorkoutCameraLayout.cameraPictureInPicture => 'Camera main / Demo PiP',
         WorkoutCameraLayout.overlay => 'Overlay',
       };
 }
