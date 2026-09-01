@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../app/app_controller.dart';
+import '../app/workout_camera_preference.dart';
 import '../core/session_engine.dart';
 import '../services/audio_feedback_service.dart';
 import '../services/background_music_service.dart';
@@ -14,6 +15,7 @@ import '../widgets/common.dart';
 import '../models/background_music.dart';
 import '../models/workout.dart';
 import '../widgets/demonstration_media.dart';
+import '../widgets/workout_camera_comparison.dart';
 
 enum CompletionDeviceAction { shutdownWindows, exitAndroid }
 
@@ -63,6 +65,14 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   String musicStatus = 'Music off';
   SessionStatus? _musicStatus;
   bool _disposed = false;
+  bool _cameraEnabled = false;
+  WorkoutCameraLayout _cameraLayout = WorkoutCameraLayout.split;
+  String? _cameraNotice;
+
+  bool get _cameraSupported => !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.windows);
 
   @override
   void initState() {
@@ -87,7 +97,41 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     );
     engine.addListener(_changed);
     _scheduleScreenOff();
+    unawaited(_initializeCameraPreference());
     _initializeAndStart();
+  }
+
+  Future<void> _initializeCameraPreference() async {
+    await WorkoutCameraPreference.instance.initialize();
+    if (!mounted || _disposed) return;
+    setState(() {
+      _cameraEnabled =
+          _cameraSupported && WorkoutCameraPreference.instance.autoStart;
+      _cameraLayout = WorkoutCameraPreference.instance.layout;
+    });
+  }
+
+  void _toggleCamera() {
+    if (!_cameraSupported) return;
+    setState(() {
+      _cameraEnabled = !_cameraEnabled;
+      if (!_cameraEnabled) _cameraNotice = null;
+    });
+  }
+
+  Future<void> _setCameraLayout(WorkoutCameraLayout layout) async {
+    setState(() => _cameraLayout = layout);
+    await WorkoutCameraPreference.instance.setLayout(layout);
+  }
+
+  void _cameraErrorChanged(String? error) {
+    if (!mounted || _cameraNotice == error) return;
+    _cameraNotice = error;
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$error Workout continues without camera.')),
+      );
+    }
   }
 
   void _scheduleScreenOff() {
@@ -315,6 +359,18 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
         }
       }
     }
+    final hasDemo = !preparing && exercise?.demoMediaId != null;
+    final demonstration = hasDemo
+        ? DemonstrationMedia(
+            key: ValueKey(exercise!.demoMediaId),
+            mediaId: exercise.demoMediaId!,
+            paused: paused,
+            resolveAsset: () =>
+                widget.controller.mediaAsset(exercise!.demoMediaId!),
+            resolveUri: () =>
+                widget.controller.resolveMediaUri(exercise!.demoMediaId!),
+          )
+        : null;
 
     return Scaffold(
       body: SafeArea(
@@ -336,6 +392,40 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                     ),
                     const SizedBox(width: 8),
                   ],
+                  if (_cameraSupported)
+                    IconButton(
+                      tooltip: _cameraEnabled
+                          ? 'Turn workout camera off'
+                          : 'Turn workout camera on',
+                      onPressed: _toggleCamera,
+                      icon: Icon(
+                        _cameraEnabled
+                            ? Icons.videocam
+                            : Icons.videocam_outlined,
+                      ),
+                    ),
+                  if (_cameraEnabled && hasDemo)
+                    PopupMenuButton<WorkoutCameraLayout>(
+                      tooltip: 'Camera layout',
+                      initialValue: _cameraLayout,
+                      onSelected: _setCameraLayout,
+                      icon: const Icon(Icons.view_quilt_outlined),
+                      itemBuilder: (_) => [
+                        for (final layout in WorkoutCameraLayout.values)
+                          PopupMenuItem(
+                            value: layout,
+                            child: Row(
+                              children: [
+                                if (layout == _cameraLayout) ...[
+                                  const Icon(Icons.check, size: 18),
+                                  const SizedBox(width: 8),
+                                ],
+                                Text(layout.label),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
                   IconButton(
                     tooltip: voiceMuted ? 'Turn voice on' : 'Mute voice',
                     onPressed: audioReady ? _toggleVoice : null,
@@ -406,16 +496,16 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                       fontWeight: FontWeight.w900,
                     ),
               ),
-              if (!preparing && exercise?.demoMediaId != null) ...[
+              if (_cameraEnabled || demonstration != null) ...[
                 const SizedBox(height: 16),
-                DemonstrationMedia(
-                  key: ValueKey(exercise!.demoMediaId),
-                  mediaId: exercise.demoMediaId!,
-                  paused: paused,
-                  resolveAsset: () =>
-                      widget.controller.mediaAsset(exercise!.demoMediaId!),
-                  resolveUri: () =>
-                      widget.controller.resolveMediaUri(exercise!.demoMediaId!),
+                SizedBox(
+                  height: 240,
+                  child: WorkoutCameraComparison(
+                    cameraEnabled: _cameraEnabled,
+                    layout: _cameraLayout,
+                    demonstration: demonstration,
+                    onCameraErrorChanged: _cameraErrorChanged,
+                  ),
                 ),
               ],
               const SizedBox(height: 12),
