@@ -14,7 +14,7 @@ During a workout, AnhPT can show the exerciser's live camera image together with
 3. A persistent preference controls whether the camera starts automatically when a workout begins. The user can still turn it on or off during the workout.
 4. The first version is live preview only. AnhPT does not record or save workout camera video because recordings would consume substantial storage.
 5. Camera preview remains available even when the current step has no demonstration media.
-6. When demonstration media exists, the user can switch layout while the workout is running.
+6. The selected comparison layout remains visually stable across all workout steps. If a step has no demonstration media, AnhPT renders a default demonstration placeholder in the demonstration slot instead of removing that slot or changing the layout.
 7. Four comparison layouts are supported:
    - Split: demonstration and user camera side by side.
    - Demo main / Camera PiP: demonstration is primary and the user's camera appears as a compact secondary view.
@@ -28,7 +28,7 @@ During a workout, AnhPT can show the exerciser's live camera image together with
 
 The workout player exposes a camera toggle. Turning the camera on requests camera permission when necessary. A denied or unavailable camera must not interrupt workout timing, voice guidance, demonstration playback, music, pause/resume, or workout completion.
 
-When the camera is on and the step has demonstration media, a layout control lets the user choose Split, Demo main / Camera PiP, Camera main / Demo PiP, or Overlay without restarting the workout. When no demonstration is available, the live camera is displayed on its own and the selected comparison layout is retained for the next step that has demonstration media.
+When the camera is on, a layout control lets the user choose Split, Demo main / Camera PiP, Camera main / Demo PiP, or Overlay without restarting the workout. The same layout is kept when the workout advances to another step. If that step has no demonstration media, the demonstration slot shows a default placeholder labeled `No demonstration for this step`. When a later step has media again, that media replaces the placeholder in the same slot without changing the selected layout.
 
 When more than one camera is detected, the live preview exposes a camera switch menu. Windows camera labels use the device names reported by the operating system so built-in and USB webcams can be distinguished.
 
@@ -109,7 +109,9 @@ These can be considered later without changing the V1 privacy expectation that l
 - Windows can use an available built-in or USB webcam.
 - Windows users can switch cameras when multiple devices are present.
 - Camera preview works independently of whether the step has demonstration media.
-- Split, both Picture-in-Picture directions, and Overlay can be selected during a workout with demonstration media.
+- Split, both Picture-in-Picture directions, and Overlay can be selected during a workout.
+- The selected layout remains unchanged when stepping between exercises with and without demonstration media.
+- A default demonstration placeholder occupies the demonstration slot when no media is assigned.
 - Camera preview preserves native aspect ratio without stretching.
 - Changing workout steps or comparison layouts does not restart the camera.
 - Changing workout steps does not unnecessarily re-request camera permission or reset the chosen layout.
