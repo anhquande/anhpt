@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'app/app_controller.dart';
@@ -23,8 +21,13 @@ Future<void> main() async {
     WorkoutCameraPreference.instance.initialize(),
     UpdateService.instance.initialize(),
   ]);
+
+  // When automatic updates are enabled, finish the startup update flow before
+  // entering the main application. Update installers terminate this process
+  // when an update is launched; otherwise startup continues normally.
+  await UpdateService.instance.checkOnStartup();
+
   runApp(AnhPtApp(controller: controller));
-  unawaited(UpdateService.instance.checkOnStartup());
 }
 
 class AnhPtApp extends StatelessWidget {
