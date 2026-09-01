@@ -50,16 +50,10 @@ class UpdateStartupApp extends StatefulWidget {
 }
 
 class _UpdateStartupAppState extends State<UpdateStartupApp> {
-  static const _featureMessages = [
-    UpdateStartupMessage(
-      'NEW IN AnhPT',
-      'Compare your movement with workout demonstrations using the live camera layouts.',
-    ),
-    UpdateStartupMessage(
-      'NEW IN AnhPT',
-      'Your workout library can surface new, recommended, and recently used workouts.',
-    ),
-  ];
+  static const _fallbackFeature = UpdateStartupMessage(
+    'NEW IN AnhPT',
+    'Discover new ways to make every workout clearer, simpler, and more motivating.',
+  );
 
   static const _fallbackQuote = UpdateStartupMessage(
     'KEEP MOVING',
@@ -67,7 +61,7 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
   );
 
   List<UpdateStartupMessage> _messages = const [
-    ..._featureMessages,
+    _fallbackFeature,
     _fallbackQuote,
   ];
   int _messageIndex = 0;
@@ -76,7 +70,7 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
   @override
   void initState() {
     super.initState();
-    _loadMotivationalQuotes();
+    _loadStartupContent();
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (mounted && _messages.isNotEmpty) {
         setState(() => _messageIndex = (_messageIndex + 1) % _messages.length);
@@ -84,33 +78,56 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
     });
   }
 
-  Future<void> _loadMotivationalQuotes() async {
-    try {
-      final source = await rootBundle.loadString(
-        'assets/content/motivational_quotes.yaml',
-      );
-      final yaml = loadYaml(source);
-      final rawQuotes = yaml is YamlMap ? yaml['quotes'] : null;
-      if (rawQuotes is! YamlList) return;
+  Future<List<UpdateStartupMessage>> _loadMessages(
+    String assetPath,
+    String rootKey,
+  ) async {
+    final source = await rootBundle.loadString(assetPath);
+    final yaml = loadYaml(source);
+    final rawItems = yaml is YamlMap ? yaml[rootKey] : null;
+    if (rawItems is! YamlList) return const [];
 
-      final quotes = <UpdateStartupMessage>[];
-      for (final entry in rawQuotes) {
-        if (entry is! YamlMap) continue;
-        final title = entry['title']?.toString().trim() ?? '';
-        final text = entry['text']?.toString().trim() ?? '';
-        if (title.isEmpty || text.isEmpty) continue;
-        quotes.add(UpdateStartupMessage(title, text));
-      }
-
-      if (!mounted || quotes.isEmpty) return;
-      setState(() {
-        _messages = [..._featureMessages, ...quotes];
-        _messageIndex %= _messages.length;
-      });
-    } catch (_) {
-      // Keep the built-in fallback so update startup can never be blocked by
-      // optional promotional content.
+    final messages = <UpdateStartupMessage>[];
+    for (final entry in rawItems) {
+      if (entry is! YamlMap) continue;
+      final title = entry['title']?.toString().trim() ?? '';
+      final text = entry['text']?.toString().trim() ?? '';
+      if (title.isEmpty || text.isEmpty) continue;
+      messages.add(UpdateStartupMessage(title, text));
     }
+    return messages;
+  }
+
+  Future<void> _loadStartupContent() async {
+    var features = <UpdateStartupMessage>[];
+    var quotes = <UpdateStartupMessage>[];
+
+    try {
+      features = await _loadMessages(
+        'assets/content/whats_new.yaml',
+        'items',
+      );
+    } catch (_) {
+      // Optional promotional content must never block app startup.
+    }
+
+    try {
+      quotes = await _loadMessages(
+        'assets/content/motivational_quotes.yaml',
+        'quotes',
+      );
+    } catch (_) {
+      // Optional motivational content must never block app startup.
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _messages = [
+        ...(features.isEmpty ? const [_fallbackFeature] : features),
+        ...(quotes.isEmpty ? const [_fallbackQuote] : quotes),
+      ];
+      _messageIndex %= _messages.length;
+    });
   }
 
   @override
