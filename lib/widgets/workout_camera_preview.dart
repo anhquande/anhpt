@@ -22,6 +22,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     with WidgetsBindingObserver {
   static const _cameraDiscoveryTimeout = Duration(seconds: 8);
   static const _cameraInitializationTimeout = Duration(seconds: 10);
+  static const _cameraDisposeTimeout = Duration(seconds: 2);
   static const _retryDelay = Duration(milliseconds: 300);
 
   CameraController? _controller;
@@ -149,7 +150,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   }) async {
     final oldController = _controller;
     _controller = null;
-    await oldController?.dispose();
+    await _disposeSafely(oldController);
 
     if (!mounted || generation != _generation || !widget.enabled) return;
     final controller = CameraController(
@@ -160,20 +161,31 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     try {
       await controller.initialize().timeout(_cameraInitializationTimeout);
     } catch (_) {
-      await controller.dispose();
+      await _disposeSafely(controller);
       rethrow;
     }
     if (!mounted || generation != _generation || !widget.enabled) {
-      await controller.dispose();
+      await _disposeSafely(controller);
       return;
     }
     setState(() => _controller = controller);
   }
 
+  Future<void> _disposeSafely(CameraController? controller) async {
+    if (controller == null) return;
+    try {
+      await controller.dispose().timeout(_cameraDisposeTimeout);
+    } on TimeoutException {
+      debugPrint('Camera controller dispose timed out.');
+    } catch (error) {
+      debugPrint('Camera controller dispose failed: $error');
+    }
+  }
+
   Future<void> _disposeControllerForRetry(int generation) async {
     final controller = _controller;
     _controller = null;
-    await controller?.dispose();
+    await _disposeSafely(controller);
     if (mounted && generation == _generation) setState(() {});
   }
 
@@ -205,7 +217,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     final controller = _controller;
     _controller = null;
     if (mounted) setState(() {});
-    await controller?.dispose();
+    await _disposeSafely(controller);
   }
 
   void _setError(String? value) {
@@ -344,7 +356,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     ++_generation;
     final controller = _controller;
     _controller = null;
-    unawaited(controller?.dispose());
+    unawaited(_disposeSafely(controller));
     super.dispose();
   }
 }
