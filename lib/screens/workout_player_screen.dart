@@ -21,6 +21,33 @@ import '../widgets/workout_camera_comparison.dart';
 
 enum CompletionDeviceAction { shutdownWindows, exitAndroid }
 
+enum _VideoDisplayMode {
+  demonstrationOnly,
+  split,
+  pictureInPicture,
+  cameraPictureInPicture,
+  overlay,
+}
+
+extension on _VideoDisplayMode {
+  String get label => switch (this) {
+        _VideoDisplayMode.demonstrationOnly => 'Demonstration only',
+        _VideoDisplayMode.split => 'Split',
+        _VideoDisplayMode.pictureInPicture => 'Demo main / Camera PiP',
+        _VideoDisplayMode.cameraPictureInPicture => 'Camera main / Demo PiP',
+        _VideoDisplayMode.overlay => 'Overlay',
+      };
+
+  WorkoutCameraLayout? get cameraLayout => switch (this) {
+        _VideoDisplayMode.demonstrationOnly => null,
+        _VideoDisplayMode.split => WorkoutCameraLayout.split,
+        _VideoDisplayMode.pictureInPicture => WorkoutCameraLayout.pictureInPicture,
+        _VideoDisplayMode.cameraPictureInPicture =>
+          WorkoutCameraLayout.cameraPictureInPicture,
+        _VideoDisplayMode.overlay => WorkoutCameraLayout.overlay,
+      };
+}
+
 CompletionDeviceAction? completionDeviceActionFor(
   TargetPlatform platform, {
   required bool isWeb,
@@ -80,6 +107,17 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
           defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.windows);
 
+  _VideoDisplayMode get _displayMode {
+    if (!_cameraEnabled) return _VideoDisplayMode.demonstrationOnly;
+    return switch (_cameraLayout) {
+      WorkoutCameraLayout.split => _VideoDisplayMode.split,
+      WorkoutCameraLayout.pictureInPicture => _VideoDisplayMode.pictureInPicture,
+      WorkoutCameraLayout.cameraPictureInPicture =>
+        _VideoDisplayMode.cameraPictureInPicture,
+      WorkoutCameraLayout.overlay => _VideoDisplayMode.overlay,
+    };
+  }
+
   @override
   void initState() {
     super.initState();
@@ -119,21 +157,22 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     });
   }
 
-  void _toggleCamera() {
-    if (!_cameraSupported) return;
+  Future<void> _setVideoDisplayMode(_VideoDisplayMode mode) async {
+    final layout = mode.cameraLayout;
     setState(() {
-      _cameraEnabled = !_cameraEnabled;
-      if (!_cameraEnabled) _cameraNotice = null;
-    });
-  }
-
-  Future<void> _setCameraLayout(WorkoutCameraLayout layout) async {
-    setState(() {
-      _cameraLayout = layout;
       _demonstrationEnabled = true;
+      if (layout == null) {
+        _cameraEnabled = false;
+        _cameraNotice = null;
+      } else {
+        _cameraEnabled = _cameraSupported;
+        _cameraLayout = layout;
+      }
     });
     await WorkoutCameraPreference.instance.setDemonstrationEnabled(true);
-    await WorkoutCameraPreference.instance.setLayout(layout);
+    if (layout != null) {
+      await WorkoutCameraPreference.instance.setLayout(layout);
+    }
   }
 
   void _cameraErrorChanged(String? error) {
@@ -416,7 +455,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   }
 
   Widget _layoutPreview(
-    WorkoutCameraLayout layout,
+    _VideoDisplayMode mode,
     ColorScheme cs, {
     double width = 68,
     double height = 44,
@@ -433,15 +472,16 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
           ),
         );
 
-    final preview = switch (layout) {
-      WorkoutCameraLayout.split => Row(
+    final preview = switch (mode) {
+      _VideoDisplayMode.demonstrationOnly => tile(demoColor),
+      _VideoDisplayMode.split => Row(
           children: [
             Expanded(child: tile(demoColor)),
             const SizedBox(width: 3),
             Expanded(child: tile(cameraColor)),
           ],
         ),
-      WorkoutCameraLayout.pictureInPicture => Stack(
+      _VideoDisplayMode.pictureInPicture => Stack(
           children: [
             Positioned.fill(child: tile(demoColor)),
             Positioned(
@@ -453,7 +493,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             ),
           ],
         ),
-      WorkoutCameraLayout.cameraPictureInPicture => Stack(
+      _VideoDisplayMode.cameraPictureInPicture => Stack(
           children: [
             Positioned.fill(child: tile(cameraColor)),
             Positioned(
@@ -465,7 +505,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             ),
           ],
         ),
-      WorkoutCameraLayout.overlay => Stack(
+      _VideoDisplayMode.overlay => Stack(
           children: [
             Positioned.fill(child: tile(demoColor)),
             Positioned(
@@ -480,22 +520,22 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     };
 
     return Semantics(
-      label: '${layout.label} layout preview',
+      label: '${mode.label} layout preview',
       child: SizedBox(width: width, height: height, child: preview),
     );
   }
 
-  Widget _buildLayoutMenuItem(WorkoutCameraLayout layout, ColorScheme cs) {
-    final selected = layout == _cameraLayout;
+  Widget _buildLayoutMenuItem(_VideoDisplayMode mode, ColorScheme cs) {
+    final selected = mode == _displayMode;
     return SizedBox(
       width: 250,
       child: Row(
         children: [
-          _layoutPreview(layout, cs),
+          _layoutPreview(mode, cs),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              layout.label,
+              mode.label,
               maxLines: 2,
               style: TextStyle(
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
@@ -610,28 +650,20 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
         ),
         if (_cameraSupported) ...[
           const SizedBox(width: 4),
-          overlayButton(
-            tooltip: _cameraEnabled ? 'Turn camera off' : 'Turn camera on',
-            onPressed: _toggleCamera,
-            icon: Icon(
-              _cameraEnabled ? Icons.videocam : Icons.videocam_outlined,
-            ),
-          ),
-          const SizedBox(width: 4),
           Material(
             color: cs.surface.withValues(alpha: .68),
             shape: const CircleBorder(),
-            child: PopupMenuButton<WorkoutCameraLayout>(
-              tooltip: 'Change video layout',
-              initialValue: _cameraLayout,
-              onSelected: _setCameraLayout,
+            child: PopupMenuButton<_VideoDisplayMode>(
+              tooltip: 'Video layout',
+              initialValue: _displayMode,
+              onSelected: _setVideoDisplayMode,
               icon: const Icon(Icons.grid_view_rounded),
               itemBuilder: (_) => [
-                for (final layout in WorkoutCameraLayout.values)
+                for (final mode in _VideoDisplayMode.values)
                   PopupMenuItem(
-                    value: layout,
+                    value: mode,
                     height: 66,
-                    child: _buildLayoutMenuItem(layout, cs),
+                    child: _buildLayoutMenuItem(mode, cs),
                   ),
               ],
             ),
