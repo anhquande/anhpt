@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
+import '../data/sample_data.dart';
 import '../models/local_profile.dart';
 import '../models/workout.dart';
 import '../services/health_store.dart';
+import '../services/local_store.dart';
 import '../services/workout_update_service.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
@@ -39,7 +41,46 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadProfiles();
     _loadTagPreferences();
-    controller.refreshAllBucketSources();
+    _syncOfficialBucketWorkouts();
+  }
+
+  Future<void> _syncOfficialBucketWorkouts() async {
+    try {
+      await controller.refreshAllBucketSources();
+      final officialEntries = controller.bucketCatalogEntries
+          .where((entry) => entry.sourceId == LocalStore.defaultBucketSourceId)
+          .toList();
+
+      for (final entry in officialEntries) {
+        if (controller.bucketInstallState(entry) != 'notInstalled') continue;
+
+        Workout? fallbackDemo;
+        if (entry.name == 'AnhPT Feature Demo') {
+          for (final workout in controller.workouts) {
+            if (workout.name == entry.name &&
+                controller.bucketProvenanceFor(workout.id) == null &&
+                workout.rawYaml.trim() == sampleYaml.trim()) {
+              fallbackDemo = workout;
+              break;
+            }
+          }
+        }
+
+        try {
+          if (fallbackDemo != null) {
+            await controller.deleteWorkout(fallbackDemo.id);
+          }
+          await controller.installBucketEntry(entry);
+        } catch (_) {
+          if (fallbackDemo != null &&
+              controller.byId(fallbackDemo.id) == null) {
+            await controller.saveWorkout(fallbackDemo);
+          }
+        }
+      }
+    } catch (_) {
+      // Keep the local dashboard usable when the official bucket is offline.
+    }
   }
 
   Future<void> _loadTagPreferences() async {
