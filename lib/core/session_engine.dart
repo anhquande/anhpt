@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/workout.dart';
+import '../models/workout_video_settings.dart';
 
 enum SessionStatus {
   preparing,
@@ -34,6 +35,7 @@ class SessionEngine extends ChangeNotifier {
       : status = workout.startCountdown > Duration.zero
             ? SessionStatus.preparing
             : SessionStatus.running {
+    WorkoutVideoRuntime.current = WorkoutVideoSettings.fromYaml(workout.rawYaml);
     _steps = workout.expand();
     if (_steps.isEmpty) {
       throw StateError('Workout must contain at least one executable step.');
@@ -256,6 +258,7 @@ class SessionEngine extends ChangeNotifier {
     _prepareWatch.stop();
     _stepWatch.stop();
     _activeWatch.stop();
+    WorkoutVideoRuntime.current = null;
     super.dispose();
   }
 }
