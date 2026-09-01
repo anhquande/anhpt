@@ -26,6 +26,7 @@ class WorkoutParser {
     'screen_off_after_start',
     'recording',
     'background_music',
+    'video',
     'exercises',
     'steps',
   };
@@ -45,6 +46,7 @@ class WorkoutParser {
   };
   static const _feedbackFields = {'sound', 'haptic'};
   static const _audioFields = {'ducking'};
+  static const _videoFields = {'auto_enable', 'layout', 'camera'};
   static const _stepFields = {
     'id',
     'name',
@@ -103,6 +105,7 @@ class WorkoutParser {
     final voice = _voice(root['voice'], defaultVoiceLanguage);
     final (sound, haptic) = _feedback(root['feedback']);
     final ducking = _audio(root['audio']);
+    _video(root['video']);
     final completionAction = (root['completion_action'] ?? 'none').toString();
     if (!{'none', 'shutdown_or_exit'}.contains(completionAction)) {
       throw const WorkoutValidationException(
@@ -275,6 +278,30 @@ class WorkoutParser {
       );
     }
     return ducking;
+  }
+
+  static void _video(Object? value) {
+    if (value == null) return;
+    final map = _map(value);
+    _unknown(map, _videoFields, 'video');
+    _bool(map['auto_enable'], false, 'video.auto_enable');
+    final layout = (map['layout'] ?? 'picture_in_picture').toString();
+    if (!{
+      'split',
+      'picture_in_picture',
+      'camera_picture_in_picture',
+      'overlay',
+    }.contains(layout)) {
+      throw const WorkoutValidationException(
+        'video.layout must be split, picture_in_picture, camera_picture_in_picture or overlay.',
+      );
+    }
+    final camera = (map['camera'] ?? 'front').toString();
+    if (!{'front', 'back'}.contains(camera)) {
+      throw const WorkoutValidationException(
+        'video.camera must be front or back.',
+      );
+    }
   }
 
   static String? _recording(Object? value, String field) {
