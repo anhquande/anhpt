@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'app/app_controller.dart';
@@ -5,6 +7,7 @@ import 'app/theme_preference.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/local_store.dart';
+import 'services/update_service.dart';
 import 'services/workout_yaml_file_store.dart';
 
 Future<void> main() async {
@@ -16,8 +19,10 @@ Future<void> main() async {
   await Future.wait([
     controller.initialize(),
     ThemePreference.instance.initialize(),
+    UpdateService.instance.initialize(),
   ]);
   runApp(AnhPtApp(controller: controller));
+  unawaited(UpdateService.instance.checkOnStartup());
 }
 
 class AnhPtApp extends StatelessWidget {
