@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:yaml/yaml.dart';
 
 import 'app/app_controller.dart';
 import 'app/theme_preference.dart';
@@ -33,6 +35,13 @@ Future<void> main() async {
   runApp(AnhPtApp(controller: controller));
 }
 
+class UpdateStartupMessage {
+  final String title;
+  final String text;
+
+  const UpdateStartupMessage(this.title, this.text);
+}
+
 class UpdateStartupApp extends StatefulWidget {
   const UpdateStartupApp({super.key});
 
@@ -41,22 +50,67 @@ class UpdateStartupApp extends StatefulWidget {
 }
 
 class _UpdateStartupAppState extends State<UpdateStartupApp> {
-  static const _messages = [
-    ('NEW IN AnhPT', 'Compare your movement with workout demonstrations using the live camera layouts.'),
-    ('KEEP MOVING', 'Consistency beats intensity. A short workout today still moves you forward.'),
-    ('NEW IN AnhPT', 'Your workout library can surface new, recommended, and recently used workouts.'),
-    ('ONE MORE STEP', 'You do not need a perfect workout. You only need to start the next one.'),
+  static const _featureMessages = [
+    UpdateStartupMessage(
+      'NEW IN AnhPT',
+      'Compare your movement with workout demonstrations using the live camera layouts.',
+    ),
+    UpdateStartupMessage(
+      'NEW IN AnhPT',
+      'Your workout library can surface new, recommended, and recently used workouts.',
+    ),
   ];
 
+  static const _fallbackQuote = UpdateStartupMessage(
+    'KEEP MOVING',
+    'Consistency beats intensity. A short workout today still moves you forward.',
+  );
+
+  List<UpdateStartupMessage> _messages = const [
+    ..._featureMessages,
+    _fallbackQuote,
+  ];
   int _messageIndex = 0;
   Timer? _timer;
 
   @override
   void initState() {
     super.initState();
+    _loadMotivationalQuotes();
     _timer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) setState(() => _messageIndex = (_messageIndex + 1) % _messages.length);
+      if (mounted && _messages.isNotEmpty) {
+        setState(() => _messageIndex = (_messageIndex + 1) % _messages.length);
+      }
     });
+  }
+
+  Future<void> _loadMotivationalQuotes() async {
+    try {
+      final source = await rootBundle.loadString(
+        'assets/content/motivational_quotes.yaml',
+      );
+      final yaml = loadYaml(source);
+      final rawQuotes = yaml is YamlMap ? yaml['quotes'] : null;
+      if (rawQuotes is! YamlList) return;
+
+      final quotes = <UpdateStartupMessage>[];
+      for (final entry in rawQuotes) {
+        if (entry is! YamlMap) continue;
+        final title = entry['title']?.toString().trim() ?? '';
+        final text = entry['text']?.toString().trim() ?? '';
+        if (title.isEmpty || text.isEmpty) continue;
+        quotes.add(UpdateStartupMessage(title, text));
+      }
+
+      if (!mounted || quotes.isEmpty) return;
+      setState(() {
+        _messages = [..._featureMessages, ...quotes];
+        _messageIndex %= _messages.length;
+      });
+    } catch (_) {
+      // Keep the built-in fallback so update startup can never be blocked by
+      // optional promotional content.
+    }
   }
 
   @override
@@ -109,10 +163,10 @@ class _UpdateStartupAppState extends State<UpdateStartupApp> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Text(message.$1, style: Theme.of(context).textTheme.labelLarge),
+                                Text(message.title, style: Theme.of(context).textTheme.labelLarge),
                                 const SizedBox(height: 16),
                                 Text(
-                                  message.$2,
+                                  message.text,
                                   textAlign: TextAlign.center,
                                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w600),
                                 ),
