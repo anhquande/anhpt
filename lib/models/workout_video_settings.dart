@@ -19,8 +19,7 @@ class WorkoutVideoSettings {
       final root = loadYaml(yamlText);
       if (root is! YamlMap) return null;
       final rawVideo = root['video'];
-      if (rawVideo == null) return null;
-      if (rawVideo is! YamlMap) return null;
+      if (rawVideo == null || rawVideo is! YamlMap) return null;
       return WorkoutVideoSettings(
         autoEnable: rawVideo['auto_enable'] is bool
             ? rawVideo['auto_enable'] as bool
@@ -32,4 +31,8 @@ class WorkoutVideoSettings {
       return null;
     }
   }
+}
+
+class WorkoutVideoRuntime {
+  static WorkoutVideoSettings? current;
 }
