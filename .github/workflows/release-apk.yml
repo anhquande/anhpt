@@ -111,8 +111,18 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Enable Windows desktop
+        shell: powershell
+        run: flutter config --enable-windows-desktop
+      - name: Prepare Windows project
+        shell: powershell
+        run: |
+          if (-not (Test-Path "windows\CMakeLists.txt")) {
+            flutter create --platforms=windows --project-name anhpt .
+          }
       - run: flutter pub get
-      - run: flutter build windows --release --build-name=${{ needs.metadata.outputs.version }} --build-number=${{ needs.metadata.outputs.build_number }}
+      - name: Build Windows release
+        run: flutter build windows --release --build-name=${{ needs.metadata.outputs.version }} --build-number=${{ needs.metadata.outputs.build_number }}
       - name: Install Inno Setup
         shell: powershell
         run: choco install innosetup -y --no-progress
