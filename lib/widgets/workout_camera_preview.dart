@@ -38,9 +38,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.enabled) {
-      unawaited(_initialize());
-    }
+    if (widget.enabled) unawaited(_initialize());
   }
 
   @override
@@ -72,7 +70,6 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     final generation = ++_generation;
     if (mounted) setState(() => _loading = true);
     _setError(null);
-
     try {
       final cameras = await availableCameras();
       if (!mounted || generation != _generation || !widget.enabled) return;
@@ -80,7 +77,6 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
         _setError('No camera was found on this device.');
         return;
       }
-
       final chosen = _chooseCamera(cameras, preferred: preferred);
       await _openCamera(chosen, generation: generation);
       if (!mounted || generation != _generation) return;
@@ -123,7 +119,6 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     final oldController = _controller;
     _controller = null;
     await oldController?.dispose();
-
     if (!mounted || generation != _generation || !widget.enabled) return;
     final controller = CameraController(
       camera,
@@ -168,7 +163,11 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     ++_generation;
     final controller = _controller;
     _controller = null;
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() => _loading = false);
+    } else {
+      _loading = false;
+    }
     await controller?.dispose();
   }
 
@@ -215,12 +214,10 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
         ),
       );
     }
-
     final controller = _controller;
     if (_loading || controller == null || !controller.value.isInitialized) {
       return const Center(child: CircularProgressIndicator());
     }
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -236,7 +233,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
             top: 8,
             right: 8,
             child: Material(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: .82),
+              color: Theme.of(context).colorScheme.surface.withOpacity(.82),
               borderRadius: BorderRadius.circular(24),
               child: PopupMenuButton<CameraDescription>(
                 tooltip: 'Choose camera',
