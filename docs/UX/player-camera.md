@@ -9,14 +9,15 @@ The Player is the most attention-sensitive surface in AnhPT. The demonstration/c
 During an active workout:
 
 - reserve most usable viewport space for demonstration/camera media;
-- keep the top chrome compact;
+- let media extend to the top of the Player safe area;
+- render progress, title, sound, display-mode controls, and timer/state as overlays on the media stage rather than separate rows;
 - do not show background-music title/status or a persistent volume slider;
 - expose one speaker icon that toggles workout sound on/off;
 - keep long instructions and secondary metadata out of the persistent running layout.
 
 ## Overall progress
 
-Place overall workout progress at the top, similar to a video player timeline:
+Place overall workout progress as a top overlay, similar to a video player timeline:
 
 - thin progress track;
 - small playhead/position indicator;
@@ -29,7 +30,7 @@ Manual next/previous navigation updates this overall position to the selected re
 
 Major visual regions should remain stable across step transitions. Do not remove the demonstration region simply because the current step has no media. Use a neutral fallback visual instead.
 
-Do not reflow the media stage when changing step, pausing, resuming, or switching camera layout.
+Do not reflow the media stage when changing step, pausing, resuming, or switching video display mode.
 
 ## Direct media interaction
 
@@ -71,9 +72,10 @@ Camera is session-scoped, not step-scoped.
 
 Once enabled:
 
-- keep the same camera stream alive across step changes,
-- do not recreate the camera when demonstration content changes,
-- stop it only when explicitly disabled, the user leaves the Player, or the workout ends.
+- keep the same camera stream alive across step changes;
+- do not recreate the camera when demonstration content changes;
+- do not restart it when switching between camera-enabled display modes;
+- stop it when `Demonstration only` is selected, the user leaves the Player, or the workout ends.
 
 This prevents visible flashing and avoids unnecessary hardware reinitialization.
 
@@ -83,31 +85,37 @@ Preserve the source aspect ratio. Prefer a sensible preview container such as 4:
 
 Never stretch camera frames to arbitrary dimensions. Use fit/crop/letterbox behavior where necessary while preserving proportions.
 
-## Supported presentation modes
+## Video display modes
 
-The Player may expose these layout modes:
+Use one grid-style `Video layout` control for both camera enable/disable and layout selection. Do not expose a separate camera on/off button in the normal Player overlay.
 
-1. Demonstration main + camera Picture-in-Picture.
-2. Camera main + demonstration Picture-in-Picture.
-3. Side-by-side/comparison mode where both receive meaningful space.
+The popup contains visual thumbnails and these modes:
 
-The layout switcher remains directly accessible in the compact top controls whenever camera comparison is active because the user may need to adapt the view to the current filming angle. Changing layout must not restart the camera stream, timer, TTS, or demonstration playback.
+1. `Demonstration only` — camera off.
+2. `Demo main / Camera PiP` — camera on.
+3. `Camera main / Demo PiP` — camera on.
+4. `Split` — camera on.
+5. `Overlay` — camera on.
+
+Selecting `Demonstration only` stops/disables the camera for the session view. Selecting any camera-enabled mode automatically enables the camera if needed. If the camera is already running, changing between camera-enabled modes must reuse the same stream and must not restart the timer, TTS, or demonstration playback.
+
+The current mode is visibly selected in the popup, and every option includes a compact layout illustration so the user can understand the result before selecting it.
 
 ## Missing demonstration
 
 When a step has no demonstration media:
 
-- keep the demonstration surface,
-- show the defined default/fallback visual,
-- preserve PiP placement and player geometry,
+- keep the demonstration surface;
+- show the defined default/fallback visual;
+- preserve PiP placement and player geometry;
 - do not treat missing media as an error that blocks progression.
 
 ## Demonstration behavior
 
-- static image remains visible,
-- GIF continues animating,
-- video loops muted,
-- video pauses/resumes with the workout session,
+- static image remains visible;
+- GIF continues animating;
+- video loops muted;
+- video pauses/resumes with the workout session;
 - unsupported or missing media degrades to fallback content.
 
 ## Session states
@@ -118,7 +126,7 @@ Show `READY` and countdown as an overlay on the stable media stage. Camera/media
 
 ### Running
 
-Show current step and remaining time as overlays while preserving maximum media space. Overall progress remains at the top and upcoming-step preview remains below the media stage.
+Show current step and remaining time as overlays while preserving maximum media space. Overall progress remains overlaid at the top and upcoming-step preview remains below the media stage.
 
 ### Finishing guide
 
@@ -142,8 +150,6 @@ Manual step navigation intentionally changes the active resolved step and resets
 
 Use one compact speaker icon instead of persistent music/volume UI. It toggles workout sound as one user-facing state, covering coach voice/audio and background music while preserving configured volume levels for later unmute.
 
-## Camera controls
+## Camera failure
 
-Camera on/off, demonstration visibility, and layout switching are session-relevant controls and remain compact so they do not consume a separate row of media space.
-
-If camera permission or device availability fails, show concise feedback and continue the workout without camera.
+If camera permission or device availability fails, show concise feedback and continue the workout with demonstration content rather than blocking the session.
