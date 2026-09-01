@@ -46,9 +46,8 @@ class UpdateService extends ChangeNotifier {
   static const _repo = 'anhquande/anhpt';
   static const _autoUpdateKey = 'auto_update_enabled';
   static const _lastCheckKey = 'auto_update_last_check';
-  static const _checkInterval = Duration(hours: 24);
 
-  bool autoUpdateEnabled = true;
+  bool autoUpdateEnabled = false;
   String currentVersion = '';
   String? latestVersion;
   DateTime? lastChecked;
@@ -65,7 +64,7 @@ class UpdateService extends ChangeNotifier {
     if (_initialized) return;
     _initialized = true;
     final prefs = await SharedPreferences.getInstance();
-    autoUpdateEnabled = prefs.getBool(_autoUpdateKey) ?? true;
+    autoUpdateEnabled = prefs.getBool(_autoUpdateKey) ?? false;
     final millis = prefs.getInt(_lastCheckKey);
     lastChecked = millis == null ? null : DateTime.fromMillisecondsSinceEpoch(millis);
     final info = await PackageInfo.fromPlatform();
@@ -83,10 +82,6 @@ class UpdateService extends ChangeNotifier {
   Future<void> checkOnStartup() async {
     await initialize();
     if (!supported || !autoUpdateEnabled) return;
-    final previous = lastChecked;
-    if (previous != null && DateTime.now().difference(previous) < _checkInterval) {
-      return;
-    }
     await checkForUpdates(autoInstall: true);
   }
 
@@ -97,13 +92,15 @@ class UpdateService extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
     try {
-      final response = await http.get(
-        Uri.parse('https://api.github.com/repos/$_repo/releases/latest'),
-        headers: const {
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
-      );
+      final response = await http
+          .get(
+            Uri.parse('https://api.github.com/repos/$_repo/releases/latest'),
+            headers: const {
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+            },
+          )
+          .timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         throw HttpException('GitHub returned HTTP ${response.statusCode}.');
       }
@@ -196,7 +193,7 @@ class UpdateService extends ChangeNotifier {
       if (result.type != ResultType.done) {
         throw StateError('Could not open Android installer: ${result.message}');
       }
-      return;
+      exit(0);
     }
     if (Platform.isWindows) {
       await Process.start(
