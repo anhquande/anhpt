@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'app/app_controller.dart';
 import 'app/theme_preference.dart';
+import 'app/workout_camera_preference.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'services/local_store.dart';
@@ -19,6 +20,7 @@ Future<void> main() async {
   await Future.wait([
     controller.initialize(),
     ThemePreference.instance.initialize(),
+    WorkoutCameraPreference.instance.initialize(),
     UpdateService.instance.initialize(),
   ]);
   runApp(AnhPtApp(controller: controller));
