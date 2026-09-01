@@ -8,6 +8,8 @@ enum WorkoutCameraLayout {
   overlay,
 }
 
+enum WorkoutCameraFacing { front, back }
+
 extension WorkoutCameraLayoutLabel on WorkoutCameraLayout {
   String get label => switch (this) {
         WorkoutCameraLayout.split => 'Split',
