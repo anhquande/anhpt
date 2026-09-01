@@ -27,8 +27,8 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
 
   @override
   Widget build(BuildContext context) {
-    final demo = widget.demonstration;
-    if (!widget.cameraEnabled) return demo ?? const SizedBox.shrink();
+    final demo = widget.demonstration ?? _defaultDemonstration(context);
+    if (!widget.cameraEnabled) return demo;
 
     final camera = WorkoutCameraPreview(
       key: _cameraKey,
@@ -39,8 +39,8 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (demo != null) _buildDemo(widget.layout, demo),
-        _buildCamera(widget.layout, camera, hasDemo: demo != null),
+        _buildDemo(widget.layout, demo),
+        _buildCamera(widget.layout, camera),
       ],
     );
   }
@@ -69,19 +69,13 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
             elevation: 4,
             borderRadius: BorderRadius.circular(12),
             clipBehavior: Clip.antiAlias,
-            child: demo,
+            child: _frame(demo),
           ),
         ),
     };
   }
 
-  Widget _buildCamera(
-    WorkoutCameraLayout layout,
-    Widget camera, {
-    required bool hasDemo,
-  }) {
-    if (!hasDemo) return _frame(camera);
-
+  Widget _buildCamera(WorkoutCameraLayout layout, Widget camera) {
     return switch (layout) {
       WorkoutCameraLayout.split => Align(
           alignment: Alignment.centerRight,
@@ -112,6 +106,37 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
           child: _frame(camera),
         ),
     };
+  }
+
+  Widget _defaultDemonstration(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return ColoredBox(
+      color: colors.surfaceContainerHighest,
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.accessibility_new_rounded,
+                size: 48,
+                color: colors.onSurfaceVariant,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No demonstration for this step',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _frame(Widget child) => ClipRRect(
