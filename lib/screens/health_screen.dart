@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
@@ -11,7 +10,6 @@ import '../models/health.dart';
 import '../models/local_profile.dart';
 import '../services/health_analytics.dart';
 import '../services/health_store.dart';
-import '../widgets/profile_editor_dialog.dart';
 
 enum _ChartRange { week, month, quarter, year }
 enum _MeasurementSort { date, weight, note }
@@ -104,18 +102,6 @@ class _HealthScreenState extends State<HealthScreen> {
 
   String get _weightUnit =>
       _profile.unitSystem == HealthUnitSystem.metric ? 'kg' : 'lb';
-
-  String get _profileSummary {
-    final values = <String>[];
-    if (_profile.birthYear != null) values.add('Born ${_profile.birthYear}');
-    if (_profile.heightCm != null) {
-      values.add('${_profile.heightCm!.toStringAsFixed(0)} cm');
-    }
-    if (_profile.sex != HealthSex.unspecified) values.add(_profile.sex.name);
-    return values.isEmpty
-        ? 'Complete your profile for BMI and better estimates.'
-        : values.join(' · ');
-  }
 
   Future<void> _editMeasurement([WeightMeasurement? existing]) async {
     final now = existing?.measuredAt ?? DateTime.now();
@@ -304,21 +290,6 @@ class _HealthScreenState extends State<HealthScreen> {
     if (confirmed != true) return;
     _measurements.removeWhere((item) => item.id == value.id);
     await _saveMeasurements();
-  }
-
-  Future<void> _editProfile() async {
-    final localProfile = _localProfile ?? await _store.activeLocalProfile();
-    if (!mounted) return;
-    final result = await showProfileEditorDialog(
-      context,
-      title: 'Edit profile',
-      initialName: localProfile.name,
-      initialHealth: _profile,
-    );
-    if (result == null) return;
-    await _store.renameLocalProfile(localProfile.id, result.name);
-    await _store.saveProfile(result.health, localProfile.id);
-    await _load();
   }
 
   Future<void> _exportData() async {
