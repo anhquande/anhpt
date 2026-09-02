@@ -9,6 +9,7 @@ import '../services/local_store.dart';
 import '../services/workout_update_service.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
+import 'bucket_sources_screen.dart';
 import 'health_screen.dart';
 import 'local_profiles_screen.dart';
 import 'settings_screen.dart';
@@ -136,6 +137,15 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: controller,
           workoutId: workout.id,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openWorkoutSources() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BucketSourcesScreen(controller: controller),
       ),
     );
   }
@@ -611,6 +621,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   : 'No workouts match “$_query”.',
                               textAlign: TextAlign.center,
                             ),
+                            if (_query.trim().isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: _openWorkoutSources,
+                                icon: const Icon(Icons.cloud_outlined),
+                                label: const Text('Manage workout sources'),
+                              ),
+                            ],
                           ],
                         ),
                       ),
