@@ -33,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   LocalProfile? _activeProfile;
   List<String> _tagOrder = [];
   Set<String> _hiddenTags = {};
+  bool _isRefreshing = false;
 
   AppController get controller => widget.controller;
 
@@ -80,6 +81,16 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (_) {
       // Keep the local dashboard usable when the official bucket is offline.
+    }
+  }
+
+  Future<void> _refreshWorkouts() async {
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      await _syncOfficialBucketWorkouts();
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
     }
   }
 
@@ -361,6 +372,17 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
         actions: [
+          IconButton(
+            tooltip: 'Refresh workouts',
+            onPressed: _isRefreshing ? null : _refreshWorkouts,
+            icon: _isRefreshing
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh),
+          ),
           TextButton.icon(
             onPressed: _chooseActiveProfile,
             icon: _activeProfile == null
@@ -411,7 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final noResults = visibleWorkouts.isEmpty;
 
           return RefreshIndicator(
-            onRefresh: _syncOfficialBucketWorkouts,
+            onRefresh: _refreshWorkouts,
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 900),
