@@ -239,7 +239,8 @@ class SessionEngine extends ChangeNotifier {
     }
 
     final wasRunning = status == SessionStatus.running;
-    if (wasRunning && !_timerFinished) {
+    final timerWasActive = wasRunning && _ticker != null && !_timerFinished;
+    if (timerWasActive) {
       _activeElapsedBefore += _activeWatch.elapsed;
     }
 
@@ -255,7 +256,7 @@ class SessionEngine extends ChangeNotifier {
     _stepElapsedBefore = Duration.zero;
     _timerFinished = currentStep.duration <= Duration.zero;
 
-    if (wasRunning && !_timerFinished) {
+    if (timerWasActive && !_timerFinished) {
       _activeWatch.start();
       _stepWatch.start();
     }
