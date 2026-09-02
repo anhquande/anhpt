@@ -25,3 +25,7 @@ Selecting **Edit** opens a dialog prefilled with the current source name and cat
 ## Sharing a source
 
 Selecting **Copy URL** copies the catalog URL to the system clipboard and shows a confirmation message. The copied URL can then be pasted into chat, email, or another AnhPT installation.
+
+## Shortcut from workout search
+
+When a workout search returns no matches, the empty-result state shows **Manage workout sources**. Selecting it opens Workout Sources directly so the user can quickly add, enable, edit, refresh, or inspect workout catalogs without navigating through Settings first.
