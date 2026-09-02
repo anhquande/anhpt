@@ -8,7 +8,6 @@ import '../services/workout_update_service.dart';
 import '../widgets/coach_recording_card.dart';
 import '../widgets/common.dart';
 import '../widgets/demo_media_source_sheet.dart';
-import '../widgets/step_recording_mini_player.dart';
 import '../widgets/workout_music_card.dart';
 import '../widgets/workout_widgets.dart';
 import 'workout_builder_screen.dart';
