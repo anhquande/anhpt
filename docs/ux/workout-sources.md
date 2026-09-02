@@ -8,6 +8,7 @@ Each source supports:
 
 - Enable or disable the source.
 - Edit the source name and catalog URL.
+- Copy the catalog URL to the system clipboard for quick sharing.
 - Refresh the source catalog.
 - Remove the source without deleting workouts that were already installed.
 
@@ -20,3 +21,7 @@ Selecting **Edit** opens a dialog prefilled with the current source name and cat
 - Saving a name-only change preserves the existing cached catalog.
 - Changing the catalog URL clears cached catalog data and refresh state for that source, then refreshes the source immediately when it is enabled.
 - The source ID is preserved, so installed workout provenance remains linked to the edited source.
+
+## Sharing a source
+
+Selecting **Copy URL** copies the catalog URL to the system clipboard and shows a confirmation message. The copied URL can then be pasted into chat, email, or another AnhPT installation.
