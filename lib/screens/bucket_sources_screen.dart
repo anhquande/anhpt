@@ -38,15 +38,7 @@ class BucketSourcesScreen extends StatelessWidget {
                     labelText: 'Catalog URL',
                     hintText: 'https://example.com/bucket.json',
                   ),
-                  validator: (value) {
-                    final uri = Uri.tryParse(value?.trim() ?? '');
-                    if (uri == null ||
-                        uri.scheme != 'https' ||
-                        !uri.hasAuthority) {
-                      return 'Enter a public HTTPS URL.';
-                    }
-                    return null;
-                  },
+                  validator: _validateCatalogUrl,
                 ),
               ],
             ),
@@ -82,6 +74,134 @@ class BucketSourcesScreen extends StatelessWidget {
         );
       }
     }
+  }
+
+  Future<void> _editSource(BuildContext context, String sourceId) async {
+    final sourceIndex =
+        controller.bucketSources.indexWhere((source) => source.id == sourceId);
+    if (sourceIndex < 0) return;
+    final source = controller.bucketSources[sourceIndex];
+    final nameController = TextEditingController(text: source.name);
+    final urlController = TextEditingController(text: source.catalogUrl);
+    final formKey = GlobalKey<FormState>();
+
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Edit workout source'),
+        content: Form(
+          key: formKey,
+          child: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Enter a name.'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: urlController,
+                  keyboardType: TextInputType.url,
+                  decoration: const InputDecoration(
+                    labelText: 'Catalog URL',
+                    hintText: 'https://example.com/bucket.json',
+                  ),
+                  validator: _validateCatalogUrl,
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dialogContext, true);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    final name = nameController.text.trim();
+    final url = urlController.text.trim();
+    nameController.dispose();
+    urlController.dispose();
+    if (submitted != true || !context.mounted) return;
+
+    try {
+      await _saveSourceChanges(sourceId, name, url);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Workout source updated.')),
+        );
+      }
+    } catch (error) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update source: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _saveSourceChanges(
+    String sourceId,
+    String name,
+    String catalogUrl,
+  ) async {
+    final index =
+        controller.bucketSources.indexWhere((source) => source.id == sourceId);
+    if (index < 0) throw StateError('Workout source no longer exists.');
+
+    final uri = Uri.tryParse(catalogUrl.trim());
+    if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) {
+      throw const FormatException('Enter a public HTTPS URL.');
+    }
+
+    final source = controller.bucketSources[index];
+    final normalizedUrl = uri.toString();
+    final urlChanged = source.catalogUrl != normalizedUrl;
+    controller.bucketSources[index] = source.copyWith(
+      name: name.trim(),
+      catalogUrl: normalizedUrl,
+      clearLastRefreshedAt: urlChanged,
+      clearLastError: urlChanged,
+      clearCachedCatalogJson: urlChanged,
+    );
+
+    if (urlChanged) {
+      controller.bucketCatalogEntries = controller.bucketCatalogEntries
+          .where((entry) => entry.sourceId != sourceId)
+          .toList();
+    }
+
+    await controller.store.saveBucketSources(controller.bucketSources);
+    controller.notifyListeners();
+
+    if (urlChanged && source.enabled) {
+      await controller.refreshBucketSource(sourceId);
+    }
+  }
+
+  static String? _validateCatalogUrl(String? value) {
+    final uri = Uri.tryParse(value?.trim() ?? '');
+    if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) {
+      return 'Enter a public HTTPS URL.';
+    }
+    return null;
   }
 
   Future<void> _removeSource(
@@ -183,7 +303,9 @@ class BucketSourcesScreen extends StatelessWidget {
                           source.lastRefreshedAt != null,
                       trailing: PopupMenuButton<String>(
                         onSelected: (value) {
-                          if (value == 'refresh') {
+                          if (value == 'edit') {
+                            _editSource(context, source.id);
+                          } else if (value == 'refresh') {
                             controller.refreshBucketSource(source.id);
                           } else if (value == 'remove') {
                             _removeSource(context, source.id, source.name);
@@ -191,12 +313,28 @@ class BucketSourcesScreen extends StatelessWidget {
                         },
                         itemBuilder: (_) => const [
                           PopupMenuItem(
+                            value: 'edit',
+                            child: ListTile(
+                              leading: Icon(Icons.edit_outlined),
+                              title: Text('Edit'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          PopupMenuItem(
                             value: 'refresh',
-                            child: Text('Refresh'),
+                            child: ListTile(
+                              leading: Icon(Icons.refresh),
+                              title: Text('Refresh'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                           PopupMenuItem(
                             value: 'remove',
-                            child: Text('Remove'),
+                            child: ListTile(
+                              leading: Icon(Icons.delete_outline),
+                              title: Text('Remove'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
                           ),
                         ],
                       ),
