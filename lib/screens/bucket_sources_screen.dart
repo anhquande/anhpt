@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../app/app_controller.dart';
 
@@ -196,6 +197,14 @@ class BucketSourcesScreen extends StatelessWidget {
     }
   }
 
+  Future<void> _copySourceUrl(BuildContext context, String catalogUrl) async {
+    await Clipboard.setData(ClipboardData(text: catalogUrl));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Workout source URL copied.')),
+    );
+  }
+
   static String? _validateCatalogUrl(String? value) {
     final uri = Uri.tryParse(value?.trim() ?? '');
     if (uri == null || uri.scheme != 'https' || !uri.hasAuthority) {
@@ -305,6 +314,8 @@ class BucketSourcesScreen extends StatelessWidget {
                         onSelected: (value) {
                           if (value == 'edit') {
                             _editSource(context, source.id);
+                          } else if (value == 'copyUrl') {
+                            _copySourceUrl(context, source.catalogUrl);
                           } else if (value == 'refresh') {
                             controller.refreshBucketSource(source.id);
                           } else if (value == 'remove') {
@@ -317,6 +328,14 @@ class BucketSourcesScreen extends StatelessWidget {
                             child: ListTile(
                               leading: Icon(Icons.edit_outlined),
                               title: Text('Edit'),
+                              contentPadding: EdgeInsets.zero,
+                            ),
+                          ),
+                          PopupMenuItem(
+                            value: 'copyUrl',
+                            child: ListTile(
+                              leading: Icon(Icons.copy_outlined),
+                              title: Text('Copy URL'),
                               contentPadding: EdgeInsets.zero,
                             ),
                           ),
