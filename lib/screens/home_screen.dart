@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
+import '../data/sample_data.dart';
 import '../models/local_profile.dart';
 import '../models/workout.dart';
 import '../services/health_store.dart';
+import '../services/local_store.dart';
 import '../services/workout_update_service.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
@@ -39,7 +41,46 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadProfiles();
     _loadTagPreferences();
-    controller.refreshAllBucketSources();
+    _syncOfficialBucketWorkouts();
+  }
+
+  Future<void> _syncOfficialBucketWorkouts() async {
+    try {
+      await controller.refreshAllBucketSources();
+      final officialEntries = controller.bucketCatalogEntries
+          .where((entry) => entry.sourceId == LocalStore.defaultBucketSourceId)
+          .toList();
+
+      for (final entry in officialEntries) {
+        if (controller.bucketInstallState(entry) != 'notInstalled') continue;
+
+        Workout? fallbackDemo;
+        if (entry.name == 'AnhPT Feature Demo') {
+          for (final workout in controller.workouts) {
+            if (workout.name == entry.name &&
+                controller.bucketProvenanceFor(workout.id) == null &&
+                workout.rawYaml.trim() == sampleYaml.trim()) {
+              fallbackDemo = workout;
+              break;
+            }
+          }
+        }
+
+        try {
+          if (fallbackDemo != null) {
+            await controller.deleteWorkout(fallbackDemo.id);
+          }
+          await controller.installBucketEntry(entry);
+        } catch (_) {
+          if (fallbackDemo != null &&
+              controller.byId(fallbackDemo.id) == null) {
+            await controller.saveWorkout(fallbackDemo);
+          }
+        }
+      }
+    } catch (_) {
+      // Keep the local dashboard usable when the official bucket is offline.
+    }
   }
 
   Future<void> _loadTagPreferences() async {
@@ -370,186 +411,190 @@ class _HomeScreenState extends State<HomeScreen> {
           }
           final noResults = visibleWorkouts.isEmpty;
 
-          return Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 900),
-              child: ListView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          decoration: InputDecoration(
-                            filled: true,
-                            prefixIcon: const Icon(Icons.search),
-                            hintText: 'Search workouts',
-                            suffixIcon: _query.isEmpty
-                                ? null
-                                : IconButton(
-                                    tooltip: 'Clear search',
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      setState(() => _query = '');
-                                    },
-                                    icon: const Icon(Icons.close),
-                                  ),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                          onChanged: (value) => setState(() => _query = value),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      PopupMenuButton<String>(
-                        tooltip: 'Workout actions',
-                        icon: const Icon(Icons.more_vert),
-                        onSelected: (value) {
-                          if (value == 'new') {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => WorkoutBuilderScreen(
-                                  controller: controller,
-                                ),
-                              ),
-                            );
-                          } else if (value == 'package') {
-                            _importPackage();
-                          } else if (value == 'yaml') {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => WorkoutEditorScreen(
-                                  controller: controller,
-                                  importMode: true,
-                                ),
-                              ),
-                            );
-                          }
-                        },
-                        itemBuilder: (_) => const [
-                          PopupMenuItem(
-                            value: 'new',
-                            child: ListTile(
-                              leading: Icon(Icons.add),
-                              title: Text('Create new workout'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'package',
-                            child: ListTile(
-                              leading: Icon(Icons.unarchive_outlined),
-                              title: Text('Import package'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                          PopupMenuItem(
-                            value: 'yaml',
-                            child: ListTile(
-                              leading: Icon(Icons.code),
-                              title: Text('Import YAML'),
-                              contentPadding: EdgeInsets.zero,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 42,
-                    child: Row(
+          return RefreshIndicator(
+            onRefresh: _syncOfficialBucketWorkouts,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 900),
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+                  children: [
+                    Row(
                       children: [
                         Expanded(
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            children: [
-                              ChoiceChip(
-                                label: const Text('All'),
-                                selected: _selectedFilter == 'all',
-                                onSelected: (_) =>
-                                    setState(() => _selectedFilter = 'all'),
+                          child: TextField(
+                            controller: _searchController,
+                            decoration: InputDecoration(
+                              filled: true,
+                              prefixIcon: const Icon(Icons.search),
+                              hintText: 'Search workouts',
+                              suffixIcon: _query.isEmpty
+                                  ? null
+                                  : IconButton(
+                                      tooltip: 'Clear search',
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _query = '');
+                                      },
+                                      icon: const Icon(Icons.close),
+                                    ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(14),
+                                borderSide: BorderSide.none,
                               ),
-                              const SizedBox(width: 8),
-                              ChoiceChip(
-                                label: const Text('Recent'),
-                                selected: _selectedFilter == 'recent',
-                                onSelected: (_) =>
-                                    setState(() => _selectedFilter = 'recent'),
-                              ),
-                              const SizedBox(width: 8),
-                              ChoiceChip(
-                                label: const Text('Favors'),
-                                selected: _selectedFilter == 'favorites',
-                                onSelected: (_) => setState(
-                                  () => _selectedFilter = 'favorites',
-                                ),
-                              ),
-                              for (final tag in visibleTags) ...[
-                                const SizedBox(width: 8),
-                                ChoiceChip(
-                                  label: Text(tag),
-                                  selected:
-                                      _selectedFilter == _normalize(tag),
-                                  onSelected: (_) => setState(
-                                    () => _selectedFilter = _normalize(tag),
-                                  ),
-                                ),
-                              ],
-                            ],
+                            ),
+                            onChanged: (value) => setState(() => _query = value),
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: 'Manage tags',
-                          onPressed: () => _manageTags(tags),
-                          icon: const Icon(Icons.tune),
+                        const SizedBox(width: 4),
+                        PopupMenuButton<String>(
+                          tooltip: 'Workout actions',
+                          icon: const Icon(Icons.more_vert),
+                          onSelected: (value) {
+                            if (value == 'new') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => WorkoutBuilderScreen(
+                                    controller: controller,
+                                  ),
+                                ),
+                              );
+                            } else if (value == 'package') {
+                              _importPackage();
+                            } else if (value == 'yaml') {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => WorkoutEditorScreen(
+                                    controller: controller,
+                                    importMode: true,
+                                  ),
+                                ),
+                              );
+                            }
+                          },
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(
+                              value: 'new',
+                              child: ListTile(
+                                leading: Icon(Icons.add),
+                                title: Text('Create new workout'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'package',
+                              child: ListTile(
+                                leading: Icon(Icons.unarchive_outlined),
+                                title: Text('Import package'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'yaml',
+                              child: ListTile(
+                                leading: Icon(Icons.code),
+                                title: Text('Import YAML'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  for (final workout in visibleWorkouts) ...[
-                    WorkoutCard(
-                      workout: workout,
-                      sourceName: _sourceNameFor(workout),
-                      originalName: _originalNameFor(workout),
-                      availableUpdateVersion:
-                          controller.updateForWorkout(workout.id)?.availableVersion,
-                      onStart: () => _openWorkout(context, workout),
-                      onFavorite: () => controller.toggleFavorite(workout.id),
-                    ),
-                    const SizedBox(height: 10),
-                  ],
-                  if (noResults)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 48),
-                      child: Column(
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      height: 42,
+                      child: Row(
                         children: [
-                          Icon(
-                            _query.isEmpty
-                                ? Icons.fitness_center_outlined
-                                : Icons.search_off_outlined,
-                            size: 36,
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
+                          Expanded(
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                ChoiceChip(
+                                  label: const Text('All'),
+                                  selected: _selectedFilter == 'all',
+                                  onSelected: (_) =>
+                                      setState(() => _selectedFilter = 'all'),
+                                ),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Text('Recent'),
+                                  selected: _selectedFilter == 'recent',
+                                  onSelected: (_) =>
+                                      setState(() => _selectedFilter = 'recent'),
+                                ),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Text('Favors'),
+                                  selected: _selectedFilter == 'favorites',
+                                  onSelected: (_) => setState(
+                                    () => _selectedFilter = 'favorites',
+                                  ),
+                                ),
+                                for (final tag in visibleTags) ...[
+                                  const SizedBox(width: 8),
+                                  ChoiceChip(
+                                    label: Text(tag),
+                                    selected:
+                                        _selectedFilter == _normalize(tag),
+                                    onSelected: (_) => setState(
+                                      () => _selectedFilter = _normalize(tag),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 12),
-                          Text(
-                            _query.isEmpty
-                                ? 'No workouts in this filter.'
-                                : 'No workouts match “$_query”.',
-                            textAlign: TextAlign.center,
+                          const SizedBox(width: 6),
+                          IconButton(
+                            tooltip: 'Manage tags',
+                            onPressed: () => _manageTags(tags),
+                            icon: const Icon(Icons.tune),
                           ),
                         ],
                       ),
                     ),
-                ],
+                    const SizedBox(height: 18),
+                    for (final workout in visibleWorkouts) ...[
+                      WorkoutCard(
+                        workout: workout,
+                        sourceName: _sourceNameFor(workout),
+                        originalName: _originalNameFor(workout),
+                        availableUpdateVersion:
+                            controller.updateForWorkout(workout.id)?.availableVersion,
+                        onStart: () => _openWorkout(context, workout),
+                        onFavorite: () => controller.toggleFavorite(workout.id),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    if (noResults)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 48),
+                        child: Column(
+                          children: [
+                            Icon(
+                              _query.isEmpty
+                                  ? Icons.fitness_center_outlined
+                                  : Icons.search_off_outlined,
+                              size: 36,
+                              color:
+                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              _query.isEmpty
+                                  ? 'No workouts in this filter.'
+                                  : 'No workouts match “$_query”.',
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           );
