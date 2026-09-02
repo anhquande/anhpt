@@ -106,6 +106,8 @@ class AudioDuckingController {
     double baseVolume = .35,
     String duckingMode = 'gentle',
   })  : _baseVolume = baseVolume.clamp(0.0, 1.0),
+        // Keep the public named parameter `duckingMode` stable.
+        // ignore: prefer_initializing_formals
         _duckingMode = duckingMode,
         _currentVolume = baseVolume.clamp(0.0, 1.0);
 
