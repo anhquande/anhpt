@@ -265,9 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     buildDefaultDragHandles: false,
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: draftOrder.length,
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       setSheetState(() {
-                        if (newIndex > oldIndex) newIndex--;
                         final item = draftOrder.removeAt(oldIndex);
                         draftOrder.insert(newIndex, item);
                       });
