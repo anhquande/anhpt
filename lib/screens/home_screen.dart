@@ -504,6 +504,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               );
+                            } else if (value == 'sources') {
+                              _openWorkoutSources();
                             }
                           },
                           itemBuilder: (_) => const [
@@ -528,6 +530,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: ListTile(
                                 leading: Icon(Icons.code),
                                 title: Text('Import YAML'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'sources',
+                              child: ListTile(
+                                leading: Icon(Icons.cloud_outlined),
+                                title: Text('Workout sources'),
                                 contentPadding: EdgeInsets.zero,
                               ),
                             ),
