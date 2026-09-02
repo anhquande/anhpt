@@ -49,11 +49,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _syncOfficialBucketWorkouts() async {
     try {
       await controller.refreshAllBucketSources();
-      final officialEntries = controller.bucketCatalogEntries
-          .where((entry) => entry.sourceId == LocalStore.defaultBucketSourceId)
-          .toList();
+      final availableEntries = controller.bucketCatalogEntries.toList();
 
-      for (final entry in officialEntries) {
+      for (final entry in availableEntries) {
         if (controller.bucketInstallState(entry) != 'notInstalled') continue;
 
         Workout? fallbackDemo;
@@ -81,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (_) {
-      // Keep the local dashboard usable when the official bucket is offline.
+      // Keep the local dashboard usable when a bucket source is offline.
     }
   }
 
