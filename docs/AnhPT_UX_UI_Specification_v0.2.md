@@ -297,6 +297,13 @@ a selected track even when workout music is disabled.
   larger feature image as their visual background. Until remote artwork is
   available, the UI shows bundled category artwork selected strictly by the
   workout's first tag; unknown or empty categories use the Strength default.
+- The pre-download detail screen reads as a workout introduction rather than a
+  package inspector. It leads with feature artwork, a benefit-led description,
+  duration, difficulty, equipment, verified author, and truthful download count;
+  then presents benefits, a scannable step outline, intensity, space, and tags.
+  The Download action remains fixed at the bottom and includes media size.
+  Source, version, and file details are available only through a small info icon.
+  Rating space is intentionally deferred until a trusted rating backend exists.
 - An installed entry exposes `Add another`, creating an independent local
   variant with the same source attribution. Duplicate local names receive the
   first available suffix, such as `Workout 2`, `Workout 3`, and `Workout 4`.

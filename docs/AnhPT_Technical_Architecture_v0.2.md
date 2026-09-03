@@ -245,6 +245,11 @@ with stable `id`, display metadata, version, and required `workoutUrl`,
 Artwork uses `thumbnailUrl`/`thumbnailSha256`/`thumbnailSize` and
 `featureImageUrl`/`featureImageSha256`/`featureImageSize`; each group is either
 complete or absent.
+Catalog discovery metadata also includes derived `durationSeconds`, expanded
+`stepCount`, and a structural `stepPreview` generated from workout YAML. Author,
+verification, difficulty, intensity, equipment, space, and benefits are curated
+manifest fields. `downloadCount` is the only popularity signal currently shown;
+the client must not label it as workout completions or infer a rating.
 Schema v1 catalogs are rejected. The assets archive contains the manifest and
 referenced media, but never workout YAML. Manual portable `.anhpt.zip`
 import/export remains a separate local sharing format.

@@ -157,6 +157,16 @@ class WorkoutBucketEntry {
   final int? featureImageSize;
   final List<String> tags;
   final String? author;
+  final bool authorVerified;
+  final int downloadCount;
+  final int? durationSeconds;
+  final int? stepCount;
+  final String? difficulty;
+  final String? intensity;
+  final List<String> equipment;
+  final List<String> benefits;
+  final String? space;
+  final List<WorkoutBucketStepPreview> stepPreview;
   final String? minAppVersion;
 
   const WorkoutBucketEntry({
@@ -180,6 +190,16 @@ class WorkoutBucketEntry {
     this.featureImageSize,
     this.tags = const [],
     this.author,
+    this.authorVerified = false,
+    this.downloadCount = 0,
+    this.durationSeconds,
+    this.stepCount,
+    this.difficulty,
+    this.intensity,
+    this.equipment = const [],
+    this.benefits = const [],
+    this.space,
+    this.stepPreview = const [],
     this.minAppVersion,
   });
 
@@ -213,6 +233,16 @@ class WorkoutBucketEntry {
     featureImageSize: featureImageSize,
     tags: tags,
     author: author,
+    authorVerified: authorVerified,
+    downloadCount: downloadCount,
+    durationSeconds: durationSeconds,
+    stepCount: stepCount,
+    difficulty: difficulty,
+    intensity: intensity,
+    equipment: equipment,
+    benefits: benefits,
+    space: space,
+    stepPreview: stepPreview,
     minAppVersion: minAppVersion,
   );
 
@@ -236,6 +266,17 @@ class WorkoutBucketEntry {
     if (featureImageSize != null) 'featureImageSize': featureImageSize,
     'tags': tags,
     if (author != null) 'author': author,
+    if (authorVerified) 'authorVerified': true,
+    'downloadCount': downloadCount,
+    if (durationSeconds != null) 'durationSeconds': durationSeconds,
+    if (stepCount != null) 'stepCount': stepCount,
+    if (difficulty != null) 'difficulty': difficulty,
+    if (intensity != null) 'intensity': intensity,
+    if (equipment.isNotEmpty) 'equipment': equipment,
+    if (benefits.isNotEmpty) 'benefits': benefits,
+    if (space != null) 'space': space,
+    if (stepPreview.isNotEmpty)
+      'stepPreview': stepPreview.map((step) => step.toJson()).toList(),
     if (minAppVersion != null) 'minAppVersion': minAppVersion,
   };
 
@@ -296,6 +337,32 @@ class WorkoutBucketEntry {
 
     validateOptionalImage('thumbnail');
     validateOptionalImage('featureImage');
+    List<String> stringList(String field) {
+      final raw = json[field];
+      if (raw == null) return const [];
+      if (raw is! List || raw.any((value) => value is! String)) {
+        throw FormatException('$field must be a list of strings');
+      }
+      return raw
+          .cast<String>()
+          .map((value) => value.trim())
+          .where((value) => value.isNotEmpty)
+          .toList();
+    }
+
+    int? positiveInt(String field) {
+      final value = json[field];
+      if (value == null) return null;
+      if (value is! int || value < 0) {
+        throw FormatException('$field must be a non-negative integer');
+      }
+      return value;
+    }
+
+    final rawStepPreview = json['stepPreview'];
+    if (rawStepPreview != null && rawStepPreview is! List) {
+      throw const FormatException('stepPreview must be a list');
+    }
     return WorkoutBucketEntry(
       sourceId: _optionalString(json, 'sourceId'),
       id: _requiredString(json, 'id'),
@@ -319,7 +386,59 @@ class WorkoutBucketEntry {
       featureImageSize: json['featureImageSize'] as int?,
       tags: tags,
       author: _optionalString(json, 'author'),
+      authorVerified: json['authorVerified'] as bool? ?? false,
+      downloadCount: positiveInt('downloadCount') ?? 0,
+      durationSeconds: positiveInt('durationSeconds'),
+      stepCount: positiveInt('stepCount'),
+      difficulty: _optionalString(json, 'difficulty'),
+      intensity: _optionalString(json, 'intensity'),
+      equipment: stringList('equipment'),
+      benefits: stringList('benefits'),
+      space: _optionalString(json, 'space'),
+      stepPreview: (rawStepPreview as List? ?? const [])
+          .map(
+            (step) => WorkoutBucketStepPreview.fromJson(
+              Map<String, dynamic>.from(step as Map),
+            ),
+          )
+          .toList(growable: false),
       minAppVersion: _optionalString(json, 'minAppVersion'),
+    );
+  }
+}
+
+class WorkoutBucketStepPreview {
+  final String name;
+  final int durationSeconds;
+  final bool hasGuide;
+  final bool hasMedia;
+
+  const WorkoutBucketStepPreview({
+    required this.name,
+    this.durationSeconds = 0,
+    this.hasGuide = false,
+    this.hasMedia = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'durationSeconds': durationSeconds,
+    if (hasGuide) 'hasGuide': true,
+    if (hasMedia) 'hasMedia': true,
+  };
+
+  factory WorkoutBucketStepPreview.fromJson(Map<String, dynamic> json) {
+    final duration = json['durationSeconds'] ?? 0;
+    if (duration is! int || duration < 0) {
+      throw const FormatException(
+        'stepPreview durationSeconds must be a non-negative integer',
+      );
+    }
+    return WorkoutBucketStepPreview(
+      name: _requiredString(json, 'name'),
+      durationSeconds: duration,
+      hasGuide: json['hasGuide'] as bool? ?? false,
+      hasMedia: json['hasMedia'] as bool? ?? false,
     );
   }
 }
