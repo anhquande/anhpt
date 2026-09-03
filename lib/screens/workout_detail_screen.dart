@@ -48,7 +48,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     widget.controller.refreshAllBucketSources();
   }
 
@@ -372,10 +372,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         final sourceName = provenance == null
             ? null
             : controller.bucketSourceName(provenance);
-        final originalName = provenance == null
-            ? null
-            : controller.bucketOriginalName(provenance);
         final bucketEntry = controller.bucketEntryForWorkout(workout.id);
+        final isWideLayout = MediaQuery.sizeOf(context).width >= 840;
 
         return Scaffold(
           appBar: AppBar(
@@ -385,6 +383,15 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
               overflow: TextOverflow.ellipsis,
             ),
             actions: [
+              if (isWideLayout)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: FilledButton.icon(
+                    onPressed: () => _startWorkout(workout),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: const Text('Start'),
+                  ),
+                ),
               PopupMenuButton<_WorkoutAction>(
                 tooltip: 'Workout actions',
                 icon: const Icon(Icons.more_vert),
@@ -430,7 +437,6 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
               constraints: const BoxConstraints(maxWidth: 820),
               child: Column(
                 children: [
-                  _CompactWorkoutHeader(workout: workout),
                   if (update != null)
                     _WorkoutUpdateBanner(
                       update: update,
@@ -438,9 +444,10 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                     ),
                   TabBar(
                     controller: _tabController,
-                    tabs: const [
-                      Tab(text: 'Overview'),
-                      Tab(text: 'Steps'),
+                    tabs: [
+                      const Tab(text: 'Overview'),
+                      Tab(text: 'Exercises · ${workout.effectiveStepCount}'),
+                      const Tab(text: 'Audio'),
                     ],
                   ),
                   Expanded(
@@ -452,38 +459,16 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                           key: const PageStorageKey('overview-tab'),
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                           children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(18),
-                              child: SizedBox(
-                                height: 190,
-                                child: WorkoutArtwork(
-                                  tags: workout.tags,
-                                  kind: WorkoutArtworkKind.feature,
-                                  bucketEntry: bucketEntry,
-                                  bucketService: controller.workoutBuckets,
-                                ),
-                              ),
+                            _WorkoutHero(
+                              workout: workout,
+                              sourceName: sourceName,
+                              bucketEntry: bucketEntry,
+                              controller: controller,
                             ),
-                            const SizedBox(height: 16),
-                            if (sourceName != null) ...[
-                              _WorkoutOrigin(
-                                sourceName,
-                                originalName:
-                                    originalName != null &&
-                                        originalName.trim() !=
-                                            workout.name.trim()
-                                    ? originalName
-                                    : null,
-                              ),
-                              const SizedBox(height: 14),
-                            ],
-                            if (workout.description.trim().isNotEmpty) ...[
-                              const _SectionTitle('About'),
-                              const SizedBox(height: 8),
-                              _WorkoutDescription(workout.description.trim()),
-                              const SizedBox(height: 18),
-                            ],
+                            const SizedBox(height: 14),
+                            _CompactWorkoutHeader(workout: workout),
                             if (workout.tags.isNotEmpty) ...[
+                              const SizedBox(height: 12),
                               Wrap(
                                 spacing: 7,
                                 runSpacing: 7,
@@ -501,63 +486,47 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                                     ),
                                 ],
                               ),
-                              const SizedBox(height: 20),
                             ],
-                            const _SectionTitle('Workout options'),
-                            const SizedBox(height: 8),
-                            _CompactOptionContainer(
-                              child: SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                secondary: const Icon(Icons.power_settings_new),
-                                title: const Text('After workout'),
-                                subtitle: Text(
-                                  workout.completionAction == 'shutdown_or_exit'
-                                      ? 'Shut down or exit when complete'
-                                      : 'Stay open after completion',
-                                ),
-                                value:
-                                    workout.completionAction ==
-                                    'shutdown_or_exit',
-                                onChanged: (enabled) =>
-                                    controller.setWorkoutCompletionAction(
-                                      workout.id,
-                                      enabled: enabled,
-                                    ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            _CompactOptionContainer(
-                              child: SwitchListTile(
-                                contentPadding: EdgeInsets.zero,
-                                secondary: const Icon(
-                                  Icons.screen_lock_landscape_outlined,
-                                ),
-                                title: const Text('Screen during workout'),
-                                subtitle: Text(
-                                  workout.screenOffAfterStart != null
-                                      ? 'Turn display off after Start'
-                                      : 'Keep current display behavior',
-                                ),
-                                value: workout.screenOffAfterStart != null,
-                                onChanged: (enabled) =>
-                                    controller.setWorkoutScreenOffAfterStart(
-                                      workout.id,
-                                      enabled: enabled,
-                                    ),
-                              ),
-                            ),
+                            if (workout.description.trim().isNotEmpty) ...[
+                              const SizedBox(height: 18),
+                              const _SectionTitle('About'),
+                              const SizedBox(height: 8),
+                              _WorkoutDescription(workout.description.trim()),
+                            ],
                             const SizedBox(height: 20),
-                            const _SectionTitle('Audio'),
-                            const SizedBox(height: 8),
-                            WorkoutMusicCard(
-                              key: _musicCardKey,
-                              controller: controller,
-                              workout: workout,
+                            LayoutBuilder(
+                              builder: (context, constraints) {
+                                final preview = _WorkoutPreview(
+                                  workout: workout,
+                                  onViewAll: () => _tabController.animateTo(1),
+                                );
+                                final options = _WorkoutOptions(
+                                  controller: controller,
+                                  workout: workout,
+                                );
+                                if (constraints.maxWidth < 680) {
+                                  return Column(
+                                    children: [
+                                      preview,
+                                      const SizedBox(height: 12),
+                                      options,
+                                    ],
+                                  );
+                                }
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(flex: 3, child: preview),
+                                    const SizedBox(width: 12),
+                                    Expanded(flex: 2, child: options),
+                                  ],
+                                );
+                              },
                             ),
                           ],
                         ),
                         ListView(
-                          key: const PageStorageKey('steps-tab'),
+                          key: const PageStorageKey('exercises-tab'),
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                           children: [
                             WorkoutStructure(
@@ -593,6 +562,19 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                             ),
                           ],
                         ),
+                        ListView(
+                          key: const PageStorageKey('audio-tab'),
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                          children: [
+                            const _SectionTitle('Background music'),
+                            const SizedBox(height: 8),
+                            WorkoutMusicCard(
+                              key: _musicCardKey,
+                              controller: controller,
+                              workout: workout,
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -600,32 +582,308 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
               ),
             ),
           ),
-          bottomNavigationBar: SafeArea(
-            top: false,
-            child: Material(
-              elevation: 8,
-              child: Center(
-                heightFactor: 1,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 820),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                    child: SizedBox(
-                      width: double.infinity,
-                      height: 48,
-                      child: FilledButton.icon(
-                        onPressed: () => _startWorkout(workout),
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: const Text('Start workout'),
+          bottomNavigationBar: isWideLayout
+              ? null
+              : SafeArea(
+                  top: false,
+                  child: Material(
+                    elevation: 8,
+                    child: Center(
+                      heightFactor: 1,
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 820),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                          child: SizedBox(
+                            width: double.infinity,
+                            height: 48,
+                            child: FilledButton.icon(
+                              onPressed: () => _startWorkout(workout),
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: const Text('Start workout'),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
-          ),
         );
       },
+    );
+  }
+}
+
+class _WorkoutHero extends StatelessWidget {
+  final Workout workout;
+  final String? sourceName;
+  final WorkoutBucketEntry? bucketEntry;
+  final AppController controller;
+
+  const _WorkoutHero({
+    required this.workout,
+    required this.sourceName,
+    required this.bucketEntry,
+    required this.controller,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final description = workout.description.trim();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: SizedBox(
+        height: 210,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            WorkoutArtwork(
+              tags: workout.tags,
+              kind: WorkoutArtworkKind.feature,
+              bucketEntry: bucketEntry,
+              bucketService: controller.workoutBuckets,
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Color(0xCC000000)],
+                  stops: [.35, 1],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 18,
+              right: 18,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (sourceName != null) ...[
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.cloud_done_outlined,
+                          size: 17,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            sourceName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                  Text(
+                    workout.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  if (description.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: colors.surface, height: 1.3),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkoutPreview extends StatelessWidget {
+  final Workout workout;
+  final VoidCallback onViewAll;
+
+  const _WorkoutPreview({required this.workout, required this.onViewAll});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final steps = workout.expand().take(3).toList();
+    return _OverviewPanel(
+      child: Column(
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _SectionTitle('Workout preview')),
+              TextButton(
+                onPressed: onViewAll,
+                child: Text('View all ${workout.effectiveStepCount}'),
+              ),
+            ],
+          ),
+          for (var index = 0; index < steps.length; index++) ...[
+            if (index > 0) const Divider(height: 1),
+            _PreviewStep(index: index + 1, executable: steps[index]),
+          ],
+          if (steps.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              child: Text(
+                'No exercises yet',
+                style: TextStyle(color: colors.onSurfaceVariant),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewStep extends StatelessWidget {
+  final int index;
+  final ExecutableStep executable;
+
+  const _PreviewStep({required this.index, required this.executable});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final step = executable.step;
+    final guide = step.guide?.trim() ?? '';
+    final repeat = executable.repeat;
+    final detail = repeat != null && repeat.total > 1
+        ? 'Repeat ${repeat.index} of ${repeat.total}'
+        : guide;
+    return SizedBox(
+      height: 62,
+      child: Row(
+        children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: colors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(9),
+            ),
+            child: Text('$index'),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  step.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (detail.isNotEmpty)
+                  Text(
+                    detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            step.duration == Duration.zero
+                ? 'Instruction'
+                : formatDuration(step.duration),
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkoutOptions extends StatelessWidget {
+  final AppController controller;
+  final Workout workout;
+
+  const _WorkoutOptions({required this.controller, required this.workout});
+
+  @override
+  Widget build(BuildContext context) {
+    return _OverviewPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _SectionTitle('Workout options'),
+          const SizedBox(height: 4),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.screen_lock_landscape_outlined),
+            title: const Text('Screen during workout'),
+            subtitle: Text(
+              workout.screenOffAfterStart != null
+                  ? 'Turn display off after Start'
+                  : 'Keep current display behavior',
+            ),
+            value: workout.screenOffAfterStart != null,
+            onChanged: (enabled) => controller.setWorkoutScreenOffAfterStart(
+              workout.id,
+              enabled: enabled,
+            ),
+          ),
+          const Divider(height: 1),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            secondary: const Icon(Icons.power_settings_new),
+            title: const Text('After workout'),
+            subtitle: Text(
+              workout.completionAction == 'shutdown_or_exit'
+                  ? 'Shut down or exit when complete'
+                  : 'Stay open after completion',
+            ),
+            value: workout.completionAction == 'shutdown_or_exit',
+            onChanged: (enabled) => controller.setWorkoutCompletionAction(
+              workout.id,
+              enabled: enabled,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OverviewPanel extends StatelessWidget {
+  final Widget child;
+
+  const _OverviewPanel({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(padding: const EdgeInsets.all(14), child: child),
     );
   }
 }
@@ -721,24 +979,6 @@ class _CompactWorkoutHeader extends StatelessWidget {
   }
 }
 
-class _CompactOptionContainer extends StatelessWidget {
-  final Widget child;
-
-  const _CompactOptionContainer({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        child: child,
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   final String text;
 
@@ -751,32 +991,6 @@ class _SectionTitle extends StatelessWidget {
       style: Theme.of(
         context,
       ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-    );
-  }
-}
-
-class _WorkoutOrigin extends StatelessWidget {
-  final String sourceName;
-  final String? originalName;
-
-  const _WorkoutOrigin(this.sourceName, {this.originalName});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = Theme.of(context).colorScheme.onSurfaceVariant;
-    return Row(
-      children: [
-        Icon(Icons.cloud_outlined, size: 17, color: color),
-        const SizedBox(width: 7),
-        Expanded(
-          child: Text(
-            originalName == null
-                ? 'From $sourceName'
-                : 'From $sourceName · Originally “$originalName”',
-            style: TextStyle(color: color),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -78,7 +78,11 @@ sequenceDiagram
 
 If the same catalog entry is already installed, the caller must choose a conflict resolution. Current behavior supports keeping the local version or replacing it. Replacement removes the previous local workout/provenance before adding the newly imported copy.
 
-The controller also checks `minAppVersion` before download/import.
+The controller also checks `minAppVersion` before download/import. The installed
+version is read from platform package metadata during `AppController.initialize()`;
+it is not duplicated as a hard-coded application constant. If platform metadata
+cannot be read, compatibility fails safely with an explicit version-detection
+error instead of assuming an outdated version.
 
 ## Local naming
 

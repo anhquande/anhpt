@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import '../data/sample_data.dart';
 import '../models/coach_recording.dart';
@@ -23,14 +24,16 @@ import '../services/workout_yaml_file_store.dart';
 import '../services/coach_recording_service.dart';
 
 class AppController extends ChangeNotifier {
-  static const currentAppVersion = '0.8.2';
   final LocalStore store;
   final WorkoutYamlFileStore? yamlFileStore;
+  String? currentAppVersion;
   AppController(
     this.store, {
     this.yamlFileStore,
     WorkoutBucketService? workoutBuckets,
-  }) : workoutBuckets = workoutBuckets ?? WorkoutBucketService();
+    String? appVersion,
+  }) : workoutBuckets = workoutBuckets ?? WorkoutBucketService(),
+       currentAppVersion = appVersion;
 
   bool loading = true;
   bool onboarded = false;
@@ -52,6 +55,15 @@ class AppController extends ChangeNotifier {
   String? _documentsPath;
 
   Future<void> initialize() async {
+    if (currentAppVersion == null) {
+      try {
+        final packageInfo = await PackageInfo.fromPlatform();
+        final version = packageInfo.version.trim();
+        if (version.isNotEmpty) currentAppVersion = version;
+      } catch (_) {
+        currentAppVersion = null;
+      }
+    }
     if (!kIsWeb) {
       try {
         _documentsPath = (await getApplicationDocumentsDirectory()).path;
@@ -717,9 +729,14 @@ class AppController extends ChangeNotifier {
   }
 
   String? bucketEntryCompatibilityError(WorkoutBucketEntry entry) {
-    if (entry.minAppVersion != null &&
-        _compareVersions(currentAppVersion, entry.minAppVersion!) < 0) {
-      return 'Requires AnhPT ${entry.minAppVersion} or newer.';
+    final requiredVersion = entry.minAppVersion;
+    if (requiredVersion == null) return null;
+    final installedVersion = currentAppVersion;
+    if (installedVersion == null) {
+      return 'Could not determine the installed AnhPT version.';
+    }
+    if (_compareVersions(installedVersion, requiredVersion) < 0) {
+      return 'Requires AnhPT $requiredVersion or newer.';
     }
     return null;
   }

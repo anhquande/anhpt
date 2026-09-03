@@ -68,7 +68,7 @@ void main() {
     expect(find.text('Turn off screen after starting'), findsOneWidget);
   });
 
-  testWidgets('workout detail uses compact Overview and Steps layout', (
+  testWidgets('workout detail prioritizes preview, exercises, and audio', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 700));
@@ -112,24 +112,23 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Sticky workout title'), findsOneWidget);
+    expect(find.text('Sticky workout title'), findsNWidgets(2));
     expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
     expect(find.byTooltip('Workout actions'), findsOneWidget);
     expect(find.text('Overview'), findsOneWidget);
-    expect(find.text('Steps'), findsOneWidget);
-    expect(find.text('Music'), findsNothing);
-    expect(find.text('Structure'), findsNothing);
+    expect(find.text('Exercises · 18'), findsOneWidget);
+    expect(find.text('Audio'), findsOneWidget);
     expect(find.text('Strength'), findsOneWidget);
     expect(find.text('Beginner'), findsOneWidget);
     expect(find.text('More'), findsOneWidget);
-    expect(
-      find.text('From AnhPT Official · Originally “Original Sticky Workout”'),
-      findsOneWidget,
-    );
-    await tester.drag(
-      find.byKey(const PageStorageKey('overview-tab')),
-      const Offset(0, -360),
-    );
+    expect(find.text('AnhPT Official'), findsOneWidget);
+    expect(find.textContaining('Originally'), findsNothing);
+    expect(find.text('Workout preview'), findsOneWidget);
+    expect(find.text('View all 18'), findsOneWidget);
+    expect(find.text('Step 1'), findsOneWidget);
+
+    final afterWorkout = find.widgetWithText(SwitchListTile, 'After workout');
+    await tester.ensureVisible(afterWorkout);
     await tester.pumpAndSettle();
     expect(find.text('Workout options'), findsOneWidget);
     expect(find.text('After workout'), findsOneWidget);
@@ -137,9 +136,6 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Screen during workout'), findsOneWidget);
     expect(find.text('Keep current display behavior'), findsOneWidget);
 
-    final afterWorkout = find.widgetWithText(SwitchListTile, 'After workout');
-    await tester.ensureVisible(afterWorkout);
-    await tester.pumpAndSettle();
     await tester.tap(afterWorkout);
     await tester.pumpAndSettle();
     expect(controller.byId('sticky')!.completionAction, 'shutdown_or_exit');
@@ -160,14 +156,12 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Turn display off after Start'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
 
-    final overviewList = find.byKey(const PageStorageKey('overview-tab'));
-    await tester.drag(overviewList, const Offset(0, -520));
+    await tester.tap(find.text('Audio'));
     await tester.pumpAndSettle();
-    expect(find.text('Audio'), findsOneWidget);
-    expect(find.text('Background music'), findsOneWidget);
+    expect(find.text('Background music'), findsWidgets);
     expect(find.widgetWithText(FilledButton, 'Start workout'), findsOneWidget);
 
-    await tester.tap(find.text('Steps'));
+    await tester.tap(find.text('Exercises · 18'));
     await tester.pumpAndSettle();
     expect(find.text('Step 1'), findsOneWidget);
     expect(find.text('Workout options'), findsNothing);
@@ -202,6 +196,44 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Source: AnhPT Official'), findsOneWidget);
     expect(find.text('Workout ID: original-sticky-workout'), findsOneWidget);
     expect(find.text('Original name: Original Sticky Workout'), findsOneWidget);
+  });
+
+  testWidgets('workout detail moves Start into the app bar on wide layouts', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1200, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppController(LocalStore())
+      ..workouts = [
+        WorkoutParser.parse(
+          '''
+version: 2
+name: Wide workout
+steps:
+  - name: Instruction
+''',
+          id: 'wide',
+          defaultVoiceLanguage: 'en',
+        ),
+      ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: MediaQuery(
+          data: const MediaQueryData(size: Size(1200, 700)),
+          child: WorkoutDetailScreen(
+            controller: controller,
+            workoutId: 'wide',
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Start'), findsOneWidget);
+    expect(find.text('Start workout'), findsNothing);
+    expect(find.text('Instruction'), findsWidgets);
   });
 
   testWidgets('app shows onboarding on first launch', (tester) async {

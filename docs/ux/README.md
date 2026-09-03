@@ -1,66 +1,28 @@
-# AnhPT UI Wireframes
+# AnhPT UX Documentation
 
-AnhPT uses text-based wireframes as a lightweight UI contract between the product owner and AI coding agents.
+This folder contains modular UX guidance that complements the canonical product specification in [`../AnhPT_UX_UI_Specification_v0.3.md`](../AnhPT_UX_UI_Specification_v0.3.md).
 
-## Why text-based wireframes
+The v0.3 specification remains the source of truth for established product decisions. Files in this folder explain how to apply those decisions consistently during design, implementation, and PR review.
 
-- Versioned together with the source code.
-- Easy to review in pull requests.
-- Easy for AI agents to read and update.
-- Fast to change before Flutter implementation begins.
-- Keeps product intent separate from implementation details.
+## Documents
 
-## Formats
+- [`design-principles.md`](design-principles.md) — core UX principles and decision rules.
+- [`information-architecture.md`](information-architecture.md) — navigation, screen ownership, and where features belong.
+- [`interaction-patterns.md`](interaction-patterns.md) — reusable behavior for actions, dialogs, lists, tables, media, and forms.
+- [`player-camera.md`](player-camera.md) — workout Player, camera lifecycle, PiP, media fallback, and stable layout rules.
+- [`responsive-platforms.md`](responsive-platforms.md) — Windows and Android responsive behavior.
+- [`states-and-feedback.md`](states-and-feedback.md) — loading, empty, error, offline, disabled, success, and degradation patterns.
+- [`accessibility.md`](accessibility.md) — accessibility requirements for workout usage and general UI.
+- [`ux-pr-checklist.md`](ux-pr-checklist.md) — review checklist for future UI/UX pull requests.
 
-Use Mermaid for navigation and screen-to-screen flows.
-Use PlantUML Salt for the internal layout of individual screens.
+## Documentation rule
 
-## Workflow
+When a UX decision changes:
 
-```mermaid
-flowchart LR
-    Idea --> Wireframe
-    Wireframe --> Review
-    Review --> FlutterImplementation[Flutter implementation]
-    FlutterImplementation --> Screenshot
-    Screenshot --> UXReview[UX review]
-    UXReview --> Done
-    UXReview -->|Needs changes| Wireframe
-```
+1. Update the canonical UX/UI specification if product behavior changes.
+2. Update the relevant modular guide if implementation guidance changes.
+3. Avoid copying the same long requirement into several files; link to the source of truth instead.
 
-## Wireframe gallery
+## Scope
 
-### Workout Detail
-
-Source: [`workout-detail.puml`](workout-detail.puml)  
-Design notes: [`workout-detail-notes.md`](workout-detail-notes.md)
-
-![Workout Detail wireframe](workout-detail.svg)
-
-## Conventions
-
-Wireframes describe structure, hierarchy, important controls, and interaction intent. They are not expected to be pixel-perfect representations of Flutter widgets.
-
-When a UI change affects layout or interaction significantly:
-
-1. Update the corresponding wireframe first.
-2. Review the intended UX in this Markdown gallery or the screen-specific notes.
-3. Implement the Flutter change.
-4. Compare the running application with the wireframe.
-5. Update the wireframe if the final accepted design differs.
-
-## Rendering PlantUML Salt
-
-The source of truth is the `.puml` file. GitHub Actions automatically renders PlantUML sources under `docs/` to SVG and commits the generated SVG files back to the repository.
-
-For example:
-
-```text
-docs/ux/workout-detail.puml
-        ↓
-docs/ux/workout-detail.svg
-        ↓
-embedded in docs/ux/README.md and workout-detail-notes.md
-```
-
-The generated SVG is committed for convenient viewing and embedding, but changes should be made to the `.puml` source rather than editing the SVG directly.
+These documents cover user-facing behavior. Technical architecture, YAML schema, health requirements, and project-management concerns remain in their existing documentation under `docs/`.

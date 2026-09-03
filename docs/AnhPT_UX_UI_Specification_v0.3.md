@@ -66,13 +66,17 @@ Use the Home visual system: standard app bar, same inset search field, counted s
 
 ## 4. Workout Overview / Detail
 
-Use one persistent top app bar. It contains the ellipsized workout title, primary `Start` action, and an adjacent overflow menu.
+Use one persistent top app bar. It contains the ellipsized workout title and an adjacent overflow menu. On wide layouts the primary `Start` action also appears in the app bar. On narrow/mobile layouts, `Start workout` remains in a persistent bottom action area for comfortable one-handed access.
 
 The overflow menu contains Edit, Duplicate, Copy YAML, Edit YAML, and Export package. Do not repeat these actions in the scrolling content. `Delete workout` is separated as destructive and requires confirmation.
 
-The summary area contains description, tags, lightweight metadata, source attribution when applicable, `After workout`, and `Screen during workout` controls.
+The Overview leads with feature artwork, source attribution when applicable, the workout name, and a compact description. Lightweight duration, effective-step-count, language, and voice-mode metadata follow the artwork. Tags remain visually secondary.
 
-Use `Introduction`, `Music`, and `Structure` tabs, with `Structure` selected initially. The tab bar pins below the app bar when the summary scrolls away. Preserve each tab's scroll position. Disable horizontal swipe between tabs to avoid slider conflicts.
+Use `Overview`, `Exercises · N`, and `Audio` tabs, with Overview selected initially. Overview provides a three-step execution preview and workout-level options; `View all N` opens Exercises. Exercises contains the complete nested step/repeat structure. Audio owns background-music controls. Preserve each tab's scroll position and disable horizontal swipe between tabs to avoid slider conflicts.
+
+On wide layouts, the preview and workout options may share two columns. On narrow layouts they stack vertically. `After workout` and `Screen during workout` remain directly available but must not visually compete with the workout summary or preview.
+
+Zero-duration steps in the Overview preview use the label `Instruction` instead of presenting an unexplained blank duration. Source origin is concise in the hero; original catalog name, stable catalog ID, and installed version remain available through `View source`.
 
 Description collapses after three lines with More/Less. Tags are compact secondary chips. Duration, step count, language, and voice mode use lightweight icon/text metadata rather than chips.
 

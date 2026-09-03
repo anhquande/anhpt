@@ -18,8 +18,8 @@ The screen is organized into four persistent layers:
 
 1. App bar with the workout name and overflow actions.
 2. Compact workout summary header.
-3. `Overview` and `Steps` tabs.
-4. A prominent Start Workout action at the bottom.
+3. `Overview`, `Exercises · N`, and `Audio` tabs.
+4. A prominent Start action in the app bar on wide layouts or at the bottom on narrow layouts.
 
 An update banner appears between the summary header and tabs when a newer bucket version is available.
 
@@ -27,16 +27,19 @@ An update banner appears between the summary header and tabs when a newer bucket
 
 The wireframe represents the main information hierarchy rather than every implementation detail:
 
-- workout source when available
-- description
-- tags
-- workout-level options
-- voice guidance configuration
-- background music configuration
+- feature artwork with concise workout source when available
+- compact description, tags, and playback metadata
+- a preview of the first three executable steps
+- a direct `View all N` route to the full Exercises tab
+- workout-level options, arranged beside the preview on wide layouts and below it on narrow layouts
 
-## Steps tab
+## Exercises tab
 
-The `Steps` tab is intentionally represented only as a tab entry in the first wireframe iteration. A dedicated step-list wireframe should be added separately because step cards contain their own demonstration-media and recording interactions.
+The `Exercises · N` tab contains the complete step and nested-repeat structure, including demonstration-media and recording interactions. `N` is the effective execution-step count.
+
+## Audio tab
+
+The Audio tab owns background-music selection, preview, volume, and ducking controls so these settings do not crowd the primary Overview journey.
 
 ## Design rule
 

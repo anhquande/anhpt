@@ -147,13 +147,13 @@ steps:
       ),
     ));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Steps'));
+    await tester.tap(find.text('Exercises · 1'));
     await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       find.byTooltip('Record step cue'),
       300,
       scrollable: find.descendant(
-        of: find.byKey(const PageStorageKey('steps-tab')),
+        of: find.byKey(const PageStorageKey('exercises-tab')),
         matching: find.byType(Scrollable),
       ),
     );
