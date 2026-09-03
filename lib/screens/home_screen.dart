@@ -9,6 +9,7 @@ import '../services/local_store.dart';
 import '../services/workout_update_service.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
+import 'bucket_sources_screen.dart';
 import 'health_screen.dart';
 import 'local_profiles_screen.dart';
 import 'settings_screen.dart';
@@ -48,11 +49,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _syncOfficialBucketWorkouts() async {
     try {
       await controller.refreshAllBucketSources();
-      final officialEntries = controller.bucketCatalogEntries
-          .where((entry) => entry.sourceId == LocalStore.defaultBucketSourceId)
-          .toList();
+      final availableEntries = controller.bucketCatalogEntries.toList();
 
-      for (final entry in officialEntries) {
+      for (final entry in availableEntries) {
         if (controller.bucketInstallState(entry) != 'notInstalled') continue;
 
         Workout? fallbackDemo;
@@ -80,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       }
     } catch (_) {
-      // Keep the local dashboard usable when the official bucket is offline.
+      // Keep the local dashboard usable when a bucket source is offline.
     }
   }
 
@@ -136,6 +135,15 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: controller,
           workoutId: workout.id,
         ),
+      ),
+    );
+  }
+
+  Future<void> _openWorkoutSources() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => BucketSourcesScreen(controller: controller),
       ),
     );
   }
@@ -494,6 +502,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               );
+                            } else if (value == 'sources') {
+                              _openWorkoutSources();
                             }
                           },
                           itemBuilder: (_) => const [
@@ -518,6 +528,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: ListTile(
                                 leading: Icon(Icons.code),
                                 title: Text('Import YAML'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'sources',
+                              child: ListTile(
+                                leading: Icon(Icons.cloud_outlined),
+                                title: Text('Workout sources'),
                                 contentPadding: EdgeInsets.zero,
                               ),
                             ),
@@ -611,6 +629,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   : 'No workouts match “$_query”.',
                               textAlign: TextAlign.center,
                             ),
+                            if (_query.trim().isNotEmpty) ...[
+                              const SizedBox(height: 16),
+                              OutlinedButton.icon(
+                                onPressed: _openWorkoutSources,
+                                icon: const Icon(Icons.cloud_outlined),
+                                label: const Text('Manage workout sources'),
+                              ),
+                            ],
                           ],
                         ),
                       ),
