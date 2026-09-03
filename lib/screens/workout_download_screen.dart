@@ -40,6 +40,7 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
   String? _installedWorkoutId;
   bool _userInteracted = false;
   bool _opening = false;
+  bool _showAllSteps = false;
   late DateTime _openedAt;
 
   @override
@@ -184,6 +185,18 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
           _phase == _DownloadPhase.failed,
       child: Scaffold(
         appBar: AppBar(title: const Text('Workout details')),
+        bottomNavigationBar: _DownloadActionBar(
+          phase: _phase,
+          progress: _progress,
+          statusText: _statusText,
+          sizeText: _formatBytes(widget.entry.assetsSize),
+          error: _error,
+          compatibilityError: widget.controller.bucketEntryCompatibilityError(
+            widget.entry,
+          ),
+          onDownload: _install,
+          onOpen: _openWorkout,
+        ),
         body: NotificationListener<ScrollNotification>(
           onNotification: (notification) {
             if (notification is UserScrollNotification && !_userInteracted) {
@@ -236,165 +249,137 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              if (_recommended) ...[
-                const SizedBox(height: 8),
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Chip(
-                    avatar: Icon(Icons.auto_awesome, size: 16),
-                    label: Text('Recommended'),
-                  ),
-                ),
-              ],
               if (widget.entry.description.isNotEmpty) ...[
-                const SizedBox(height: 12),
                 Text(
                   widget.entry.description,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    height: 1.35,
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
               Wrap(
-                spacing: 8,
-                runSpacing: 8,
+                spacing: 10,
+                runSpacing: 10,
                 children: [
-                  _MetaChip(
-                    icon: Icons.cloud_outlined,
-                    label: widget.sourceName,
-                  ),
-                  _MetaChip(
-                    icon: Icons.system_update_alt,
-                    label:
-                        'v${widget.entry.version} '
-                        '(${_formatBytes(widget.entry.assetsSize)} media)',
-                  ),
-                  if (widget.entry.author != null)
-                    _MetaChip(
-                      icon: Icons.person_outline,
-                      label: widget.entry.author!,
+                  if (widget.entry.durationSeconds case final seconds?)
+                    _QuickFact(
+                      icon: Icons.schedule,
+                      label: _formatDuration(seconds),
                     ),
+                  if (widget.entry.difficulty case final difficulty?)
+                    _QuickFact(
+                      icon: Icons.signal_cellular_alt,
+                      label: difficulty,
+                    ),
+                  _QuickFact(
+                    icon: Icons.fitness_center,
+                    label: widget.entry.equipment.isEmpty
+                        ? 'No equipment'
+                        : widget.entry.equipment.join(', '),
+                  ),
                 ],
               ),
-              if (widget.entry.tags.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
+              const SizedBox(height: 20),
+              _AuthorAndPopularity(entry: widget.entry),
+              if (widget.entry.benefits.isNotEmpty) ...[
+                const SizedBox(height: 28),
+                const _SectionHeading('What you’ll get'),
+                const SizedBox(height: 10),
+                for (final benefit in widget.entry.benefits)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          size: 19,
+                          color: colors.primary,
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(child: Text(benefit)),
+                      ],
+                    ),
+                  ),
+              ],
+              if (widget.entry.stepPreview.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Row(
                   children: [
-                    for (final tag in widget.entry.tags)
-                      if (tag.trim().toLowerCase() != 'recommended')
-                        Chip(label: Text(tag)),
+                    const Expanded(child: _SectionHeading('Workout outline')),
+                    if (widget.entry.stepCount case final count?)
+                      Text(
+                        '$count steps',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...(_showAllSteps
+                        ? widget.entry.stepPreview
+                        : widget.entry.stepPreview.take(5))
+                    .toList()
+                    .asMap()
+                    .entries
+                    .map(
+                      (item) =>
+                          _OutlineStep(index: item.key + 1, step: item.value),
+                    ),
+                if (widget.entry.stepPreview.length > 5)
+                  TextButton(
+                    onPressed: () =>
+                        setState(() => _showAllSteps = !_showAllSteps),
+                    child: Text(
+                      _showAllSteps ? 'Show less' : 'See the full workout',
+                    ),
+                  ),
+              ],
+              if (widget.entry.intensity != null ||
+                  widget.entry.space != null) ...[
+                const SizedBox(height: 24),
+                const _SectionHeading('Good to know'),
+                const SizedBox(height: 10),
+                if (widget.entry.intensity case final intensity?)
+                  _RequirementRow(
+                    icon: Icons.local_fire_department_outlined,
+                    label: 'Intensity',
+                    value: intensity,
+                  ),
+                if (widget.entry.space case final space?)
+                  _RequirementRow(
+                    icon: Icons.crop_free,
+                    label: 'Space',
+                    value: space,
+                  ),
+              ],
+              if (widget.entry.tags.isNotEmpty) ...[
+                const SizedBox(height: 24),
+                Wrap(
+                  spacing: 7,
+                  runSpacing: 7,
+                  children: [
+                    for (final tag in widget.entry.tags.take(4))
+                      Chip(
+                        label: Text(tag),
+                        visualDensity: VisualDensity.compact,
+                      ),
                   ],
                 ),
               ],
-              const SizedBox(height: 28),
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(18),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            _phase == _DownloadPhase.preview
-                                ? Icons.cloud_download_outlined
-                                : _phase == _DownloadPhase.ready
-                                ? Icons.check_circle
-                                : _phase == _DownloadPhase.failed
-                                ? Icons.error_outline
-                                : Icons.downloading,
-                            color: _phase == _DownloadPhase.failed
-                                ? colors.error
-                                : colors.primary,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Text(
-                              _statusText,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          if (_phase == _DownloadPhase.downloading &&
-                              _progress != null)
-                            Text('${(_progress! * 100).round()}%'),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-                      if (_phase == _DownloadPhase.preview) ...[
-                        Text(
-                          '${_formatBytes(widget.entry.assetsSize)} of workout media '
-                          'will be downloaded when you choose Download.',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colors.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 14),
-                        FilledButton.icon(
-                          onPressed:
-                              widget.controller.bucketEntryCompatibilityError(
-                                    widget.entry,
-                                  ) ==
-                                  null
-                              ? _install
-                              : null,
-                          icon: const Icon(Icons.download),
-                          label: const Text('Download'),
-                        ),
-                        if (widget.controller.bucketEntryCompatibilityError(
-                              widget.entry,
-                            ) !=
-                            null) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            widget.controller.bucketEntryCompatibilityError(
-                              widget.entry,
-                            )!,
-                            style: TextStyle(color: colors.error),
-                          ),
-                        ],
-                      ] else if (_phase == _DownloadPhase.downloading)
-                        LinearProgressIndicator(value: _progress)
-                      else if (_phase == _DownloadPhase.installing)
-                        const LinearProgressIndicator()
-                      else if (_phase == _DownloadPhase.ready)
-                        LinearProgressIndicator(
-                          value: 1,
-                          color: colors.primary,
-                        ),
-                      if (_phase == _DownloadPhase.downloading) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          _downloadSizeText,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(color: colors.onSurfaceVariant),
-                        ),
-                      ],
-                      if (_phase == _DownloadPhase.failed &&
-                          _error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(_error!, style: TextStyle(color: colors.error)),
-                        const SizedBox(height: 14),
-                        FilledButton.icon(
-                          onPressed: _install,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Try again'),
-                        ),
-                      ],
-                      if (_phase == _DownloadPhase.ready &&
-                          _userInteracted) ...[
-                        const SizedBox(height: 14),
-                        FilledButton.icon(
-                          onPressed: _openWorkout,
-                          icon: const Icon(Icons.arrow_forward),
-                          label: const Text('Open workout'),
-                        ),
-                      ],
-                    ],
-                  ),
+              const SizedBox(height: 14),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: IconButton(
+                  tooltip: 'Technical information',
+                  icon: const Icon(Icons.info_outline, size: 20),
+                  onPressed: () => _showTechnicalInformation(context),
                 ),
               ),
+              const SizedBox(height: 80),
             ],
           ),
         ),
@@ -402,13 +387,34 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     );
   }
 
-  bool get _recommended =>
-      widget.entry.tags.any((tag) => tag.trim().toLowerCase() == 'recommended');
+  String _formatDuration(int seconds) {
+    if (seconds < 60) return '$seconds sec';
+    final minutes = (seconds / 60).ceil();
+    return '$minutes min';
+  }
 
-  String get _downloadSizeText {
-    final total = _totalBytes;
-    if (total == null) return _formatBytes(_receivedBytes);
-    return '${_formatBytes(_receivedBytes)} / ${_formatBytes(total)}';
+  Future<void> _showTechnicalInformation(BuildContext context) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Workout information'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Source: ${widget.sourceName}'),
+            Text('Version: ${widget.entry.version}'),
+            Text('Media download: ${_formatBytes(widget.entry.assetsSize)}'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
   }
 
   String _formatBytes(int bytes) {
@@ -420,11 +426,11 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
   }
 }
 
-class _MetaChip extends StatelessWidget {
+class _QuickFact extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  const _MetaChip({required this.icon, required this.label});
+  const _QuickFact({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) => Container(
@@ -435,7 +441,298 @@ class _MetaChip extends StatelessWidget {
     ),
     child: Row(
       mainAxisSize: MainAxisSize.min,
-      children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(label)],
+      children: [
+        Icon(icon, size: 17),
+        const SizedBox(width: 7),
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+      ],
     ),
   );
+}
+
+class _AuthorAndPopularity extends StatelessWidget {
+  final WorkoutBucketEntry entry;
+
+  const _AuthorAndPopularity({required this.entry});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final author = entry.author?.trim();
+    return Row(
+      children: [
+        if (author != null && author.isNotEmpty) ...[
+          CircleAvatar(
+            radius: 18,
+            backgroundColor: colors.primaryContainer,
+            child: Text(
+              author.characters.first.toUpperCase(),
+              style: TextStyle(
+                color: colors.onPrimaryContainer,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text(
+                    author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if (entry.authorVerified) ...[
+                  const SizedBox(width: 4),
+                  Icon(Icons.verified, size: 17, color: colors.primary),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 14),
+        ],
+        Icon(Icons.download_outlined, size: 17, color: colors.onSurfaceVariant),
+        const SizedBox(width: 5),
+        Text(
+          entry.downloadCount == 0
+              ? 'New'
+              : '${_compactCount(entry.downloadCount)} downloads',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: colors.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _compactCount(int count) {
+    if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M';
+    if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K';
+    return '$count';
+  }
+}
+
+class _SectionHeading extends StatelessWidget {
+  final String text;
+
+  const _SectionHeading(this.text);
+
+  @override
+  Widget build(BuildContext context) => Text(
+    text,
+    style: Theme.of(
+      context,
+    ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+  );
+}
+
+class _OutlineStep extends StatelessWidget {
+  final int index;
+  final WorkoutBucketStepPreview step;
+
+  const _OutlineStep({required this.index, required this.step});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 7),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 15,
+            backgroundColor: colors.surfaceContainerHighest,
+            child: Text(
+              '$index',
+              style: Theme.of(context).textTheme.labelSmall,
+            ),
+          ),
+          const SizedBox(width: 11),
+          Expanded(
+            child: Text(
+              step.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (step.hasGuide)
+            Padding(
+              padding: const EdgeInsets.only(left: 8),
+              child: Icon(
+                Icons.volume_up_outlined,
+                size: 17,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          if (step.hasMedia)
+            Padding(
+              padding: const EdgeInsets.only(left: 7),
+              child: Icon(
+                Icons.play_circle_outline,
+                size: 17,
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+          if (step.durationSeconds > 0) ...[
+            const SizedBox(width: 9),
+            Text(
+              _stepDuration(step.durationSeconds),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static String _stepDuration(int seconds) {
+    if (seconds < 60) return '${seconds}s';
+    final minutes = seconds ~/ 60;
+    final remainder = seconds.remainder(60);
+    return remainder == 0 ? '${minutes}m' : '${minutes}m ${remainder}s';
+  }
+}
+
+class _RequirementRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _RequirementRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 7),
+    child: Row(
+      children: [
+        Icon(icon, size: 19),
+        const SizedBox(width: 10),
+        SizedBox(width: 78, child: Text(label)),
+        Expanded(
+          child: Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _DownloadActionBar extends StatelessWidget {
+  final _DownloadPhase phase;
+  final double? progress;
+  final String statusText;
+  final String sizeText;
+  final String? error;
+  final String? compatibilityError;
+  final VoidCallback onDownload;
+  final VoidCallback onOpen;
+
+  const _DownloadActionBar({
+    required this.phase,
+    required this.progress,
+    required this.statusText,
+    required this.sizeText,
+    required this.error,
+    required this.compatibilityError,
+    required this.onDownload,
+    required this.onOpen,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Material(
+      elevation: 12,
+      color: colors.surface,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (phase == _DownloadPhase.downloading ||
+                  phase == _DownloadPhase.installing) ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        statusText,
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    if (progress != null) Text('${(progress! * 100).round()}%'),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                LinearProgressIndicator(
+                  value: phase == _DownloadPhase.downloading ? progress : null,
+                ),
+              ] else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: phase == _DownloadPhase.ready
+                        ? onOpen
+                        : compatibilityError == null
+                        ? onDownload
+                        : null,
+                    icon: Icon(
+                      phase == _DownloadPhase.failed
+                          ? Icons.refresh
+                          : phase == _DownloadPhase.ready
+                          ? Icons.arrow_forward
+                          : Icons.download,
+                    ),
+                    label: Text(
+                      phase == _DownloadPhase.failed
+                          ? 'Try again'
+                          : phase == _DownloadPhase.ready
+                          ? 'Open workout'
+                          : 'Download workout · $sizeText',
+                    ),
+                  ),
+                ),
+              if (compatibilityError != null) ...[
+                const SizedBox(height: 7),
+                Text(
+                  compatibilityError!,
+                  style: TextStyle(color: colors.error),
+                ),
+              ] else if (phase == _DownloadPhase.failed && error != null) ...[
+                const SizedBox(height: 7),
+                Text(
+                  error!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: colors.error),
+                ),
+              ] else if (phase == _DownloadPhase.preview) ...[
+                const SizedBox(height: 6),
+                Text(
+                  'Available offline after download',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

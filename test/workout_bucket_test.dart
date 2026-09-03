@@ -85,6 +85,23 @@ void main() {
               'https://example.com/morning-flow.featureImage.webp',
           'featureImageSha256': hash.toUpperCase(),
           'featureImageSize': 72000,
+          'authorVerified': true,
+          'downloadCount': 2450,
+          'durationSeconds': 720,
+          'stepCount': 2,
+          'difficulty': 'Beginner',
+          'intensity': 'Low',
+          'equipment': ['Mat'],
+          'benefits': ['Improve mobility'],
+          'space': '2 × 1 m',
+          'stepPreview': [
+            {
+              'name': 'Warm up',
+              'durationSeconds': 60,
+              'hasGuide': true,
+              'hasMedia': false,
+            },
+          ],
           'tags': ['mobility', 'quick'],
           'author': 'AnhPT',
           'minAppVersion': '0.8.0',
@@ -99,6 +116,10 @@ void main() {
     expect(catalog.entries.single.totalSize, 4096);
     expect(catalog.entries.single.thumbnailSize, 12000);
     expect(catalog.entries.single.featureImageSha256, hash);
+    expect(catalog.entries.single.authorVerified, isTrue);
+    expect(catalog.entries.single.downloadCount, 2450);
+    expect(catalog.entries.single.durationSeconds, 720);
+    expect(catalog.entries.single.stepPreview.single.hasGuide, isTrue);
     expect(
       catalog.entries.single.copyWithSource('community').sourceId,
       'community',

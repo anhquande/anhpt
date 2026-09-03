@@ -16,6 +16,22 @@ void main() {
     workoutSha256:
         'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
     workoutSize: 512,
+    author: 'Trusted Coach',
+    authorVerified: true,
+    durationSeconds: 600,
+    stepCount: 3,
+    difficulty: 'Beginner',
+    intensity: 'Gentle',
+    benefits: ['Move with confidence'],
+    stepPreview: [
+      WorkoutBucketStepPreview(name: 'Warm up', durationSeconds: 60),
+      WorkoutBucketStepPreview(
+        name: 'Flow',
+        durationSeconds: 480,
+        hasGuide: true,
+      ),
+      WorkoutBucketStepPreview(name: 'Cool down', durationSeconds: 60),
+    ],
   );
 
   testWidgets('Dashboard reports catalog listing count then hides it', (
@@ -76,10 +92,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Workout details'), findsOneWidget);
-    expect(find.text('Download'), findsOneWidget);
+    expect(find.text('Trusted Coach'), findsOneWidget);
+    expect(find.text('New'), findsOneWidget);
+    expect(find.text('10 min'), findsOneWidget);
+    expect(find.text('Move with confidence'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -320));
+    await tester.pumpAndSettle();
+    expect(find.text('Workout outline'), findsOneWidget);
+    expect(find.textContaining('Download workout'), findsOneWidget);
     expect(controller.installCalls, 0);
 
-    await tester.tap(find.text('Download'));
+    await tester.tap(find.textContaining('Download workout'));
     await tester.pump();
     expect(controller.installCalls, 1);
   });

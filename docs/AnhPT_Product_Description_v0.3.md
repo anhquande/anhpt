@@ -91,3 +91,8 @@ Workout cards fetch small thumbnails independently after catalog metadata is
 available. Opening a workout detail screen fetches its larger feature image.
 Missing or unavailable artwork falls back to bundled category imagery selected
 by the workout's first tag (for example Yoga, HIIT, Meditation, or Tabata).
+Before download, the detail screen prioritizes the feature image, benefit-led
+description, duration, difficulty, equipment, verified author, download count,
+benefits, and a compact workout outline. Technical source, version, and file
+details remain behind a small information action. Ratings are reserved for a
+future trusted backend and are not synthesized from local activity.

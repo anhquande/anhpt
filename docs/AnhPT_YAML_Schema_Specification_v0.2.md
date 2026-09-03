@@ -200,3 +200,9 @@ case category artwork is selected exclusively from the first workout tag.
 Both workout artifacts must validate before installation is committed. Schema
 v1 bucket catalogs are not supported; manual portable `.anhpt.zip` files remain
 a separate import/export format.
+
+The bucket build derives `durationSeconds`, expanded `stepCount`, and
+`stepPreview` from the workout definition so discovery never requires a YAML
+download. Curated package-manifest metadata may provide `author`,
+`authorVerified`, `difficulty`, `intensity`, `equipment`, `benefits`, and
+`space`. `downloadCount` is maintained by the bucket release workflow.
