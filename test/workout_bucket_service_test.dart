@@ -93,6 +93,32 @@ void main() {
     expect(() => service.downloadWorkout(invalid), throwsStateError);
   });
 
+  test(
+    'verified workout definition is reused after preview download',
+    () async {
+      final bytes = utf8.encode('workout yaml');
+      var requests = 0;
+      final service = WorkoutBucketService(
+        client: MockClient((_) async {
+          requests++;
+          return http.Response.bytes(bytes, 200);
+        }),
+      );
+      final entry = WorkoutBucketEntry(
+        id: 'flow',
+        name: 'Flow',
+        version: '1.0.0',
+        workoutUrl: 'https://example.com/flow.yaml',
+        workoutSha256: sha256.convert(bytes).toString(),
+        workoutSize: bytes.length,
+      );
+
+      expect(await service.downloadWorkout(entry), bytes);
+      expect(await service.downloadWorkout(entry), bytes);
+      expect(requests, 1);
+    },
+  );
+
   test('workout definition and assets download independently', () async {
     final workoutBytes = utf8.encode('workout yaml');
     final assetsBytes = utf8.encode('assets zip');

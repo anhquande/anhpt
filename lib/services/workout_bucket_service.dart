@@ -49,6 +49,7 @@ class WorkoutBucketService {
 
   final http.Client _client;
   final Map<String, Future<Uint8List>> _artworkDownloads = {};
+  final Map<String, Future<Uint8List>> _workoutDefinitionDownloads = {};
 
   WorkoutBucketService({http.Client? client})
     : _client = client ?? http.Client();
@@ -91,15 +92,23 @@ class WorkoutBucketService {
     WorkoutBucketEntry entry, {
     BucketDownloadProgress? onProgress,
   }) async {
-    return _downloadEntryArtifact(
-      entry,
-      artifact: 'workout',
-      uri: entry.workoutUri,
-      expectedSha256: entry.workoutSha256,
-      expectedBytes: entry.workoutSize,
-      maxBytes: maxCatalogBytes,
-      onProgress: onProgress,
+    final key = '${entry.workoutUri}#${entry.workoutSha256}';
+    final download = _workoutDefinitionDownloads.putIfAbsent(
+      key,
+      () => _downloadEntryArtifact(
+        entry,
+        artifact: 'workout',
+        uri: entry.workoutUri,
+        expectedSha256: entry.workoutSha256,
+        expectedBytes: entry.workoutSize,
+        maxBytes: maxCatalogBytes,
+        onProgress: onProgress,
+      ),
     );
+    return download.catchError((Object error) {
+      _workoutDefinitionDownloads.remove(key);
+      throw error;
+    });
   }
 
   Future<Uint8List> downloadAssets(

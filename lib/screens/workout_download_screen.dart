@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout_bucket.dart';
+import '../models/workout.dart';
 import '../services/workout_bucket_service.dart';
+import '../services/workout_parser.dart';
 import '../widgets/workout_artwork.dart';
+import '../widgets/workout_widgets.dart';
 import 'workout_detail_screen.dart';
 
 enum _DownloadPhase { preview, downloading, installing, ready, failed }
@@ -16,6 +20,7 @@ class WorkoutDownloadScreen extends StatefulWidget {
   final String sourceName;
   final BucketInstallConflictResolution? resolution;
   final Duration minimumReadingTime;
+  final WorkoutBucketService? bucketService;
 
   const WorkoutDownloadScreen({
     super.key,
@@ -24,13 +29,15 @@ class WorkoutDownloadScreen extends StatefulWidget {
     required this.sourceName,
     this.resolution,
     this.minimumReadingTime = const Duration(seconds: 2),
+    this.bucketService,
   });
 
   @override
   State<WorkoutDownloadScreen> createState() => _WorkoutDownloadScreenState();
 }
 
-class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
+class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen>
+    with SingleTickerProviderStateMixin {
   _DownloadPhase _phase = _DownloadPhase.preview;
   StreamSubscription<BucketPackageProgressEvent>? _progressSubscription;
   int _receivedBytes = 0;
@@ -40,17 +47,27 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
   String? _installedWorkoutId;
   bool _userInteracted = false;
   bool _opening = false;
-  bool _showAllSteps = false;
+  Workout? _previewWorkout;
+  String? _previewError;
+  bool _previewLoading = true;
+  bool _installingRequested = false;
   late DateTime _openedAt;
+  late final TabController _tabController;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _openedAt = DateTime.now();
+    unawaited(_loadWorkoutPreview());
     _progressSubscription = WorkoutBucketService.packageProgress.listen((
       event,
     ) {
-      if (!mounted || event.entryId != widget.entry.id) return;
+      if (!mounted ||
+          !_installingRequested ||
+          event.entryId != widget.entry.id) {
+        return;
+      }
       final total = event.totalBytes;
       setState(() {
         _artifact = event.artifact;
@@ -70,13 +87,44 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     });
   }
 
+  WorkoutBucketService get _bucketService =>
+      widget.bucketService ?? widget.controller.workoutBuckets;
+
+  Future<void> _loadWorkoutPreview() async {
+    setState(() {
+      _previewLoading = true;
+      _previewError = null;
+    });
+    try {
+      final bytes = await _bucketService.downloadWorkout(widget.entry);
+      final workout = WorkoutParser.parse(
+        utf8.decode(bytes),
+        id: 'preview-${widget.entry.id}',
+        defaultVoiceLanguage: widget.controller.defaultVoiceLanguage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _previewWorkout = workout;
+        _previewLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _previewLoading = false;
+        _previewError = '$error';
+      });
+    }
+  }
+
   @override
   void dispose() {
     _progressSubscription?.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
   Future<void> _install() async {
+    _installingRequested = true;
     final existingWorkoutIds = widget.controller.workouts
         .map((workout) => workout.id)
         .toSet();
@@ -197,193 +245,238 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
           onDownload: _install,
           onOpen: _openWorkout,
         ),
-        body: NotificationListener<ScrollNotification>(
-          onNotification: (notification) {
-            if (notification is UserScrollNotification && !_userInteracted) {
-              setState(() => _userInteracted = true);
-            }
-            return false;
-          },
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: SizedBox(
-                  height: 200,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      WorkoutArtwork(
-                        tags: widget.entry.tags,
-                        kind: WorkoutArtworkKind.feature,
-                        bucketEntry: widget.entry,
-                        bucketService: widget.controller.workoutBuckets,
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Color(0xB3000000)],
+        body: Column(
+          children: [
+            TabBar(
+              controller: _tabController,
+              tabs: [
+                const Tab(text: 'Overview'),
+                  const Tab(key: Key('bucket-steps-tab'), text: 'Steps'),
+              ],
+            ),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification is UserScrollNotification &&
+                          !_userInteracted) {
+                        setState(() => _userInteracted = true);
+                      }
+                      return false;
+                    },
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: SizedBox(
+                            height: 200,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                WorkoutArtwork(
+                                  tags: widget.entry.tags,
+                                  kind: WorkoutArtworkKind.feature,
+                                  bucketEntry: widget.entry,
+                                  bucketService:
+                                      widget.controller.workoutBuckets,
+                                ),
+                                const DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        Colors.transparent,
+                                        Color(0xB3000000),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  left: 18,
+                                  right: 18,
+                                  bottom: 16,
+                                  child: Text(
+                                    widget.entry.name,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        left: 18,
-                        right: 18,
-                        bottom: 16,
-                        child: Text(
-                          widget.entry.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.headlineSmall
-                              ?.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w800,
+                        const SizedBox(height: 16),
+                        if (widget.entry.description.isNotEmpty) ...[
+                          Text(
+                            widget.entry.description,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  color: colors.onSurfaceVariant,
+                                  height: 1.35,
+                                ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: [
+                            if (widget.entry.durationSeconds
+                                case final seconds?)
+                              _QuickFact(
+                                icon: Icons.schedule,
+                                label: _formatDuration(seconds),
                               ),
+                            if (widget.entry.difficulty case final difficulty?)
+                              _QuickFact(
+                                icon: Icons.signal_cellular_alt,
+                                label: difficulty,
+                              ),
+                            _QuickFact(
+                              icon: Icons.fitness_center,
+                              label: widget.entry.equipment.isEmpty
+                                  ? 'No equipment'
+                                  : widget.entry.equipment.join(', '),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              if (widget.entry.description.isNotEmpty) ...[
-                Text(
-                  widget.entry.description,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: colors.onSurfaceVariant,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: [
-                  if (widget.entry.durationSeconds case final seconds?)
-                    _QuickFact(
-                      icon: Icons.schedule,
-                      label: _formatDuration(seconds),
-                    ),
-                  if (widget.entry.difficulty case final difficulty?)
-                    _QuickFact(
-                      icon: Icons.signal_cellular_alt,
-                      label: difficulty,
-                    ),
-                  _QuickFact(
-                    icon: Icons.fitness_center,
-                    label: widget.entry.equipment.isEmpty
-                        ? 'No equipment'
-                        : widget.entry.equipment.join(', '),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              _AuthorAndPopularity(entry: widget.entry),
-              if (widget.entry.benefits.isNotEmpty) ...[
-                const SizedBox(height: 28),
-                const _SectionHeading('What you’ll get'),
-                const SizedBox(height: 10),
-                for (final benefit in widget.entry.benefits)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(
-                          Icons.check_circle,
-                          size: 19,
-                          color: colors.primary,
+                        const SizedBox(height: 20),
+                        _AuthorAndPopularity(entry: widget.entry),
+                        if (widget.entry.benefits.isNotEmpty) ...[
+                          const SizedBox(height: 28),
+                          const _SectionHeading('What you’ll get'),
+                          const SizedBox(height: 10),
+                          for (final benefit in widget.entry.benefits)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 8),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Icon(
+                                    Icons.check_circle,
+                                    size: 19,
+                                    color: colors.primary,
+                                  ),
+                                  const SizedBox(width: 9),
+                                  Expanded(child: Text(benefit)),
+                                ],
+                              ),
+                            ),
+                        ],
+                        if (widget.entry.intensity != null ||
+                            widget.entry.space != null) ...[
+                          const SizedBox(height: 24),
+                          const _SectionHeading('Good to know'),
+                          const SizedBox(height: 10),
+                          if (widget.entry.intensity case final intensity?)
+                            _RequirementRow(
+                              icon: Icons.local_fire_department_outlined,
+                              label: 'Intensity',
+                              value: intensity,
+                            ),
+                          if (widget.entry.space case final space?)
+                            _RequirementRow(
+                              icon: Icons.crop_free,
+                              label: 'Space',
+                              value: space,
+                            ),
+                        ],
+                        if (widget.entry.tags.isNotEmpty) ...[
+                          const SizedBox(height: 24),
+                          Wrap(
+                            spacing: 7,
+                            runSpacing: 7,
+                            children: [
+                              for (final tag in widget.entry.tags.take(4))
+                                Chip(
+                                  label: Text(tag),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 14),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: IconButton(
+                            tooltip: 'Technical information',
+                            icon: const Icon(Icons.info_outline, size: 20),
+                            onPressed: () => _showTechnicalInformation(context),
+                          ),
                         ),
-                        const SizedBox(width: 9),
-                        Expanded(child: Text(benefit)),
+                        const SizedBox(height: 80),
                       ],
                     ),
                   ),
-              ],
-              if (widget.entry.stepPreview.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    const Expanded(child: _SectionHeading('Workout outline')),
-                    if (widget.entry.stepCount case final count?)
-                      Text(
-                        '$count steps',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colors.onSurfaceVariant,
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ...(_showAllSteps
-                        ? widget.entry.stepPreview
-                        : widget.entry.stepPreview.take(5))
-                    .toList()
-                    .asMap()
-                    .entries
-                    .map(
-                      (item) =>
-                          _OutlineStep(index: item.key + 1, step: item.value),
-                    ),
-                if (widget.entry.stepPreview.length > 5)
-                  TextButton(
-                    onPressed: () =>
-                        setState(() => _showAllSteps = !_showAllSteps),
-                    child: Text(
-                      _showAllSteps ? 'Show less' : 'See the full workout',
-                    ),
-                  ),
-              ],
-              if (widget.entry.intensity != null ||
-                  widget.entry.space != null) ...[
-                const SizedBox(height: 24),
-                const _SectionHeading('Good to know'),
-                const SizedBox(height: 10),
-                if (widget.entry.intensity case final intensity?)
-                  _RequirementRow(
-                    icon: Icons.local_fire_department_outlined,
-                    label: 'Intensity',
-                    value: intensity,
-                  ),
-                if (widget.entry.space case final space?)
-                  _RequirementRow(
-                    icon: Icons.crop_free,
-                    label: 'Space',
-                    value: space,
-                  ),
-              ],
-              if (widget.entry.tags.isNotEmpty) ...[
-                const SizedBox(height: 24),
-                Wrap(
-                  spacing: 7,
-                  runSpacing: 7,
-                  children: [
-                    for (final tag in widget.entry.tags.take(4))
-                      Chip(
-                        label: Text(tag),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 14),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: IconButton(
-                  tooltip: 'Technical information',
-                  icon: const Icon(Icons.info_outline, size: 20),
-                  onPressed: () => _showTechnicalInformation(context),
-                ),
+                  _buildStepsPreview(),
+                ],
               ),
-              const SizedBox(height: 80),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStepsPreview() {
+    if (_previewLoading) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 14),
+            Text('Loading workout steps…'),
+          ],
+        ),
+      );
+    }
+    final workout = _previewWorkout;
+    if (workout == null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off_outlined, size: 40),
+              const SizedBox(height: 12),
+              const Text(
+                'Could not load workout steps',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                _previewError ?? 'Unknown error',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: _loadWorkoutPreview,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Try again'),
+              ),
             ],
           ),
         ),
-      ),
+      );
+    }
+    return ListView(
+      key: const PageStorageKey('bucket-preview-steps-tab'),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+      children: [WorkoutStructure(nodes: workout.steps)],
     );
   }
 
@@ -529,75 +622,6 @@ class _SectionHeading extends StatelessWidget {
       context,
     ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
   );
-}
-
-class _OutlineStep extends StatelessWidget {
-  final int index;
-  final WorkoutBucketStepPreview step;
-
-  const _OutlineStep({required this.index, required this.step});
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 7),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 15,
-            backgroundColor: colors.surfaceContainerHighest,
-            child: Text(
-              '$index',
-              style: Theme.of(context).textTheme.labelSmall,
-            ),
-          ),
-          const SizedBox(width: 11),
-          Expanded(
-            child: Text(
-              step.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          if (step.hasGuide)
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: Icon(
-                Icons.volume_up_outlined,
-                size: 17,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          if (step.hasMedia)
-            Padding(
-              padding: const EdgeInsets.only(left: 7),
-              child: Icon(
-                Icons.play_circle_outline,
-                size: 17,
-                color: colors.onSurfaceVariant,
-              ),
-            ),
-          if (step.durationSeconds > 0) ...[
-            const SizedBox(width: 9),
-            Text(
-              _stepDuration(step.durationSeconds),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colors.onSurfaceVariant),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  static String _stepDuration(int seconds) {
-    if (seconds < 60) return '${seconds}s';
-    final minutes = seconds ~/ 60;
-    final remainder = seconds.remainder(60);
-    return remainder == 0 ? '${minutes}m' : '${minutes}m ${remainder}s';
-  }
 }
 
 class _RequirementRow extends StatelessWidget {

@@ -81,9 +81,9 @@ signatures are deferred; Web sources must support CORS.
 Dashboard startup and refresh download catalog metadata only; workout artifacts
 and their media are never installed automatically. Uninstalled catalog entries
 appear beside local workouts using `bucket.json` metadata. Selecting one opens
-a metadata-only detail screen. Pressing Download fetches an independently
-checksummed YAML definition and media ZIP; installation becomes visible only
-after both validate successfully. The UI omits the negligible YAML size and
+its detail screen and automatically downloads only its independently checksummed
+YAML definition. Pressing Download later fetches the media ZIP; installation
+becomes visible only after both artifacts validate successfully. The UI omits the negligible YAML size and
 shows the media size beside the version. The download screen reports the
 definition and media phases separately, and changes to Installing only after
 the media ZIP has finished downloading.
@@ -93,6 +93,8 @@ Missing or unavailable artwork falls back to bundled category imagery selected
 by the workout's first tag (for example Yoga, HIIT, Meditation, or Tabata).
 Before download, the detail screen prioritizes the feature image, benefit-led
 description, duration, difficulty, equipment, verified author, download count,
-benefits, and a compact workout outline. Technical source, version, and file
-details remain behind a small information action. Ratings are reserved for a
-future trusted backend and are not synthesized from local activity.
+and benefits. Its Steps tab reuses the installed workout's nested structure tree
+after the YAML preview parses. Preview mode never exposes recording, camera, or
+demonstration-media controls and never fetches media. Technical source, version,
+and file details remain behind a small information action. Ratings are reserved
+for a future trusted backend and are not synthesized from local activity.

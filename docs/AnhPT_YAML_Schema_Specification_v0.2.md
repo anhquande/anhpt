@@ -201,6 +201,11 @@ Both workout artifacts must validate before installation is committed. Schema
 v1 bucket catalogs are not supported; manual portable `.anhpt.zip` files remain
 a separate import/export format.
 
+The YAML artifact may be downloaded, checksum-verified, parsed, and cached when
+an uninstalled workout detail opens. This read-only definition preview does not
+make the workout installed. Media references remain unresolved until the assets
+artifact is explicitly downloaded and installation succeeds.
+
 The bucket build derives `durationSeconds`, expanded `stepCount`, and
 `stepPreview` from the workout definition so discovery never requires a YAML
 download. Curated package-manifest metadata may provide `author`,
