@@ -7,18 +7,18 @@ import 'package:http/http.dart' as http;
 
 import '../models/workout_bucket.dart';
 
-typedef BucketDownloadProgress = void Function(
-  int receivedBytes,
-  int? totalBytes,
-);
+typedef BucketDownloadProgress =
+    void Function(int receivedBytes, int? totalBytes);
 
 class BucketPackageProgressEvent {
   final String entryId;
+  final String artifact;
   final int receivedBytes;
   final int? totalBytes;
 
   const BucketPackageProgressEvent({
     required this.entryId,
+    required this.artifact,
     required this.receivedBytes,
     required this.totalBytes,
   });
@@ -48,7 +48,7 @@ class WorkoutBucketService {
   final http.Client _client;
 
   WorkoutBucketService({http.Client? client})
-      : _client = client ?? http.Client();
+    : _client = client ?? http.Client();
 
   Future<BucketRefreshResult> refresh(WorkoutBucketSource source) async {
     final uri = source.catalogUri;
@@ -84,32 +84,70 @@ class WorkoutBucketService {
     }
   }
 
-  Future<Uint8List> downloadPackage(
+  Future<Uint8List> downloadWorkout(
     WorkoutBucketEntry entry, {
     BucketDownloadProgress? onProgress,
   }) async {
-    if (entry.size != null && entry.size! > maxPackageBytes) {
-      throw StateError('Workout package exceeds the 100 MB marketplace limit.');
+    return _downloadEntryArtifact(
+      entry,
+      artifact: 'workout',
+      uri: entry.workoutUri,
+      expectedSha256: entry.workoutSha256,
+      expectedBytes: entry.workoutSize,
+      maxBytes: maxCatalogBytes,
+      onProgress: onProgress,
+    );
+  }
+
+  Future<Uint8List> downloadAssets(
+    WorkoutBucketEntry entry, {
+    BucketDownloadProgress? onProgress,
+  }) async {
+    return _downloadEntryArtifact(
+      entry,
+      artifact: 'assets',
+      uri: entry.assetsUri,
+      expectedSha256: entry.assetsSha256,
+      expectedBytes: entry.assetsSize,
+      maxBytes: maxPackageBytes,
+      onProgress: onProgress,
+    );
+  }
+
+  Future<Uint8List> _downloadEntryArtifact(
+    WorkoutBucketEntry entry, {
+    required String artifact,
+    required Uri uri,
+    required String expectedSha256,
+    required int expectedBytes,
+    required int maxBytes,
+    BucketDownloadProgress? onProgress,
+  }) async {
+    if (expectedBytes > maxBytes) {
+      throw StateError('$artifact exceeds the marketplace size limit.');
     }
 
     void report(int received, int? total) {
       onProgress?.call(received, total);
-      _packageProgressController.add(BucketPackageProgressEvent(
-        entryId: entry.id,
-        receivedBytes: received,
-        totalBytes: total,
-      ));
+      _packageProgressController.add(
+        BucketPackageProgressEvent(
+          entryId: entry.id,
+          artifact: artifact,
+          receivedBytes: received,
+          totalBytes: total,
+        ),
+      );
     }
 
     final bytes = await _download(
-      entry.packageUri,
-      maxBytes: maxPackageBytes,
-      expectedBytes: entry.size,
+      uri,
+      maxBytes: maxBytes,
+      expectedBytes: expectedBytes,
       onProgress: report,
     );
     final actual = sha256.convert(bytes).toString();
-    if (actual.toLowerCase() != entry.sha256.toLowerCase()) {
-      throw StateError('Workout package checksum does not match the catalog.');
+    if (actual.toLowerCase() != expectedSha256.toLowerCase()) {
+      throw StateError('$artifact checksum does not match the catalog.');
     }
     return bytes;
   }
@@ -124,8 +162,9 @@ class WorkoutBucketService {
     final request = http.Request('GET', uri)
       ..followRedirects = true
       ..maxRedirects = 3;
-    final response =
-        await _client.send(request).timeout(const Duration(seconds: 20));
+    final response = await _client
+        .send(request)
+        .timeout(const Duration(seconds: 20));
     final finalUri = response.request?.url ?? uri;
     requirePublicHttpsUri(finalUri.toString());
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -144,8 +183,9 @@ class WorkoutBucketService {
     var total = 0;
     final progressTotal = expectedBytes ?? declared;
     onProgress?.call(0, progressTotal);
-    await for (final chunk
-        in response.stream.timeout(const Duration(seconds: 30))) {
+    await for (final chunk in response.stream.timeout(
+      const Duration(seconds: 30),
+    )) {
       total += chunk.length;
       if (total > maxBytes) {
         throw StateError('Download exceeds the allowed size.');

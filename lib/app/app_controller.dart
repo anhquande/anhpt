@@ -66,10 +66,7 @@ class AppController extends ChangeNotifier {
           defaultVoiceLanguage: defaultVoiceLanguage,
           favorite: stored.favorite,
           createdAt: stored.createdAt,
-        ).copyWith(
-          updatedAt: stored.updatedAt,
-          lastUsedAt: stored.lastUsedAt,
-        );
+        ).copyWith(updatedAt: stored.updatedAt, lastUsedAt: stored.lastUsedAt);
       } on WorkoutValidationException {
         return stored;
       }
@@ -78,18 +75,24 @@ class AppController extends ChangeNotifier {
     final personalTracks = await store.loadMusicTracks();
     musicTracks = [
       MusicTrack(
-          id: 'bundled-soft-bell',
-          name: 'Soft Bell Pulse',
-          mood: 'Calm',
-          source: 'audio/bell.wav',
-          bundled: true,
-          createdAt: DateTime.utc(2026)),
+        id: 'bundled-soft-bell',
+        name: 'Soft Bell Pulse',
+        mood: 'Calm',
+        source: 'audio/bell.wav',
+        bundled: true,
+        createdAt: DateTime.utc(2026),
+      ),
       ...personalTracks,
     ];
     await _refreshGeneratedMusicNames(personalTracks);
     workoutMusic = await store.loadWorkoutMusic();
     bucketSources = await store.loadBucketSources();
     installedBucketWorkouts = await store.loadInstalledBucketWorkouts();
+    final storedProvenanceCount = installedBucketWorkouts.length;
+    _removeOrphanedBucketProvenance();
+    if (installedBucketWorkouts.length != storedProvenanceCount) {
+      await store.saveInstalledBucketWorkouts(installedBucketWorkouts);
+    }
     _loadCachedBucketCatalogs();
 
     await _migrateLegacyAudioAssignments();
@@ -117,7 +120,8 @@ class AppController extends ChangeNotifier {
   Future<MediaAsset?> importDemoMedia() async {
     if (kIsWeb) {
       throw StateError(
-          'Local demonstration media import is not available on Web yet.');
+        'Local demonstration media import is not available on Web yet.',
+      );
     }
 
     if (defaultTargetPlatform == TargetPlatform.android) {
@@ -144,7 +148,7 @@ class AppController extends ChangeNotifier {
         'jpeg',
         'png',
         'webp',
-        'gif'
+        'gif',
       ],
       withData: kIsWeb,
     );
@@ -157,11 +161,14 @@ class AppController extends ChangeNotifier {
     final type = extension == 'gif'
         ? 'animation'
         : {'jpg', 'jpeg', 'png', 'webp'}.contains(extension)
-            ? 'image'
-            : 'video';
+        ? 'image'
+        : 'video';
     if (picked.bytes != null) {
-      return mediaLibrary.importBytes(picked.bytes!,
-          fileName: picked.name, type: type);
+      return mediaLibrary.importBytes(
+        picked.bytes!,
+        fileName: picked.name,
+        type: type,
+      );
     }
     if (picked.path == null) {
       throw StateError('Could not read the selected media file.');
@@ -217,11 +224,13 @@ class AppController extends ChangeNotifier {
         final dot = leaf.lastIndexOf('.');
         final currentStem = dot > 0 ? leaf.substring(0, dot) : leaf;
         final expected = CoachRecordingService.readableStem(cueName);
-        final alreadyManaged =
-            source.replaceAll('\\', '/').startsWith('coach_recordings/');
+        final alreadyManaged = source
+            .replaceAll('\\', '/')
+            .startsWith('coach_recordings/');
         if (alreadyManaged &&
-            RegExp('^${RegExp.escape(expected)}(?:-[0-9]+)?\$')
-                .hasMatch(currentStem)) {
+            RegExp(
+              '^${RegExp.escape(expected)}(?:-[0-9]+)?\$',
+            ).hasMatch(currentStem)) {
           return source;
         }
         final renamed = await recordingFiles.renameForCue(absolute, cueName);
@@ -230,7 +239,9 @@ class AppController extends ChangeNotifier {
 
       if (draft.recording.isNotEmpty) {
         final renamed = await migrateSource(
-            draft.recording, '${workout.name} introduction');
+          draft.recording,
+          '${workout.name} introduction',
+        );
         if (renamed != draft.recording) {
           draft.recording = renamed;
           workoutChanged = true;
@@ -316,14 +327,16 @@ class AppController extends ChangeNotifier {
         final displayName = preferredName != null && preferredName.isNotEmpty
             ? preferredName
             : await musicLibrary.resolveDisplayName(effectiveAbsolute);
-        musicTracks.add(MusicTrack(
-          id: 'personal-${DateTime.now().microsecondsSinceEpoch}',
-          name: displayName,
-          mood: 'Imported',
-          source: effectiveAbsolute,
-          bundled: false,
-          createdAt: DateTime.now(),
-        ));
+        musicTracks.add(
+          MusicTrack(
+            id: 'personal-${DateTime.now().microsecondsSinceEpoch}',
+            name: displayName,
+            mood: 'Imported',
+            source: effectiveAbsolute,
+            bundled: false,
+            createdAt: DateTime.now(),
+          ),
+        );
         tracksChanged = true;
       }
 
@@ -353,20 +366,23 @@ class AppController extends ChangeNotifier {
     final draft = WorkoutDraft.fromWorkout(workout);
     final step = _draftStepAt(draft.steps, stepKey);
     if (step == null) return;
-    final existingIndex = draft.exercises
-        .indexWhere((exercise) => exercise.id == step.exerciseId);
+    final existingIndex = draft.exercises.indexWhere(
+      (exercise) => exercise.id == step.exerciseId,
+    );
     final normalizedName = step.name
         .toLowerCase()
         .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
         .replaceAll(RegExp(r'^-+|-+$'), '');
-    final base =
-        normalizedName.isEmpty ? asset.id.substring(7, 15) : normalizedName;
+    final base = normalizedName.isEmpty
+        ? asset.id.substring(7, 15)
+        : normalizedName;
     var exerciseId = existingIndex >= 0
         ? draft.exercises[existingIndex].id
         : 'exercise-$base';
     var suffix = 2;
-    while (draft.exercises.any((exercise) =>
-        exercise.id == exerciseId && exercise.id != step.exerciseId)) {
+    while (draft.exercises.any(
+      (exercise) => exercise.id == exerciseId && exercise.id != step.exerciseId,
+    )) {
       exerciseId = 'exercise-$base-${suffix++}';
     }
     final exercise = Exercise(
@@ -456,10 +472,12 @@ class AppController extends ChangeNotifier {
           workoutChanged = true;
         }
       }
-      for (final legacy in coachRecordings.values.where((item) =>
-          item.workoutId == workout.id &&
-          item.scope == 'step' &&
-          item.stepKey != null)) {
+      for (final legacy in coachRecordings.values.where(
+        (item) =>
+            item.workoutId == workout.id &&
+            item.scope == 'step' &&
+            item.stepKey != null,
+      )) {
         final step = _draftStepAt(draft.steps, legacy.stepKey!);
         if (step != null && step.recording.isEmpty) {
           step.recording = portableAudioSource(legacy.audioPath);
@@ -597,9 +615,11 @@ class AppController extends ChangeNotifier {
       if (cached == null) continue;
       try {
         final decoded = Map<String, dynamic>.from(jsonDecode(cached) as Map);
-        entries.addAll(WorkoutBucketCatalog.fromJson(decoded)
-            .entries
-            .map((entry) => entry.copyWithSource(source.id)));
+        entries.addAll(
+          WorkoutBucketCatalog.fromJson(
+            decoded,
+          ).entries.map((entry) => entry.copyWithSource(source.id)),
+        );
       } catch (_) {
         // A bad cache is ignored and replaced on the next successful refresh.
       }
@@ -622,16 +642,19 @@ class AppController extends ChangeNotifier {
 
   Future<void> removeBucketSource(String id) async {
     bucketSources = bucketSources.where((source) => source.id != id).toList();
-    bucketCatalogEntries =
-        bucketCatalogEntries.where((entry) => entry.sourceId != id).toList();
+    bucketCatalogEntries = bucketCatalogEntries
+        .where((entry) => entry.sourceId != id)
+        .toList();
     await store.saveBucketSources(bucketSources);
     notifyListeners();
   }
 
   Future<void> setBucketSourceEnabled(String id, bool enabled) async {
     bucketSources = bucketSources
-        .map((source) =>
-            source.id == id ? source.copyWith(enabled: enabled) : source)
+        .map(
+          (source) =>
+              source.id == id ? source.copyWith(enabled: enabled) : source,
+        )
         .toList();
     await store.saveBucketSources(bucketSources);
     _loadCachedBucketCatalogs();
@@ -676,12 +699,32 @@ class AppController extends ChangeNotifier {
   }
 
   String bucketInstallState(WorkoutBucketEntry entry) {
+    final workoutIds = workouts.map((workout) => workout.id).toSet();
     final installed = installedBucketWorkouts.where(
-        (item) => item.sourceId == entry.sourceId && item.entryId == entry.id);
+      (item) =>
+          workoutIds.contains(item.workoutId) &&
+          item.sourceId == entry.sourceId &&
+          item.entryId == entry.id,
+    );
     if (installed.isEmpty) return 'notInstalled';
     return installed.any((item) => item.version == entry.version)
         ? 'installed'
         : 'updateAvailable';
+  }
+
+  String? bucketEntryCompatibilityError(WorkoutBucketEntry entry) {
+    if (entry.minAppVersion != null &&
+        _compareVersions(currentAppVersion, entry.minAppVersion!) < 0) {
+      return 'Requires AnhPT ${entry.minAppVersion} or newer.';
+    }
+    return null;
+  }
+
+  void _removeOrphanedBucketProvenance() {
+    final workoutIds = workouts.map((workout) => workout.id).toSet();
+    installedBucketWorkouts.removeWhere(
+      (item) => !workoutIds.contains(item.workoutId),
+    );
   }
 
   InstalledWorkoutProvenance? bucketProvenanceFor(String workoutId) {
@@ -716,17 +759,18 @@ class AppController extends ChangeNotifier {
     WorkoutBucketEntry entry, {
     BucketInstallConflictResolution? resolution,
   }) async {
+    _removeOrphanedBucketProvenance();
     final sourceId = entry.sourceId;
     if (sourceId == null) {
       throw StateError('Catalog entry has no bucket source.');
     }
-    if (entry.minAppVersion != null &&
-        _compareVersions(currentAppVersion, entry.minAppVersion!) < 0) {
-      throw StateError(
-          'This workout requires AnhPT ${entry.minAppVersion} or newer.');
+    final compatibilityError = bucketEntryCompatibilityError(entry);
+    if (compatibilityError != null) {
+      throw StateError(compatibilityError);
     }
     final existingIndex = installedBucketWorkouts.indexWhere(
-        (item) => item.sourceId == sourceId && item.entryId == entry.id);
+      (item) => item.sourceId == sourceId && item.entryId == entry.id,
+    );
     if (existingIndex >= 0 && resolution == null) {
       throw StateError('Choose how to handle the installed workout.');
     }
@@ -734,9 +778,11 @@ class AppController extends ChangeNotifier {
         resolution == BucketInstallConflictResolution.keepLocal) {
       return false;
     }
-    final bytes = await workoutBuckets.downloadPackage(entry);
-    var imported = await workoutPackages.importPackageBytes(
-      bytes,
+    final workoutBytes = await workoutBuckets.downloadWorkout(entry);
+    final assetsBytes = await workoutBuckets.downloadAssets(entry);
+    var imported = await workoutPackages.importSplitPackageBytes(
+      workoutBytes,
+      assetsBytes,
       defaultVoiceLanguage: defaultVoiceLanguage,
       mediaRepository: mediaLibrary,
     );
@@ -759,17 +805,19 @@ class AppController extends ChangeNotifier {
         .where((source) => source.id == sourceId)
         .map((source) => source.name)
         .firstOrNull;
-    installedBucketWorkouts.add(InstalledWorkoutProvenance(
-      workoutId: imported.id,
-      sourceId: sourceId,
-      sourceName: sourceName,
-      entryId: entry.id,
-      originalName: entry.name,
-      version: entry.version,
-      packageUrl: entry.packageUrl,
-      sha256: entry.sha256,
-      installedAt: DateTime.now(),
-    ));
+    installedBucketWorkouts.add(
+      InstalledWorkoutProvenance(
+        workoutId: imported.id,
+        sourceId: sourceId,
+        sourceName: sourceName,
+        entryId: entry.id,
+        originalName: entry.name,
+        version: entry.version,
+        packageUrl: entry.workoutUrl,
+        sha256: entry.workoutSha256,
+        installedAt: DateTime.now(),
+      ),
+    );
     await _migrateReadableMusicPaths();
     await store.saveWorkouts(workouts);
     await store.saveInstalledBucketWorkouts(installedBucketWorkouts);
@@ -781,9 +829,11 @@ class AppController extends ChangeNotifier {
   int _compareVersions(String left, String right) {
     final a = left.split('.').map((part) => int.tryParse(part) ?? 0).toList();
     final b = right.split('.').map((part) => int.tryParse(part) ?? 0).toList();
-    for (var index = 0;
-        index < (a.length > b.length ? a.length : b.length);
-        index++) {
+    for (
+      var index = 0;
+      index < (a.length > b.length ? a.length : b.length);
+      index++
+    ) {
       final av = index < a.length ? a[index] : 0;
       final bv = index < b.length ? b[index] : 0;
       if (av != bv) return av.compareTo(bv);
@@ -844,13 +894,14 @@ class AppController extends ChangeNotifier {
     }
     if (source == null) return null;
     return CoachRecording(
-        workoutId: workoutId,
-        cue: scope == 'description' ? 'workout_description' : 'step_voice',
-        scope: scope,
-        stepKey: stepKey,
-        language: '',
-        audioPath: resolveAudioSource(source),
-        createdAt: workout.updatedAt);
+      workoutId: workoutId,
+      cue: scope == 'description' ? 'workout_description' : 'step_voice',
+      scope: scope,
+      stepKey: stepKey,
+      language: '',
+      audioPath: resolveAudioSource(source),
+      createdAt: workout.updatedAt,
+    );
   }
 
   Future<void> assignCoachRecording(CoachRecording recording) async {
@@ -860,12 +911,13 @@ class AppController extends ChangeNotifier {
     final cueName = recording.scope == 'description'
         ? '${workout.name} introduction'
         : recording.stepKey == null
-            ? 'recording'
-            : _draftStepAt(draft.steps, recording.stepKey!)?.name ??
-                'recording';
+        ? 'recording'
+        : _draftStepAt(draft.steps, recording.stepKey!)?.name ?? 'recording';
     final originalPath = recording.audioPath;
-    final readablePath =
-        await recordingFiles.renameForCue(originalPath, cueName);
+    final readablePath = await recordingFiles.renameForCue(
+      originalPath,
+      cueName,
+    );
     final source = portableAudioSource(readablePath);
     if (recording.scope == 'description') {
       draft.recording = source;
@@ -890,8 +942,11 @@ class AppController extends ChangeNotifier {
     required String scope,
     String? stepKey,
   }) async {
-    final removed =
-        coachRecordingFor(workoutId: workoutId, scope: scope, stepKey: stepKey);
+    final removed = coachRecordingFor(
+      workoutId: workoutId,
+      scope: scope,
+      stepKey: stepKey,
+    );
     final workout = byId(workoutId);
     if (removed == null || workout == null) return removed;
     final draft = WorkoutDraft.fromWorkout(workout);
@@ -930,11 +985,12 @@ class AppController extends ChangeNotifier {
       }
     }
     return WorkoutMusicConfig(
-        workoutId: workoutId,
-        trackId: track?.id,
-        enabled: music.enabled,
-        baseVolume: music.volume,
-        duckingMode: music.ducking);
+      workoutId: workoutId,
+      trackId: track?.id,
+      enabled: music.enabled,
+      baseVolume: music.volume,
+      duckingMode: music.ducking,
+    );
   }
 
   MusicTrack? musicTrackById(String? id) {
@@ -952,20 +1008,24 @@ class AppController extends ChangeNotifier {
       imported.path,
       originalFileName: imported.originalFileName,
     );
-    musicTracks.add(MusicTrack(
+    musicTracks.add(
+      MusicTrack(
         id: 'personal-${DateTime.now().microsecondsSinceEpoch}',
         name: name,
         mood: 'Custom',
         source: imported.path,
         bundled: false,
-        createdAt: DateTime.now()));
+        createdAt: DateTime.now(),
+      ),
+    );
     await store.saveMusicTracks(musicTracks);
     notifyListeners();
     return true;
   }
 
   Future<void> _refreshGeneratedMusicNames(
-      List<MusicTrack> personalTracks) async {
+    List<MusicTrack> personalTracks,
+  ) async {
     var changed = false;
     final renamedSources = <String, String>{};
     for (final track in personalTracks) {

@@ -5,10 +5,11 @@ void main() {
   test('local workout variants get the first available numeric suffix', () {
     expect(uniqueLocalWorkoutName('Daily Plank', const []), 'Daily Plank');
     expect(
-      uniqueLocalWorkoutName(
-        'Daily Plank',
-        const ['daily plank', 'Daily Plank 2', 'Other Workout'],
-      ),
+      uniqueLocalWorkoutName('Daily Plank', const [
+        'daily plank',
+        'Daily Plank 2',
+        'Other Workout',
+      ]),
       'Daily Plank 3',
     );
     expect(
@@ -29,7 +30,7 @@ void main() {
       enabled: false,
       lastRefreshedAt: DateTime.utc(2026, 8, 27),
       lastError: 'Offline',
-      cachedCatalogJson: '{"schemaVersion":1}',
+      cachedCatalogJson: '{"schemaVersion":2}',
     );
 
     final restored = WorkoutBucketSource.fromJson(source.toJson());
@@ -44,7 +45,7 @@ void main() {
 
   test('catalog parses canonical schema and normalizes checksum', () {
     final catalog = WorkoutBucketCatalog.fromJson({
-      'schemaVersion': 1,
+      'schemaVersion': 2,
       'name': 'AnhPT Community',
       'description': 'Public workouts',
       'workouts': [
@@ -53,58 +54,58 @@ void main() {
           'name': 'Morning flow',
           'description': 'A short routine',
           'version': '1.2.0',
-          'packageUrl': 'https://example.com/morning-flow.anhpt.zip',
-          'sha256': hash.toUpperCase(),
+          'workoutUrl': 'https://example.com/morning-flow.yaml',
+          'workoutSha256': hash.toUpperCase(),
+          'workoutSize': 1024,
+          'assetsUrl': 'https://example.com/morning-flow.assets.zip',
+          'assetsSha256': hash.toUpperCase(),
+          'assetsSize': 3072,
           'tags': ['mobility', 'quick'],
           'author': 'AnhPT',
           'minAppVersion': '0.8.0',
-          'size': 4096,
         },
       ],
     });
 
     expect(catalog.entries, hasLength(1));
-    expect(catalog.entries.single.sha256, hash);
+    expect(catalog.entries.single.workoutSha256, hash);
     expect(catalog.entries.single.tags, ['mobility', 'quick']);
     expect(catalog.entries.single.minAppVersion, '0.8.0');
-    expect(catalog.entries.single.size, 4096);
-    expect(catalog.entries.single.copyWithSource('community').sourceId,
-        'community');
+    expect(catalog.entries.single.totalSize, 4096);
+    expect(
+      catalog.entries.single.copyWithSource('community').sourceId,
+      'community',
+    );
     expect(catalog.toJson()['workouts'], hasLength(1));
   });
 
-  test('catalog accepts version, entries, package_url and checksum aliases',
-      () {
-    final catalog = WorkoutBucketCatalog.fromJson({
-      'version': 1,
-      'name': 'Bucket',
-      'entries': [
-        {
-          'id': 'strength',
-          'name': 'Strength',
-          'version': '1',
-          'package_url': 'https://cdn.example.com/strength.zip',
-          'checksum': hash,
-        },
-      ],
-    });
-
-    expect(catalog.entries.single.description, isEmpty);
-    expect(catalog.entries.single.packageUrl, contains('strength.zip'));
+  test('catalog rejects obsolete schema versions', () {
+    expect(
+      () => WorkoutBucketCatalog.fromJson({
+        'schemaVersion': 1,
+        'name': 'Old bucket',
+        'workouts': <Object>[],
+      }),
+      throwsFormatException,
+    );
   });
 
   test('catalog rejects duplicates and malformed checksum', () {
     Map<String, dynamic> entry(String id, String checksum) => {
-          'id': id,
-          'name': 'Workout',
-          'version': '1',
-          'packageUrl': 'https://example.com/workout.zip',
-          'sha256': checksum,
-        };
+      'id': id,
+      'name': 'Workout',
+      'version': '1',
+      'workoutUrl': 'https://example.com/workout.yaml',
+      'workoutSha256': checksum,
+      'workoutSize': 100,
+      'assetsUrl': 'https://example.com/workout.assets.zip',
+      'assetsSha256': hash,
+      'assetsSize': 100,
+    };
 
     expect(
       () => WorkoutBucketCatalog.fromJson({
-        'schemaVersion': 1,
+        'schemaVersion': 2,
         'name': 'Bucket',
         'workouts': [entry('same', hash), entry('same', hash)],
       }),
@@ -125,15 +126,20 @@ void main() {
       'https://[::1]/bucket.json',
       'https://user:password@example.com/bucket.json',
     ]) {
-      expect(() => requirePublicHttpsUri(url), throwsFormatException,
-          reason: url);
+      expect(
+        () => requirePublicHttpsUri(url),
+        throwsFormatException,
+        reason: url,
+      );
     }
     expect(
       requirePublicHttpsUri('https://example.com/bucket.json').host,
       'example.com',
     );
     expect(
-        requirePublicHttpsUri('https://fcc.gov/bucket.json').host, 'fcc.gov');
+      requirePublicHttpsUri('https://fcc.gov/bucket.json').host,
+      'fcc.gov',
+    );
   });
 
   test('installed provenance round-trips', () {

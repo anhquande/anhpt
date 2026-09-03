@@ -127,6 +127,12 @@ the YAML references. Bundled `asset:` audio is referenced but not copied.
 | `announce_start` | Default `true`. |
 | `announce_finish` | Default `true`. |
 
+Legacy `mode`, `announce_every`, and `countdown_from` remain accepted for
+existing workouts and bucket packages. `continuous`, `interval`, `ending`, and
+`combined` map to the equivalent independent timing flags. Builder saves use
+the newer `voice.timing` structure; when both forms are present, explicit
+`voice.timing` values take precedence.
+
 ## 7. Example
 
 ```yaml
@@ -181,10 +187,13 @@ the action because ordinary applications cannot safely lock or power off the
 device display without privileged device-management capabilities. The timer is
 cancelled if the Player closes or the workout finishes before the delay.
 
-## 11. Marketplace package metadata
+## 11. Marketplace artifact metadata
 
-Marketplace downloads use the same `.anhpt.zip` and YAML validation path as
-manual import. A package may add a root `manifest.json` with `schemaVersion: 1`
-and optional `workoutFile` (default `workout.yaml`). Package identity, version,
-URL, and SHA-256 live in the bucket catalog rather than workout YAML. Existing
-manifest-less packages remain valid.
+Bucket catalog schema v2 publishes each workout as two required, independently
+downloadable artifacts. `<id>-<version>.workout.yaml` contains only the workout
+definition. `<id>-<version>.assets.zip` contains `manifest.json` plus referenced
+audio, video, images, and other local media, and must not contain workout YAML.
+The catalog stores separate URL, SHA-256, and byte-size fields for both files.
+Both artifacts must validate before installation is committed. Schema v1 bucket
+catalogs are not supported; manual portable `.anhpt.zip` files remain a separate
+import/export format.

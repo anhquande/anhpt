@@ -4,29 +4,36 @@ import 'package:anhpt/services/workout_serializer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('legacy voice mode is rejected', () {
-    expect(
-      () => WorkoutParser.parse(
+  test('legacy voice modes map to independent timing flags', () {
+    final expected = {
+      'continuous': [true, false, false],
+      'interval': [false, true, false],
+      'ending': [false, false, true],
+      'combined': [false, true, true],
+    };
+    for (final mode in expected.entries) {
+      final workout = WorkoutParser.parse(
         '''
 version: 2
 name: Legacy mode
 voice:
-  mode: combined
+  mode: ${mode.key}
 steps:
   - name: Plank
     duration: 30s
 ''',
         id: 'legacy-mode',
         defaultVoiceLanguage: 'en',
-      ),
-      throwsA(isA<WorkoutValidationException>()),
-    );
+      );
+      expect(workout.voice.announceElapsedTime, mode.value[0]);
+      expect(workout.voice.announceInterval, mode.value[1]);
+      expect(workout.voice.announceFinalCountdown, mode.value[2]);
+    }
   });
 
-  test('legacy voice timing fields are rejected', () {
-    expect(
-      () => WorkoutParser.parse(
-        '''
+  test('legacy voice timing durations remain supported', () {
+    final workout = WorkoutParser.parse(
+      '''
 version: 2
 name: Legacy fields
 voice:
@@ -36,11 +43,12 @@ steps:
   - name: Plank
     duration: 30s
 ''',
-        id: 'legacy-fields',
-        defaultVoiceLanguage: 'en',
-      ),
-      throwsA(isA<WorkoutValidationException>()),
+      id: 'legacy-fields',
+      defaultVoiceLanguage: 'en',
     );
+
+    expect(workout.voice.announceEvery, const Duration(seconds: 10));
+    expect(workout.voice.countdownFrom, const Duration(seconds: 5));
   });
 
   test('new timing flags can be combined independently', () {

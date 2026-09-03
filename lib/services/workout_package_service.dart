@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 
 import '../models/workout.dart';
@@ -16,6 +17,11 @@ class WorkoutPackageService {
   static const _maxPackageBytes = 500 * 1024 * 1024;
   static const _maxFileBytes = 200 * 1024 * 1024;
 
+  final bool supportsPackageFileExtraction;
+
+  WorkoutPackageService({bool? supportsPackageFileExtraction})
+    : supportsPackageFileExtraction = supportsPackageFileExtraction ?? !kIsWeb;
+
   Future<bool> exportPackage(
     Workout workout, {
     required String Function(String source) resolveSource,
@@ -24,10 +30,11 @@ class WorkoutPackageService {
     final archive = Archive()
       ..add(ArchiveFile.string('workout.yaml', workout.rawYaml));
     final mediaManifest = <Map<String, dynamic>>[];
-    for (final mediaReference in workout.exercises
-        .map((exercise) => exercise.demoMediaId)
-        .whereType<String>()
-        .toSet()) {
+    for (final mediaReference
+        in workout.exercises
+            .map((exercise) => exercise.demoMediaId)
+            .whereType<String>()
+            .toSet()) {
       final asset = await mediaRepository.get(mediaReference);
       final uri = await mediaRepository.resolveUri(mediaReference);
       if (asset == null || uri == null) continue;
@@ -44,16 +51,19 @@ class WorkoutPackageService {
         'path': path,
       });
     }
-    archive.add(ArchiveFile.string(
+    archive.add(
+      ArchiveFile.string(
         'manifest.json',
         jsonEncode({
           'schemaVersion': 1,
           'workoutFile': 'workout.yaml',
           if (mediaManifest.isNotEmpty) 'assets': mediaManifest,
-        })));
-    final sources = _sources(workout)
-        .where((source) => !source.startsWith('asset:'))
-        .toSet();
+        }),
+      ),
+    );
+    final sources = _sources(
+      workout,
+    ).where((source) => !source.startsWith('asset:')).toSet();
     for (final source in sources) {
       final file = File(resolveSource(source));
       if (!await file.exists()) continue;
@@ -86,7 +96,8 @@ class WorkoutPackageService {
     );
     if (picked == null) return null;
     final pickedFile = picked.files.single;
-    final bytes = pickedFile.bytes ??
+    final bytes =
+        pickedFile.bytes ??
         (pickedFile.path == null
             ? null
             : await File(pickedFile.path!).readAsBytes());
@@ -180,9 +191,11 @@ class WorkoutPackageService {
         if (content == null) {
           throw StateError('Package media is missing: $path');
         }
-        final imported = await mediaRepository.importBytes(content,
-            fileName: path.split('/').last,
-            type: asset['type'] as String? ?? 'video');
+        final imported = await mediaRepository.importBytes(
+          content,
+          fileName: path.split('/').last,
+          type: asset['type'] as String? ?? 'video',
+        );
         if (imported.id != id.toLowerCase()) {
           throw StateError('Package media hash does not match: $path');
         }
@@ -216,19 +229,53 @@ class WorkoutPackageService {
     return _importAudioReferences(parsed, archive, id, defaultVoiceLanguage);
   }
 
+  /// Combines independently downloaded YAML and assets in memory before using
+  /// the same validated import path as a manually selected package.
+  Future<Workout> importSplitPackageBytes(
+    Uint8List workoutBytes,
+    Uint8List assetsBytes, {
+    required String defaultVoiceLanguage,
+    MediaRepository? mediaRepository,
+  }) async {
+    final assets = ZipDecoder().decodeBytes(assetsBytes, verify: true);
+    if (assets.find('workout.yaml') != null) {
+      throw StateError('Assets archive must not contain workout.yaml.');
+    }
+    final combined = Archive()
+      ..add(ArchiveFile.bytes('workout.yaml', workoutBytes));
+    for (final entry in assets) {
+      final content = entry.readBytes();
+      if (content == null) {
+        throw StateError('Could not read assets entry: ${entry.name}');
+      }
+      combined.add(ArchiveFile.bytes(entry.name, content));
+    }
+    return importPackageBytes(
+      Uint8List.fromList(ZipEncoder().encodeBytes(combined)),
+      defaultVoiceLanguage: defaultVoiceLanguage,
+      mediaRepository: mediaRepository,
+    );
+  }
+
   Future<Workout> _importAudioReferences(
     Workout parsed,
     Archive archive,
     String id,
     String defaultVoiceLanguage,
   ) async {
+    // Browsers do not expose an application Documents directory. Keep the
+    // workout definition usable there; unavailable package-local recordings
+    // and music already degrade to TTS / no background music at playback.
+    if (!supportsPackageFileExtraction) return parsed;
+
     final draft = WorkoutDraft.fromWorkout(parsed);
     final root = await getApplicationDocumentsDirectory();
     final imports = Directory('${root.path}${Platform.pathSeparator}imports');
     await imports.create(recursive: true);
     final target = Directory('${imports.path}${Platform.pathSeparator}$id');
-    final staging =
-        Directory('${imports.path}${Platform.pathSeparator}.tmp-$id');
+    final staging = Directory(
+      '${imports.path}${Platform.pathSeparator}.tmp-$id',
+    );
     await staging.create(recursive: true);
     final copiedSources = <String, String>{};
     final usedNames = <String>{};
@@ -249,8 +296,9 @@ class WorkoutPackageService {
       while (!usedNames.add(fileName.toLowerCase())) {
         fileName = '$stem-${suffix++}$extension';
       }
-      final destination =
-          File('${staging.path}${Platform.pathSeparator}$fileName');
+      final destination = File(
+        '${staging.path}${Platform.pathSeparator}$fileName',
+      );
       await destination.writeAsBytes(content, flush: true);
       final reference = 'imports/$id/$fileName';
       copiedSources[source] = reference;
@@ -258,11 +306,13 @@ class WorkoutPackageService {
     }
 
     try {
-      draft.recording =
-          draft.recording.isEmpty ? '' : await copyReference(draft.recording);
+      draft.recording = draft.recording.isEmpty
+          ? ''
+          : await copyReference(draft.recording);
       if (draft.backgroundMusicSource.isNotEmpty) {
-        draft.backgroundMusicSource =
-            await copyReference(draft.backgroundMusicSource);
+        draft.backgroundMusicSource = await copyReference(
+          draft.backgroundMusicSource,
+        );
       }
       Future<void> copySteps(List<WorkoutDraftNode> nodes) async {
         for (final node in nodes) {
