@@ -113,12 +113,10 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
               children: [
                 Text(entry.description),
                 const SizedBox(height: 16),
-                Text('Version ${entry.version}'),
-                if (entry.author != null) Text('By ${entry.author}'),
                 Text(
-                  '${_formatBytes(entry.workoutSize)} YAML + '
-                  '${_formatBytes(entry.assetsSize)} assets',
+                  'v${entry.version} (${_formatBytes(entry.assetsSize)} media)',
                 ),
+                if (entry.author != null) Text('By ${entry.author}'),
                 if (entry.tags.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(
@@ -375,11 +373,6 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
 
   Widget _entryCard(BuildContext context, WorkoutBucketEntry entry) {
     final state = widget.controller.bucketInstallState(entry);
-    final label = switch (state) {
-      'installed' => 'Add another',
-      'updateAvailable' => 'Update',
-      _ => 'Install',
-    };
     final colors = Theme.of(context).colorScheme;
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -404,24 +397,17 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                       const SizedBox(height: 3),
                       Text(
                         entry.description,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colors.onSurfaceVariant,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_sourceName(entry.sourceId)}  ·  Version ${entry.version}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
                     if (entry.tags.isNotEmpty) ...[
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 5),
                       Text(
-                        entry.tags.join('  ·  '),
+                        _tagSummary(entry.tags),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -433,26 +419,60 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              FilledButton.tonal(
-                onPressed: () {
-                  if (state == 'installed') {
-                    _install(
-                      entry,
-                      resolution: BucketInstallConflictResolution.installCopy,
-                    );
-                  } else if (state == 'updateAvailable') {
-                    _showUpdateChoices(entry);
-                  } else {
-                    _install(entry);
-                  }
+              Tooltip(
+                message: switch (state) {
+                  'installed' =>
+                    'Downloaded from ${_sourceName(entry.sourceId)}',
+                  'updateAvailable' =>
+                    'Update available from ${_sourceName(entry.sourceId)}',
+                  _ => 'From ${_sourceName(entry.sourceId)}',
                 },
-                child: Text(label),
+                child: _catalogStateIcon(context, state),
               ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _catalogStateIcon(BuildContext context, String state) {
+    final colors = Theme.of(context).colorScheme;
+    if (state == 'updateAvailable') {
+      return SizedBox(
+        width: 32,
+        height: 32,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(Icons.cloud_done_outlined, color: colors.onSurfaceVariant),
+            Positioned(
+              top: 2,
+              right: 1,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: colors.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colors.surface, width: 1.5),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    return Icon(
+      state == 'installed' ? Icons.cloud_done_outlined : Icons.cloud_outlined,
+      color: colors.onSurfaceVariant,
+    );
+  }
+
+  String _tagSummary(List<String> tags) {
+    final visible = tags.take(3).toList();
+    final remaining = tags.length - visible.length;
+    return [...visible, if (remaining > 0) '+$remaining'].join(' · ');
   }
 
   List<WorkoutBucketEntry> _filteredEntries() {

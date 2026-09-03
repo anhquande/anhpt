@@ -32,7 +32,9 @@ void main() {
 
     expect(find.text('Loaded 1 workout listing.'), findsOneWidget);
     expect(find.text('Morning Flow'), findsOneWidget);
-    expect(find.textContaining('Not downloaded'), findsOneWidget);
+    expect(find.byIcon(Icons.cloud_outlined), findsOneWidget);
+    expect(find.textContaining('Not downloaded'), findsNothing);
+    expect(find.textContaining('v1.0.0'), findsNothing);
     await tester.pump(const Duration(seconds: 8));
     await tester.pump(const Duration(milliseconds: 300));
     expect(find.text('Loaded 1 workout listing.'), findsNothing);

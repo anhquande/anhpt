@@ -82,5 +82,8 @@ Dashboard startup and refresh download catalog metadata only; workout artifacts
 and their media are never installed automatically. Uninstalled catalog entries
 appear beside local workouts using `bucket.json` metadata. Selecting one opens
 a metadata-only detail screen. Pressing Download fetches an independently
-checksummed YAML definition and assets ZIP; installation becomes visible only
-after both validate successfully.
+checksummed YAML definition and media ZIP; installation becomes visible only
+after both validate successfully. The UI omits the negligible YAML size and
+shows the media size beside the version. The download screen reports the
+definition and media phases separately, and changes to Installing only after
+the media ZIP has finished downloading.

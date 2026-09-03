@@ -197,7 +197,10 @@ Dashboard refresh fetches only each enabled source's `bucket.json`. Catalog
 entries are rendered directly from metadata and do not enter the persisted
 workout list. The two artifact downloads, checksum verification, media
 extraction, and workout persistence begin only from the Download action on the
-catalog detail screen. Nothing is committed unless both artifacts validate.
+catalog detail screen. Download progress treats completion of the YAML artifact
+as an intermediate state and continues to show the subsequent assets transfer;
+the UI enters its installation phase only after the assets artifact completes.
+Nothing is committed unless both artifacts validate.
 
 Installed-workout provenance is stored internally, independently of editable
 workout YAML and display names. The durable identity is the bucket source plus
