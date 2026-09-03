@@ -189,11 +189,14 @@ cancelled if the Player closes or the workout finishes before the delay.
 
 ## 11. Marketplace artifact metadata
 
-Bucket catalog schema v2 publishes each workout as two required, independently
+Bucket catalog schema v2 publishes each workout as four independently
 downloadable artifacts. `<id>-<version>.workout.yaml` contains only the workout
 definition. `<id>-<version>.assets.zip` contains `manifest.json` plus referenced
 audio, video, images, and other local media, and must not contain workout YAML.
-The catalog stores separate URL, SHA-256, and byte-size fields for both files.
-Both artifacts must validate before installation is committed. Schema v1 bucket
-catalogs are not supported; manual portable `.anhpt.zip` files remain a separate
-import/export format.
+A small thumbnail is downloaded when the catalog is displayed; a larger feature
+image is downloaded only when workout details open. Each artifact has its own
+URL, SHA-256, and byte-size fields. A source may omit custom artwork, in which
+case category artwork is selected exclusively from the first workout tag.
+Both workout artifacts must validate before installation is committed. Schema
+v1 bucket catalogs are not supported; manual portable `.anhpt.zip` files remain
+a separate import/export format.

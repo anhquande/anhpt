@@ -9,6 +9,7 @@ import '../widgets/coach_recording_card.dart';
 import '../widgets/common.dart';
 import '../widgets/demo_media_source_sheet.dart';
 import '../widgets/workout_music_card.dart';
+import '../widgets/workout_artwork.dart';
 import '../widgets/workout_widgets.dart';
 import 'workout_builder_screen.dart';
 import 'workout_download_screen.dart';
@@ -198,8 +199,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
           }
         } catch (error) {
           if (mounted) {
-            ScaffoldMessenger.of(context)
-                .showSnackBar(SnackBar(content: Text('Export failed: $error')));
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Export failed: $error')));
           }
         }
         return;
@@ -373,6 +375,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
         final originalName = provenance == null
             ? null
             : controller.bucketOriginalName(provenance);
+        final bucketEntry = controller.bucketEntryForWorkout(workout.id);
 
         return Scaffold(
           appBar: AppBar(
@@ -449,6 +452,19 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                           key: const PageStorageKey('overview-tab'),
                           padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                           children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(18),
+                              child: SizedBox(
+                                height: 190,
+                                child: WorkoutArtwork(
+                                  tags: workout.tags,
+                                  kind: WorkoutArtworkKind.feature,
+                                  bucketEntry: bucketEntry,
+                                  bucketService: controller.workoutBuckets,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 16),
                             if (sourceName != null) ...[
                               _WorkoutOrigin(
                                 sourceName,
@@ -479,9 +495,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen>
                                       materialTapTargetSize:
                                           MaterialTapTargetSize.shrinkWrap,
                                       side: BorderSide.none,
-                                      backgroundColor: Theme.of(context)
-                                          .colorScheme
-                                          .secondaryContainer,
+                                      backgroundColor: Theme.of(
+                                        context,
+                                      ).colorScheme.secondaryContainer,
                                     ),
                                 ],
                               ),
@@ -732,8 +748,9 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text,
-      style: Theme.of(context).textTheme.titleSmall
-          ?.copyWith(fontWeight: FontWeight.w800),
+      style: Theme.of(
+        context,
+      ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
     );
   }
 }

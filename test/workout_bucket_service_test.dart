@@ -120,6 +120,56 @@ void main() {
   });
 
   test(
+    'thumbnail and feature image download and verify independently',
+    () async {
+      final thumbnail = utf8.encode('thumbnail');
+      final feature = utf8.encode('feature image');
+      var thumbnailRequests = 0;
+      final service = WorkoutBucketService(
+        client: MockClient((request) async {
+          if (request.url.path.contains('thumbnail')) {
+            thumbnailRequests++;
+            return http.Response.bytes(thumbnail, 200);
+          }
+          return http.Response.bytes(feature, 200);
+        }),
+      );
+      final entry = WorkoutBucketEntry(
+        id: 'flow',
+        name: 'Flow',
+        version: '1.0.0',
+        workoutUrl: 'https://example.com/flow.yaml',
+        workoutSha256: List.filled(64, 'a').join(),
+        workoutSize: 1,
+        thumbnailUrl: 'https://example.com/flow.thumbnail.webp',
+        thumbnailSha256: sha256.convert(thumbnail).toString(),
+        thumbnailSize: thumbnail.length,
+        featureImageUrl: 'https://example.com/flow.featureImage.webp',
+        featureImageSha256: sha256.convert(feature).toString(),
+        featureImageSize: feature.length,
+      );
+
+      expect(await service.downloadThumbnail(entry), thumbnail);
+      expect(await service.downloadThumbnail(entry), thumbnail);
+      expect(thumbnailRequests, 1);
+      expect(await service.downloadFeatureImage(entry), feature);
+      expect(
+        await service.downloadThumbnail(
+          WorkoutBucketEntry(
+            id: 'fallback',
+            name: 'Fallback',
+            version: '1.0.0',
+            workoutUrl: 'https://example.com/fallback.yaml',
+            workoutSha256: List.filled(64, 'b').join(),
+            workoutSize: 1,
+          ),
+        ),
+        isNull,
+      );
+    },
+  );
+
+  test(
     'split YAML and assets import through the validated package path',
     () async {
       final assets = Archive()

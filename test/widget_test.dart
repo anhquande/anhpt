@@ -24,11 +24,11 @@ void main() {
   setUp(() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(pathProviderChannel, (call) async {
-      if (call.method == 'getApplicationDocumentsDirectory') {
-        return Directory.systemTemp.path;
-      }
-      return null;
-    });
+          if (call.method == 'getApplicationDocumentsDirectory') {
+            return Directory.systemTemp.path;
+          }
+          return null;
+        });
   });
 
   tearDown(() {
@@ -45,10 +45,7 @@ void main() {
       completionDeviceActionFor(TargetPlatform.android, isWeb: false),
       CompletionDeviceAction.exitAndroid,
     );
-    expect(
-      completionDeviceActionFor(TargetPlatform.iOS, isWeb: false),
-      isNull,
-    );
+    expect(completionDeviceActionFor(TargetPlatform.iOS, isWeb: false), isNull);
     expect(
       completionDeviceActionFor(TargetPlatform.windows, isWeb: true),
       isNull,
@@ -71,14 +68,16 @@ void main() {
     expect(find.text('Turn off screen after starting'), findsOneWidget);
   });
 
-  testWidgets('workout detail uses compact Overview and Steps layout',
-      (tester) async {
+  testWidgets('workout detail uses compact Overview and Steps layout', (
+    tester,
+  ) async {
     await tester.binding.setSurfaceSize(const Size(390, 700));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
       ..workouts = [
-        WorkoutParser.parse('''
+        WorkoutParser.parse(
+          '''
 version: 2
 name: Sticky workout title
 description: This is a deliberately long workout description that explains the goal, expected intensity, preparation, breathing, movement quality, and completion criteria so the Overview can verify its compact expandable presentation without overwhelming the structure below.
@@ -87,7 +86,10 @@ tags:
   - Beginner
 steps:
 ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s').join('\n')}
-''', id: 'sticky', defaultVoiceLanguage: 'en'),
+''',
+          id: 'sticky',
+          defaultVoiceLanguage: 'en',
+        ),
       ]
       ..installedBucketWorkouts = [
         InstalledWorkoutProvenance(
@@ -103,9 +105,11 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
         ),
       ];
 
-    await tester.pumpWidget(MaterialApp(
-      home: WorkoutDetailScreen(controller: controller, workoutId: 'sticky'),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkoutDetailScreen(controller: controller, workoutId: 'sticky'),
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Sticky workout title'), findsOneWidget);
@@ -122,6 +126,11 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
       find.text('From AnhPT Official · Originally “Original Sticky Workout”'),
       findsOneWidget,
     );
+    await tester.drag(
+      find.byKey(const PageStorageKey('overview-tab')),
+      const Offset(0, -360),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Workout options'), findsOneWidget);
     expect(find.text('After workout'), findsOneWidget);
     expect(find.text('Stay open after completion'), findsOneWidget);
@@ -136,8 +145,10 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(controller.byId('sticky')!.completionAction, 'shutdown_or_exit');
     expect(find.text('Shut down or exit when complete'), findsOneWidget);
 
-    final screenDuringWorkout =
-        find.widgetWithText(SwitchListTile, 'Screen during workout');
+    final screenDuringWorkout = find.widgetWithText(
+      SwitchListTile,
+      'Screen during workout',
+    );
     await tester.ensureVisible(screenDuringWorkout);
     await tester.pumpAndSettle();
     await tester.tap(screenDuringWorkout);
@@ -205,24 +216,33 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Get Started'), findsOneWidget);
   });
 
-  testWidgets('Home is compact and searches local workouts without accents',
-      (tester) async {
+  testWidgets('Home is compact and searches local workouts without accents', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
       ..workouts = [
-        WorkoutParser.parse('''
+        WorkoutParser.parse(
+          '''
 version: 2
 name: Khởi động nhanh
 tags: [Mobility]
 steps:
   - name: Move
-''', id: 'warmup', defaultVoiceLanguage: 'vi'),
-        WorkoutParser.parse('''
+''',
+          id: 'warmup',
+          defaultVoiceLanguage: 'vi',
+        ),
+        WorkoutParser.parse(
+          '''
 version: 2
 name: Strength Builder
 steps:
   - name: Lift
-''', id: 'strength', defaultVoiceLanguage: 'en'),
+''',
+          id: 'strength',
+          defaultVoiceLanguage: 'en',
+        ),
       ]
       ..installedBucketWorkouts = [
         InstalledWorkoutProvenance(
@@ -238,8 +258,9 @@ steps:
         ),
       ];
 
-    await tester
-        .pumpWidget(MaterialApp(home: HomeScreen(controller: controller)));
+    await tester.pumpWidget(
+      MaterialApp(home: HomeScreen(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Workouts'), findsOneWidget);
@@ -267,15 +288,16 @@ steps:
     expect(find.text('Strength Builder'), findsNothing);
   });
 
-  testWidgets('settings owns Windows microphone permission guidance',
-      (tester) async {
+  testWidgets('settings owns Windows microphone permission guidance', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
 
-    await tester.pumpWidget(MaterialApp(
-      home: SettingsScreen(controller: controller),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(home: SettingsScreen(controller: controller)),
+    );
     await tester.pump();
 
     expect(find.text('Microphone access'), findsOneWidget);
@@ -289,9 +311,9 @@ steps:
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
 
-    await tester.pumpWidget(MaterialApp(
-      home: HomeScreen(controller: controller),
-    ));
+    await tester.pumpWidget(
+      MaterialApp(home: HomeScreen(controller: controller)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Workouts'), findsOneWidget);

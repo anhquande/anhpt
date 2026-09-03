@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout_bucket.dart';
+import '../widgets/workout_artwork.dart';
 import 'bucket_sources_screen.dart';
 import 'workout_download_screen.dart';
 
@@ -383,6 +384,20 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
           padding: const EdgeInsets.fromLTRB(16, 13, 10, 13),
           child: Row(
             children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 88,
+                  height: 76,
+                  child: WorkoutArtwork(
+                    tags: entry.tags,
+                    kind: WorkoutArtworkKind.thumbnail,
+                    bucketEntry: entry,
+                    bucketService: widget.controller.workoutBuckets,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

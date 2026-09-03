@@ -87,3 +87,7 @@ after both validate successfully. The UI omits the negligible YAML size and
 shows the media size beside the version. The download screen reports the
 definition and media phases separately, and changes to Installing only after
 the media ZIP has finished downloading.
+Workout cards fetch small thumbnails independently after catalog metadata is
+available. Opening a workout detail screen fetches its larger feature image.
+Missing or unavailable artwork falls back to bundled category imagery selected
+by the workout's first tag (for example Yoga, HIIT, Meditation, or Tabata).

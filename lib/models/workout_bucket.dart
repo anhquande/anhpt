@@ -149,6 +149,12 @@ class WorkoutBucketEntry {
   final String assetsUrl;
   final String assetsSha256;
   final int assetsSize;
+  final String? thumbnailUrl;
+  final String? thumbnailSha256;
+  final int? thumbnailSize;
+  final String? featureImageUrl;
+  final String? featureImageSha256;
+  final int? featureImageSize;
   final List<String> tags;
   final String? author;
   final String? minAppVersion;
@@ -166,6 +172,12 @@ class WorkoutBucketEntry {
     this.assetsSha256 =
         '0000000000000000000000000000000000000000000000000000000000000000',
     this.assetsSize = 1,
+    this.thumbnailUrl,
+    this.thumbnailSha256,
+    this.thumbnailSize,
+    this.featureImageUrl,
+    this.featureImageSha256,
+    this.featureImageSize,
     this.tags = const [],
     this.author,
     this.minAppVersion,
@@ -173,6 +185,12 @@ class WorkoutBucketEntry {
 
   Uri get workoutUri => requirePublicHttpsUri(workoutUrl, field: 'workoutUrl');
   Uri get assetsUri => requirePublicHttpsUri(assetsUrl, field: 'assetsUrl');
+  Uri? get thumbnailUri => thumbnailUrl == null
+      ? null
+      : requirePublicHttpsUri(thumbnailUrl!, field: 'thumbnailUrl');
+  Uri? get featureImageUri => featureImageUrl == null
+      ? null
+      : requirePublicHttpsUri(featureImageUrl!, field: 'featureImageUrl');
   int get totalSize => workoutSize + assetsSize;
 
   WorkoutBucketEntry copyWithSource(String sourceId) => WorkoutBucketEntry(
@@ -187,6 +205,12 @@ class WorkoutBucketEntry {
     assetsUrl: assetsUrl,
     assetsSha256: assetsSha256,
     assetsSize: assetsSize,
+    thumbnailUrl: thumbnailUrl,
+    thumbnailSha256: thumbnailSha256,
+    thumbnailSize: thumbnailSize,
+    featureImageUrl: featureImageUrl,
+    featureImageSha256: featureImageSha256,
+    featureImageSize: featureImageSize,
     tags: tags,
     author: author,
     minAppVersion: minAppVersion,
@@ -204,6 +228,12 @@ class WorkoutBucketEntry {
     'assetsUrl': assetsUrl,
     'assetsSha256': assetsSha256,
     'assetsSize': assetsSize,
+    if (thumbnailUrl != null) 'thumbnailUrl': thumbnailUrl,
+    if (thumbnailSha256 != null) 'thumbnailSha256': thumbnailSha256,
+    if (thumbnailSize != null) 'thumbnailSize': thumbnailSize,
+    if (featureImageUrl != null) 'featureImageUrl': featureImageUrl,
+    if (featureImageSha256 != null) 'featureImageSha256': featureImageSha256,
+    if (featureImageSize != null) 'featureImageSize': featureImageSize,
     'tags': tags,
     if (author != null) 'author': author,
     if (minAppVersion != null) 'minAppVersion': minAppVersion,
@@ -243,6 +273,29 @@ class WorkoutBucketEntry {
         'workoutSize and assetsSize must be positive integers',
       );
     }
+    void validateOptionalImage(String prefix) {
+      final url = _optionalString(json, '${prefix}Url');
+      final checksum = _optionalString(json, '${prefix}Sha256');
+      final size = json['${prefix}Size'];
+      final present = [
+        url,
+        checksum,
+        size,
+      ].where((value) => value != null).length;
+      if (present == 0) return;
+      if (present != 3 || size is! int || size <= 0) {
+        throw FormatException(
+          '${prefix}Url, ${prefix}Sha256, and ${prefix}Size must be provided together',
+        );
+      }
+      requirePublicHttpsUri(url!, field: '${prefix}Url');
+      if (!isSha256Hex(checksum!)) {
+        throw FormatException('${prefix}Sha256 must be a SHA-256 checksum');
+      }
+    }
+
+    validateOptionalImage('thumbnail');
+    validateOptionalImage('featureImage');
     return WorkoutBucketEntry(
       sourceId: _optionalString(json, 'sourceId'),
       id: _requiredString(json, 'id'),
@@ -255,6 +308,15 @@ class WorkoutBucketEntry {
       assetsUrl: assetsUrl,
       assetsSha256: assetsSha256,
       assetsSize: assetsSize,
+      thumbnailUrl: _optionalString(json, 'thumbnailUrl'),
+      thumbnailSha256: _optionalString(json, 'thumbnailSha256')?.toLowerCase(),
+      thumbnailSize: json['thumbnailSize'] as int?,
+      featureImageUrl: _optionalString(json, 'featureImageUrl'),
+      featureImageSha256: _optionalString(
+        json,
+        'featureImageSha256',
+      )?.toLowerCase(),
+      featureImageSize: json['featureImageSize'] as int?,
       tags: tags,
       author: _optionalString(json, 'author'),
       minAppVersion: _optionalString(json, 'minAppVersion'),

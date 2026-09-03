@@ -1,7 +1,25 @@
 import 'package:anhpt/models/workout_bucket.dart';
+import 'package:anhpt/widgets/workout_artwork.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('default artwork category uses only the first workout tag', () {
+    expect(
+      defaultWorkoutArtwork(const [
+        'meditation',
+        'hiit',
+      ], WorkoutArtworkKind.thumbnail),
+      'assets/workout_artwork/thumbnail/meditation.webp',
+    );
+    expect(
+      defaultWorkoutArtwork(const [
+        'unknown',
+        'yoga',
+      ], WorkoutArtworkKind.feature),
+      'assets/workout_artwork/feature/strength.webp',
+    );
+  });
+
   test('local workout variants get the first available numeric suffix', () {
     expect(uniqueLocalWorkoutName('Daily Plank', const []), 'Daily Plank');
     expect(
@@ -60,6 +78,13 @@ void main() {
           'assetsUrl': 'https://example.com/morning-flow.assets.zip',
           'assetsSha256': hash.toUpperCase(),
           'assetsSize': 3072,
+          'thumbnailUrl': 'https://example.com/morning-flow.thumbnail.webp',
+          'thumbnailSha256': hash.toUpperCase(),
+          'thumbnailSize': 12000,
+          'featureImageUrl':
+              'https://example.com/morning-flow.featureImage.webp',
+          'featureImageSha256': hash.toUpperCase(),
+          'featureImageSize': 72000,
           'tags': ['mobility', 'quick'],
           'author': 'AnhPT',
           'minAppVersion': '0.8.0',
@@ -72,11 +97,31 @@ void main() {
     expect(catalog.entries.single.tags, ['mobility', 'quick']);
     expect(catalog.entries.single.minAppVersion, '0.8.0');
     expect(catalog.entries.single.totalSize, 4096);
+    expect(catalog.entries.single.thumbnailSize, 12000);
+    expect(catalog.entries.single.featureImageSha256, hash);
     expect(
       catalog.entries.single.copyWithSource('community').sourceId,
       'community',
     );
     expect(catalog.toJson()['workouts'], hasLength(1));
+  });
+
+  test('catalog requires complete optional artwork metadata', () {
+    expect(
+      () => WorkoutBucketEntry.fromJson({
+        'id': 'flow',
+        'name': 'Flow',
+        'version': '1',
+        'workoutUrl': 'https://example.com/flow.yaml',
+        'workoutSha256': hash,
+        'workoutSize': 100,
+        'assetsUrl': 'https://example.com/flow.assets.zip',
+        'assetsSha256': hash,
+        'assetsSize': 100,
+        'thumbnailUrl': 'https://example.com/flow.webp',
+      }),
+      throwsFormatException,
+    );
   });
 
   test('catalog rejects obsolete schema versions', () {
