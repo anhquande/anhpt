@@ -85,26 +85,6 @@ class WorkoutCard extends StatelessWidget {
 
   Widget _statusLine(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final updateVersion = availableUpdateVersion;
-    if (updateVersion != null) {
-      return Row(
-        children: [
-          Icon(Icons.system_update_alt, size: 14, color: cs.primary),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              'Update available · v$updateVersion',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: cs.primary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      );
-    }
     if (workout.lastUsedAt != null) {
       return Row(
         children: [
@@ -134,6 +114,40 @@ class WorkoutCard extends StatelessWidget {
       );
     }
     return const SizedBox.shrink();
+  }
+
+  Widget _sourceIcon(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final hasUpdate = availableUpdateVersion != null;
+    return Tooltip(
+      message: hasUpdate
+          ? 'Update available from $sourceName'
+          : 'Downloaded from $sourceName',
+      child: SizedBox(
+        width: 32,
+        height: 32,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(Icons.cloud_done_outlined, color: cs.onSurfaceVariant),
+            if (hasUpdate)
+              Positioned(
+                top: 3,
+                right: 2,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: cs.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.surface, width: 1.5),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -217,18 +231,26 @@ class WorkoutCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 6),
-                child: IconButton(
-                  tooltip: workout.favorite
-                      ? 'Remove favorite'
-                      : 'Add to favorites',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onFavorite,
-                  icon: Icon(
-                    workout.favorite
-                        ? Icons.star_rounded
-                        : Icons.star_border_rounded,
-                    color: workout.favorite ? cs.primary : cs.onSurfaceVariant,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (sourceName != null) _sourceIcon(context),
+                    IconButton(
+                      tooltip: workout.favorite
+                          ? 'Remove favorite'
+                          : 'Add to favorites',
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onFavorite,
+                      icon: Icon(
+                        workout.favorite
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        color: workout.favorite
+                            ? cs.primary
+                            : cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -260,7 +282,7 @@ class CatalogWorkoutCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: SizedBox(
-          height: 96,
+          height: 108,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -286,31 +308,40 @@ class CatalogWorkoutCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
-                    const SizedBox(height: 6),
-                    Text(
-                      '${_formatCatalogBytes(entry.totalSize)}  |  v${entry.version}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.onSurfaceVariant,
+                    if (entry.description.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        entry.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'From $sourceName · Not downloaded',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.w600,
+                    ],
+                    if (entry.tags.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        _tagSummary(entry.tags),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 14),
-                child: Icon(Icons.cloud_download_outlined),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Tooltip(
+                  message: 'From $sourceName',
+                  child: Icon(
+                    Icons.cloud_outlined,
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
               ),
             ],
           ),
@@ -335,12 +366,10 @@ class CatalogWorkoutCard extends StatelessWidget {
     return Icons.fitness_center;
   }
 
-  static String _formatCatalogBytes(int bytes) {
-    if (bytes >= 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
-    return '$bytes B';
+  static String _tagSummary(List<String> tags) {
+    final visible = tags.take(3).toList();
+    final remaining = tags.length - visible.length;
+    return [...visible, if (remaining > 0) '+$remaining'].join(' · ');
   }
 }
 

@@ -288,6 +288,11 @@ a selected track even when workout music is disabled.
 - A source can be added by name and public HTTPS catalog URL, enabled/disabled,
   refreshed, or removed without deleting installed workouts.
 - The catalog shows package metadata and installed/update state.
+- Workout lists prioritize the workout name, a maximum two-line description,
+  and up to three tags. Version, artifact size, source name, and textual
+  download status are omitted from list cards. A compact cloud icon identifies
+  bucket content; downloaded entries use `cloud_done`, and a small dot on that
+  icon signals an available update. Hovering the icon reveals the source name.
 - An installed entry exposes `Add another`, creating an independent local
   variant with the same source attribution. Duplicate local names receive the
   first available suffix, such as `Workout 2`, `Workout 3`, and `Workout 4`.
@@ -299,8 +304,9 @@ a selected track even when workout music is disabled.
   failures show the first useful error. Success messages dismiss automatically
   after several seconds, while errors remain slightly longer.
 - An uninstalled catalog item opens a metadata-only detail screen. It shows the
-  source, version, author, separate YAML/assets sizes, description, and tags
-  without fetching either artifact. Download starts only after the user presses
-  Download; that screen distinguishes definition and assets progress, then shows
-  validation/import state and retryable errors.
+  source, author, description, and tags without fetching either artifact. The
+  version and media download size share one compact label, such as
+  `v1.0.0 (4.3 MB media)`; YAML size is not shown. Download starts only after
+  the user presses Download; that screen distinguishes definition and media
+  progress, then shows validation/import state and retryable errors.
 # AnhPT UX/UI Specification

@@ -54,8 +54,15 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
         _artifact = event.artifact;
         _receivedBytes = event.receivedBytes;
         _totalBytes = total;
-        if (total != null && total > 0 && event.receivedBytes >= total) {
+        final artifactComplete =
+            total != null && total > 0 && event.receivedBytes >= total;
+        if (event.artifact == 'assets' && artifactComplete) {
           _phase = _DownloadPhase.installing;
+        } else {
+          // Completing the small YAML file is not the end of the download.
+          // The assets request starts next and must remain visible, especially
+          // for workouts containing large video or audio files.
+          _phase = _DownloadPhase.downloading;
         }
       });
     });
@@ -159,7 +166,7 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     _DownloadPhase.preview => 'Available to download',
     _DownloadPhase.downloading =>
       _artifact == 'assets'
-          ? 'Downloading workout assets…'
+          ? 'Downloading workout media…'
           : 'Downloading workout definition…',
     _DownloadPhase.installing => 'Installing workout…',
     _DownloadPhase.ready => 'Workout ready',
@@ -234,21 +241,15 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                   ),
                   _MetaChip(
                     icon: Icons.system_update_alt,
-                    label: 'Version ${widget.entry.version}',
+                    label:
+                        'v${widget.entry.version} '
+                        '(${_formatBytes(widget.entry.assetsSize)} media)',
                   ),
                   if (widget.entry.author != null)
                     _MetaChip(
                       icon: Icons.person_outline,
                       label: widget.entry.author!,
                     ),
-                  _MetaChip(
-                    icon: Icons.description_outlined,
-                    label: '${_formatBytes(widget.entry.workoutSize)} YAML',
-                  ),
-                  _MetaChip(
-                    icon: Icons.perm_media_outlined,
-                    label: '${_formatBytes(widget.entry.assetsSize)} assets',
-                  ),
                 ],
               ),
               if (widget.entry.tags.isNotEmpty) ...[
@@ -301,9 +302,8 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                       const SizedBox(height: 14),
                       if (_phase == _DownloadPhase.preview) ...[
                         Text(
-                          '${_formatBytes(widget.entry.workoutSize)} workout definition and '
-                          '${_formatBytes(widget.entry.assetsSize)} assets are separate downloads. '
-                          'Neither file is downloaded until you choose Download.',
+                          '${_formatBytes(widget.entry.assetsSize)} of workout media '
+                          'will be downloaded when you choose Download.',
                           style: Theme.of(context).textTheme.bodySmall
                               ?.copyWith(color: colors.onSurfaceVariant),
                         ),
