@@ -7,7 +7,7 @@ import '../models/workout_bucket.dart';
 import '../services/workout_bucket_service.dart';
 import 'workout_detail_screen.dart';
 
-enum _DownloadPhase { downloading, installing, ready, failed }
+enum _DownloadPhase { preview, downloading, installing, ready, failed }
 
 class WorkoutDownloadScreen extends StatefulWidget {
   final AppController controller;
@@ -30,10 +30,11 @@ class WorkoutDownloadScreen extends StatefulWidget {
 }
 
 class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
-  _DownloadPhase _phase = _DownloadPhase.downloading;
+  _DownloadPhase _phase = _DownloadPhase.preview;
   StreamSubscription<BucketPackageProgressEvent>? _progressSubscription;
   int _receivedBytes = 0;
   int? _totalBytes;
+  String _artifact = 'workout';
   String? _error;
   String? _installedWorkoutId;
   bool _userInteracted = false;
@@ -44,10 +45,13 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
   void initState() {
     super.initState();
     _openedAt = DateTime.now();
-    _progressSubscription = WorkoutBucketService.packageProgress.listen((event) {
+    _progressSubscription = WorkoutBucketService.packageProgress.listen((
+      event,
+    ) {
       if (!mounted || event.entryId != widget.entry.id) return;
-      final total = event.totalBytes ?? widget.entry.size;
+      final total = event.totalBytes;
       setState(() {
+        _artifact = event.artifact;
         _receivedBytes = event.receivedBytes;
         _totalBytes = total;
         if (total != null && total > 0 && event.receivedBytes >= total) {
@@ -55,7 +59,6 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
         }
       });
     });
-    _install();
   }
 
   @override
@@ -65,13 +68,15 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
   }
 
   Future<void> _install() async {
-    final existingWorkoutIds =
-        widget.controller.workouts.map((workout) => workout.id).toSet();
+    final existingWorkoutIds = widget.controller.workouts
+        .map((workout) => workout.id)
+        .toSet();
     if (mounted) {
       setState(() {
         _phase = _DownloadPhase.downloading;
+        _artifact = 'workout';
         _receivedBytes = 0;
-        _totalBytes = widget.entry.size;
+        _totalBytes = widget.entry.workoutSize;
         _error = null;
         _installedWorkoutId = null;
         _opening = false;
@@ -151,19 +156,26 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
   }
 
   String get _statusText => switch (_phase) {
-        _DownloadPhase.downloading => 'Downloading workout…',
-        _DownloadPhase.installing => 'Installing workout…',
-        _DownloadPhase.ready => 'Workout ready',
-        _DownloadPhase.failed => 'Download failed',
-      };
+    _DownloadPhase.preview => 'Available to download',
+    _DownloadPhase.downloading =>
+      _artifact == 'assets'
+          ? 'Downloading workout assets…'
+          : 'Downloading workout definition…',
+    _DownloadPhase.installing => 'Installing workout…',
+    _DownloadPhase.ready => 'Workout ready',
+    _DownloadPhase.failed => 'Download failed',
+  };
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return PopScope(
-      canPop: _phase == _DownloadPhase.ready || _phase == _DownloadPhase.failed,
+      canPop:
+          _phase == _DownloadPhase.preview ||
+          _phase == _DownloadPhase.ready ||
+          _phase == _DownloadPhase.failed,
       child: Scaffold(
-        appBar: AppBar(title: const Text('Workout download')),
+        appBar: AppBar(title: const Text('Workout details')),
         body: NotificationListener<ScrollNotification>(
           onNotification: (notification) {
             if (notification is UserScrollNotification && !_userInteracted) {
@@ -190,10 +202,9 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
               const SizedBox(height: 20),
               Text(
                 widget.entry.name,
-                style: Theme.of(context)
-                    .textTheme
-                    .headlineSmall
-                    ?.copyWith(fontWeight: FontWeight.w800),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
               ),
               if (_recommended) ...[
                 const SizedBox(height: 8),
@@ -217,7 +228,10 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _MetaChip(icon: Icons.cloud_outlined, label: widget.sourceName),
+                  _MetaChip(
+                    icon: Icons.cloud_outlined,
+                    label: widget.sourceName,
+                  ),
                   _MetaChip(
                     icon: Icons.system_update_alt,
                     label: 'Version ${widget.entry.version}',
@@ -227,11 +241,14 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                       icon: Icons.person_outline,
                       label: widget.entry.author!,
                     ),
-                  if (widget.entry.size != null)
-                    _MetaChip(
-                      icon: Icons.data_usage_outlined,
-                      label: _formatBytes(widget.entry.size!),
-                    ),
+                  _MetaChip(
+                    icon: Icons.description_outlined,
+                    label: '${_formatBytes(widget.entry.workoutSize)} YAML',
+                  ),
+                  _MetaChip(
+                    icon: Icons.perm_media_outlined,
+                    label: '${_formatBytes(widget.entry.assetsSize)} assets',
+                  ),
                 ],
               ),
               if (widget.entry.tags.isNotEmpty) ...[
@@ -256,11 +273,13 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                       Row(
                         children: [
                           Icon(
-                            _phase == _DownloadPhase.ready
+                            _phase == _DownloadPhase.preview
+                                ? Icons.cloud_download_outlined
+                                : _phase == _DownloadPhase.ready
                                 ? Icons.check_circle
                                 : _phase == _DownloadPhase.failed
-                                    ? Icons.error_outline
-                                    : Icons.downloading,
+                                ? Icons.error_outline
+                                : Icons.downloading,
                             color: _phase == _DownloadPhase.failed
                                 ? colors.error
                                 : colors.primary,
@@ -269,7 +288,9 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                           Expanded(
                             child: Text(
                               _statusText,
-                              style: const TextStyle(fontWeight: FontWeight.w700),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                           if (_phase == _DownloadPhase.downloading &&
@@ -278,7 +299,39 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      if (_phase == _DownloadPhase.downloading)
+                      if (_phase == _DownloadPhase.preview) ...[
+                        Text(
+                          '${_formatBytes(widget.entry.workoutSize)} workout definition and '
+                          '${_formatBytes(widget.entry.assetsSize)} assets are separate downloads. '
+                          'Neither file is downloaded until you choose Download.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.onSurfaceVariant),
+                        ),
+                        const SizedBox(height: 14),
+                        FilledButton.icon(
+                          onPressed:
+                              widget.controller.bucketEntryCompatibilityError(
+                                    widget.entry,
+                                  ) ==
+                                  null
+                              ? _install
+                              : null,
+                          icon: const Icon(Icons.download),
+                          label: const Text('Download'),
+                        ),
+                        if (widget.controller.bucketEntryCompatibilityError(
+                              widget.entry,
+                            ) !=
+                            null) ...[
+                          const SizedBox(height: 10),
+                          Text(
+                            widget.controller.bucketEntryCompatibilityError(
+                              widget.entry,
+                            )!,
+                            style: TextStyle(color: colors.error),
+                          ),
+                        ],
+                      ] else if (_phase == _DownloadPhase.downloading)
                         LinearProgressIndicator(value: _progress)
                       else if (_phase == _DownloadPhase.installing)
                         const LinearProgressIndicator()
@@ -291,17 +344,14 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                         const SizedBox(height: 8),
                         Text(
                           _downloadSizeText,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colors.onSurfaceVariant,
-                              ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: colors.onSurfaceVariant),
                         ),
                       ],
-                      if (_phase == _DownloadPhase.failed && _error != null) ...[
+                      if (_phase == _DownloadPhase.failed &&
+                          _error != null) ...[
                         const SizedBox(height: 10),
-                        Text(
-                          _error!,
-                          style: TextStyle(color: colors.error),
-                        ),
+                        Text(_error!, style: TextStyle(color: colors.error)),
                         const SizedBox(height: 14),
                         FilledButton.icon(
                           onPressed: _install,
@@ -309,7 +359,8 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
                           label: const Text('Try again'),
                         ),
                       ],
-                      if (_phase == _DownloadPhase.ready && _userInteracted) ...[
+                      if (_phase == _DownloadPhase.ready &&
+                          _userInteracted) ...[
                         const SizedBox(height: 14),
                         FilledButton.icon(
                           onPressed: _openWorkout,
@@ -328,8 +379,8 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     );
   }
 
-  bool get _recommended => widget.entry.tags
-      .any((tag) => tag.trim().toLowerCase() == 'recommended');
+  bool get _recommended =>
+      widget.entry.tags.any((tag) => tag.trim().toLowerCase() == 'recommended');
 
   String get _downloadSizeText {
     final total = _totalBytes;
@@ -339,7 +390,9 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
 
   IconData _thumbnailIcon(List<String> tags) {
     final values = tags.map((tag) => tag.toLowerCase()).toSet();
-    if (values.any((tag) => tag.contains('karate') || tag.contains('martial'))) {
+    if (values.any(
+      (tag) => tag.contains('karate') || tag.contains('martial'),
+    )) {
       return Icons.sports_martial_arts;
     }
     if (values.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
@@ -368,18 +421,14 @@ class _MetaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 16),
-            const SizedBox(width: 6),
-            Text(label),
-          ],
-        ),
-      );
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(label)],
+    ),
+  );
 }

@@ -1,11 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
-import '../data/sample_data.dart';
 import '../models/local_profile.dart';
 import '../models/workout.dart';
+import '../models/workout_bucket.dart';
 import '../services/health_store.dart';
-import '../services/local_store.dart';
 import '../services/workout_update_service.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
@@ -15,6 +16,7 @@ import 'local_profiles_screen.dart';
 import 'settings_screen.dart';
 import 'workout_builder_screen.dart';
 import 'workout_detail_screen.dart';
+import 'workout_download_screen.dart';
 import 'workout_editor_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -35,6 +37,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _tagOrder = [];
   Set<String> _hiddenTags = {};
   bool _isRefreshing = false;
+  String? _syncMessage;
+  bool _syncHasError = false;
+  Timer? _syncMessageTimer;
 
   AppController get controller => widget.controller;
 
@@ -43,53 +48,56 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadProfiles();
     _loadTagPreferences();
-    _syncOfficialBucketWorkouts();
-  }
-
-  Future<void> _syncOfficialBucketWorkouts() async {
-    try {
-      await controller.refreshAllBucketSources();
-      final availableEntries = controller.bucketCatalogEntries.toList();
-
-      for (final entry in availableEntries) {
-        if (controller.bucketInstallState(entry) != 'notInstalled') continue;
-
-        Workout? fallbackDemo;
-        if (entry.name == 'AnhPT Feature Demo') {
-          for (final workout in controller.workouts) {
-            if (workout.name == entry.name &&
-                controller.bucketProvenanceFor(workout.id) == null &&
-                workout.rawYaml.trim() == sampleYaml.trim()) {
-              fallbackDemo = workout;
-              break;
-            }
-          }
-        }
-
-        try {
-          if (fallbackDemo != null) {
-            await controller.deleteWorkout(fallbackDemo.id);
-          }
-          await controller.installBucketEntry(entry);
-        } catch (_) {
-          if (fallbackDemo != null &&
-              controller.byId(fallbackDemo.id) == null) {
-            await controller.saveWorkout(fallbackDemo);
-          }
-        }
-      }
-    } catch (_) {
-      // Keep the local dashboard usable when a bucket source is offline.
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshWorkouts());
   }
 
   Future<void> _refreshWorkouts() async {
     if (_isRefreshing) return;
     setState(() => _isRefreshing = true);
+    _showSyncMessage('Checking workout sources…');
+    final errors = <String>[];
     try {
-      await _syncOfficialBucketWorkouts();
+      await controller.refreshAllBucketSources();
+      if (controller.bucketCatalogError != null) {
+        errors.add(controller.bucketCatalogError!);
+      }
+    } catch (error) {
+      errors.add('$error');
     } finally {
-      if (mounted) setState(() => _isRefreshing = false);
+      if (mounted) {
+        setState(() => _isRefreshing = false);
+        if (errors.isNotEmpty) {
+          _showSyncMessage(
+            'Could not refresh workout listings: ${errors.first}',
+            hasError: true,
+            hideAfter: const Duration(seconds: 12),
+          );
+        } else {
+          final count = controller.bucketCatalogEntries.length;
+          _showSyncMessage(
+            'Loaded $count workout ${count == 1 ? 'listing' : 'listings'}.',
+            hideAfter: const Duration(seconds: 5),
+          );
+        }
+      }
+    }
+  }
+
+  void _showSyncMessage(
+    String message, {
+    bool hasError = false,
+    Duration? hideAfter,
+  }) {
+    _syncMessageTimer?.cancel();
+    if (!mounted) return;
+    setState(() {
+      _syncMessage = message;
+      _syncHasError = hasError;
+    });
+    if (hideAfter != null) {
+      _syncMessageTimer = Timer(hideAfter, () {
+        if (mounted) setState(() => _syncMessage = null);
+      });
     }
   }
 
@@ -121,6 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _syncMessageTimer?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -131,10 +140,8 @@ class _HomeScreenState extends State<HomeScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => WorkoutDetailScreen(
-          controller: controller,
-          workoutId: workout.id,
-        ),
+        builder: (_) =>
+            WorkoutDetailScreen(controller: controller, workoutId: workout.id),
       ),
     );
   }
@@ -182,7 +189,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Navigator.pop(context);
                 await Navigator.push(
                   this.context,
-                  MaterialPageRoute(builder: (_) => const LocalProfilesScreen()),
+                  MaterialPageRoute(
+                    builder: (_) => const LocalProfilesScreen(),
+                  ),
                 );
                 await _loadProfiles();
               },
@@ -206,9 +215,9 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (error) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Import failed: $error')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Import failed: $error')));
       }
     }
   }
@@ -216,12 +225,9 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _matchesSearch(Workout workout) {
     final needle = _normalize(_query.trim());
     if (needle.isEmpty) return true;
-    return _normalize([
-      workout.name,
-      workout.description,
-      ...workout.tags,
-    ].join(' '))
-        .contains(needle);
+    return _normalize(
+      [workout.name, workout.description, ...workout.tags].join(' '),
+    ).contains(needle);
   }
 
   bool _matchesFilter(Workout workout) {
@@ -235,10 +241,66 @@ class _HomeScreenState extends State<HomeScreen> {
 
   List<Workout> _allWorkouts() => List<Workout>.from(controller.workouts);
 
-  List<String> _availableTags(List<Workout> workouts) {
+  List<WorkoutBucketEntry> _catalogWorkouts() => controller.bucketCatalogEntries
+      .where((entry) => controller.bucketInstallState(entry) == 'notInstalled')
+      .toList();
+
+  bool _matchesCatalogSearch(WorkoutBucketEntry entry) {
+    final needle = _normalize(_query.trim());
+    if (needle.isEmpty) return true;
+    return _normalize(
+      [
+        entry.name,
+        entry.description,
+        entry.author ?? '',
+        _bucketSourceName(entry.sourceId),
+        ...entry.tags,
+      ].join(' '),
+    ).contains(needle);
+  }
+
+  bool _matchesCatalogFilter(WorkoutBucketEntry entry) {
+    if (_selectedFilter == 'all') return true;
+    if (_selectedFilter == 'favorites' || _selectedFilter == 'recent') {
+      return false;
+    }
+    return _normalizeTags(entry.tags).containsKey(_selectedFilter);
+  }
+
+  String _bucketSourceName(String? sourceId) {
+    for (final source in controller.bucketSources) {
+      if (source.id == sourceId) return source.name;
+    }
+    return sourceId ?? 'Workout source';
+  }
+
+  Future<void> _openCatalogWorkout(WorkoutBucketEntry entry) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkoutDownloadScreen(
+          controller: controller,
+          entry: entry,
+          sourceName: _bucketSourceName(entry.sourceId),
+        ),
+      ),
+    );
+  }
+
+  List<String> _availableTags(
+    List<Workout> workouts, [
+    List<WorkoutBucketEntry> catalogEntries = const [],
+  ]) {
     final tagsByKey = <String, String>{};
     for (final workout in workouts) {
       for (final tag in workout.tags) {
+        final trimmed = tag.trim();
+        if (trimmed.isEmpty) continue;
+        tagsByKey.putIfAbsent(_normalize(trimmed), () => trimmed);
+      }
+    }
+    for (final entry in catalogEntries) {
+      for (final tag in entry.tags) {
         final trimmed = tag.trim();
         if (trimmed.isEmpty) continue;
         tagsByKey.putIfAbsent(_normalize(trimmed), () => trimmed);
@@ -356,8 +418,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Map<String, String> _normalizeTags(List<String> tags) => {
-        for (final tag in tags) _normalize(tag): tag,
-      };
+    for (final tag in tags) _normalize(tag): tag,
+  };
 
   static String _normalize(String value) {
     var normalized = value.toLowerCase();
@@ -425,7 +487,8 @@ class _HomeScreenState extends State<HomeScreen> {
         animation: controller,
         builder: (_, __) {
           final allWorkouts = _allWorkouts();
-          final tags = _availableTags(allWorkouts);
+          final catalogWorkouts = _catalogWorkouts();
+          final tags = _availableTags(allWorkouts, catalogWorkouts);
           final visibleTags = tags
               .where((tag) => !_hiddenTags.contains(_normalize(tag)))
               .toList();
@@ -433,12 +496,17 @@ class _HomeScreenState extends State<HomeScreen> {
               .where(_matchesSearch)
               .where(_matchesFilter)
               .toList();
+          final visibleCatalogWorkouts = catalogWorkouts
+              .where(_matchesCatalogSearch)
+              .where(_matchesCatalogFilter)
+              .toList();
           if (_selectedFilter == 'recent') {
             visibleWorkouts.sort(
               (a, b) => b.lastUsedAt!.compareTo(a.lastUsedAt!),
             );
           }
-          final noResults = visibleWorkouts.isEmpty;
+          final noResults =
+              visibleWorkouts.isEmpty && visibleCatalogWorkouts.isEmpty;
 
           return RefreshIndicator(
             onRefresh: _refreshWorkouts,
@@ -473,7 +541,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 borderSide: BorderSide.none,
                               ),
                             ),
-                            onChanged: (value) => setState(() => _query = value),
+                            onChanged: (value) =>
+                                setState(() => _query = value),
                           ),
                         ),
                         const SizedBox(width: 4),
@@ -543,6 +612,58 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 250),
+                      child: _syncMessage == null
+                          ? const SizedBox.shrink()
+                          : Container(
+                              key: ValueKey(_syncMessage),
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(top: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _syncHasError
+                                    ? Theme.of(
+                                        context,
+                                      ).colorScheme.errorContainer
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.secondaryContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                children: [
+                                  if (_isRefreshing) ...[
+                                    const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                  ] else ...[
+                                    Icon(
+                                      _syncHasError
+                                          ? Icons.error_outline
+                                          : Icons.check_circle_outline,
+                                      size: 20,
+                                    ),
+                                    const SizedBox(width: 10),
+                                  ],
+                                  Expanded(
+                                    child: Semantics(
+                                      liveRegion: true,
+                                      child: Text(_syncMessage!),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                    ),
                     const SizedBox(height: 12),
                     SizedBox(
                       height: 42,
@@ -562,8 +683,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ChoiceChip(
                                   label: const Text('Recent'),
                                   selected: _selectedFilter == 'recent',
-                                  onSelected: (_) =>
-                                      setState(() => _selectedFilter = 'recent'),
+                                  onSelected: (_) => setState(
+                                    () => _selectedFilter = 'recent',
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 ChoiceChip(
@@ -602,10 +724,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         workout: workout,
                         sourceName: _sourceNameFor(workout),
                         originalName: _originalNameFor(workout),
-                        availableUpdateVersion:
-                            controller.updateForWorkout(workout.id)?.availableVersion,
+                        availableUpdateVersion: controller
+                            .updateForWorkout(workout.id)
+                            ?.availableVersion,
                         onStart: () => _openWorkout(context, workout),
                         onFavorite: () => controller.toggleFavorite(workout.id),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
+                    for (final entry in visibleCatalogWorkouts) ...[
+                      CatalogWorkoutCard(
+                        entry: entry,
+                        sourceName: _bucketSourceName(entry.sourceId),
+                        onTap: () => _openCatalogWorkout(entry),
                       ),
                       const SizedBox(height: 10),
                     ],
@@ -619,8 +750,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ? Icons.fitness_center_outlined
                                   : Icons.search_off_outlined,
                               size: 36,
-                              color:
-                                  Theme.of(context).colorScheme.onSurfaceVariant,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                             const SizedBox(height: 12),
                             Text(

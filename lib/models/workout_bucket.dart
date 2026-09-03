@@ -29,30 +29,29 @@ class WorkoutBucketSource {
     bool clearLastError = false,
     String? cachedCatalogJson,
     bool clearCachedCatalogJson = false,
-  }) =>
-      WorkoutBucketSource(
-        id: id,
-        name: name ?? this.name,
-        catalogUrl: catalogUrl ?? this.catalogUrl,
-        enabled: enabled ?? this.enabled,
-        lastRefreshedAt: clearLastRefreshedAt
-            ? null
-            : lastRefreshedAt ?? this.lastRefreshedAt,
-        lastError: clearLastError ? null : lastError ?? this.lastError,
-        cachedCatalogJson: clearCachedCatalogJson
-            ? null
-            : cachedCatalogJson ?? this.cachedCatalogJson,
-      );
+  }) => WorkoutBucketSource(
+    id: id,
+    name: name ?? this.name,
+    catalogUrl: catalogUrl ?? this.catalogUrl,
+    enabled: enabled ?? this.enabled,
+    lastRefreshedAt: clearLastRefreshedAt
+        ? null
+        : lastRefreshedAt ?? this.lastRefreshedAt,
+    lastError: clearLastError ? null : lastError ?? this.lastError,
+    cachedCatalogJson: clearCachedCatalogJson
+        ? null
+        : cachedCatalogJson ?? this.cachedCatalogJson,
+  );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'name': name,
-        'catalogUrl': catalogUrl,
-        'enabled': enabled,
-        'lastRefreshedAt': lastRefreshedAt?.toIso8601String(),
-        'lastError': lastError,
-        'cachedCatalogJson': cachedCatalogJson,
-      };
+    'id': id,
+    'name': name,
+    'catalogUrl': catalogUrl,
+    'enabled': enabled,
+    'lastRefreshedAt': lastRefreshedAt?.toIso8601String(),
+    'lastError': lastError,
+    'cachedCatalogJson': cachedCatalogJson,
+  };
 
   static WorkoutBucketSource fromJson(Map<String, dynamic> json) {
     final id = _requiredString(json, 'id');
@@ -85,30 +84,31 @@ class WorkoutBucketCatalog {
   });
 
   Map<String, dynamic> toJson() => {
-        'schemaVersion': schemaVersion,
-        'name': name,
-        if (description != null) 'description': description,
-        'workouts': entries.map((entry) => entry.toJson()).toList(),
-      };
+    'schemaVersion': schemaVersion,
+    'name': name,
+    if (description != null) 'description': description,
+    'workouts': entries.map((entry) => entry.toJson()).toList(),
+  };
 
   static WorkoutBucketCatalog fromJson(Map<String, dynamic> json) {
     final schemaVersion = _requiredIntAlias(json, ['schemaVersion', 'version']);
-    if (schemaVersion != 1) {
+    if (schemaVersion != 2) {
       throw FormatException(
-          'Unsupported bucket schema version: $schemaVersion');
+        'Unsupported bucket schema version: $schemaVersion',
+      );
     }
     final rawEntries = json['workouts'] ?? json['entries'];
     if (rawEntries is! List) {
       throw const FormatException('workouts must be a list');
     }
-    final entries = rawEntries.map((value) {
-      if (value is! Map) {
-        throw const FormatException('Each workout must be an object');
-      }
-      return WorkoutBucketEntry.fromJson(
-        Map<String, dynamic>.from(value),
-      );
-    }).toList(growable: false);
+    final entries = rawEntries
+        .map((value) {
+          if (value is! Map) {
+            throw const FormatException('Each workout must be an object');
+          }
+          return WorkoutBucketEntry.fromJson(Map<String, dynamic>.from(value));
+        })
+        .toList(growable: false);
     final ids = <String>{};
     for (final entry in entries) {
       if (!ids.add(entry.id)) {
@@ -143,12 +143,15 @@ class WorkoutBucketEntry {
   final String name;
   final String description;
   final String version;
-  final String packageUrl;
-  final String sha256;
+  final String workoutUrl;
+  final String workoutSha256;
+  final int workoutSize;
+  final String assetsUrl;
+  final String assetsSha256;
+  final int assetsSize;
   final List<String> tags;
   final String? author;
   final String? minAppVersion;
-  final int? size;
 
   const WorkoutBucketEntry({
     this.sourceId,
@@ -156,68 +159,89 @@ class WorkoutBucketEntry {
     required this.name,
     this.description = '',
     required this.version,
-    required this.packageUrl,
-    required this.sha256,
+    required this.workoutUrl,
+    required this.workoutSha256,
+    required this.workoutSize,
+    this.assetsUrl = 'https://example.com/assets.zip',
+    this.assetsSha256 =
+        '0000000000000000000000000000000000000000000000000000000000000000',
+    this.assetsSize = 1,
     this.tags = const [],
     this.author,
     this.minAppVersion,
-    this.size,
   });
 
-  Uri get packageUri => requirePublicHttpsUri(packageUrl, field: 'packageUrl');
+  Uri get workoutUri => requirePublicHttpsUri(workoutUrl, field: 'workoutUrl');
+  Uri get assetsUri => requirePublicHttpsUri(assetsUrl, field: 'assetsUrl');
+  int get totalSize => workoutSize + assetsSize;
 
   WorkoutBucketEntry copyWithSource(String sourceId) => WorkoutBucketEntry(
-        sourceId: sourceId,
-        id: id,
-        name: name,
-        description: description,
-        version: version,
-        packageUrl: packageUrl,
-        sha256: sha256,
-        tags: tags,
-        author: author,
-        minAppVersion: minAppVersion,
-        size: size,
-      );
+    sourceId: sourceId,
+    id: id,
+    name: name,
+    description: description,
+    version: version,
+    workoutUrl: workoutUrl,
+    workoutSha256: workoutSha256,
+    workoutSize: workoutSize,
+    assetsUrl: assetsUrl,
+    assetsSha256: assetsSha256,
+    assetsSize: assetsSize,
+    tags: tags,
+    author: author,
+    minAppVersion: minAppVersion,
+  );
 
   Map<String, dynamic> toJson() => {
-        if (sourceId != null) 'sourceId': sourceId,
-        'id': id,
-        'name': name,
-        'description': description,
-        'version': version,
-        'packageUrl': packageUrl,
-        'sha256': sha256,
-        'tags': tags,
-        if (author != null) 'author': author,
-        if (minAppVersion != null) 'minAppVersion': minAppVersion,
-        if (size != null) 'size': size,
-      };
+    if (sourceId != null) 'sourceId': sourceId,
+    'id': id,
+    'name': name,
+    'description': description,
+    'version': version,
+    'workoutUrl': workoutUrl,
+    'workoutSha256': workoutSha256,
+    'workoutSize': workoutSize,
+    'assetsUrl': assetsUrl,
+    'assetsSha256': assetsSha256,
+    'assetsSize': assetsSize,
+    'tags': tags,
+    if (author != null) 'author': author,
+    if (minAppVersion != null) 'minAppVersion': minAppVersion,
+  };
 
   static WorkoutBucketEntry fromJson(Map<String, dynamic> json) {
-    final packageUrl = _requiredStringAlias(
-      json,
-      ['packageUrl', 'package_url', 'url'],
-    );
-    requirePublicHttpsUri(packageUrl, field: 'packageUrl');
-    final sha256 =
-        _requiredStringAlias(json, ['sha256', 'checksum']).toLowerCase();
-    if (!isSha256Hex(sha256)) {
-      throw const FormatException('sha256 must be 64 hexadecimal characters');
+    final workoutUrl = _requiredString(json, 'workoutUrl');
+    final assetsUrl = _requiredString(json, 'assetsUrl');
+    requirePublicHttpsUri(workoutUrl, field: 'workoutUrl');
+    requirePublicHttpsUri(assetsUrl, field: 'assetsUrl');
+    final workoutSha256 = _requiredString(json, 'workoutSha256').toLowerCase();
+    final assetsSha256 = _requiredString(json, 'assetsSha256').toLowerCase();
+    if (!isSha256Hex(workoutSha256) || !isSha256Hex(assetsSha256)) {
+      throw const FormatException(
+        'workoutSha256 and assetsSha256 must be 64 hexadecimal characters',
+      );
     }
     final rawTags = json['tags'];
     if (rawTags != null && rawTags is! List) {
       throw const FormatException('tags must be a list');
     }
-    final tags = (rawTags as List? ?? const []).map((tag) {
-      if (tag is! String || tag.trim().isEmpty) {
-        throw const FormatException('Each tag must be a non-empty string');
-      }
-      return tag.trim();
-    }).toList(growable: false);
-    final size = json['size'] ?? json['sizeBytes'];
-    if (size != null && (size is! int || size <= 0)) {
-      throw const FormatException('size must be a positive integer');
+    final tags = (rawTags as List? ?? const [])
+        .map((tag) {
+          if (tag is! String || tag.trim().isEmpty) {
+            throw const FormatException('Each tag must be a non-empty string');
+          }
+          return tag.trim();
+        })
+        .toList(growable: false);
+    final workoutSize = json['workoutSize'];
+    final assetsSize = json['assetsSize'];
+    if (workoutSize is! int ||
+        workoutSize <= 0 ||
+        assetsSize is! int ||
+        assetsSize <= 0) {
+      throw const FormatException(
+        'workoutSize and assetsSize must be positive integers',
+      );
     }
     return WorkoutBucketEntry(
       sourceId: _optionalString(json, 'sourceId'),
@@ -225,12 +249,15 @@ class WorkoutBucketEntry {
       name: _requiredString(json, 'name'),
       description: _optionalString(json, 'description') ?? '',
       version: _requiredString(json, 'version'),
-      packageUrl: packageUrl,
-      sha256: sha256,
+      workoutUrl: workoutUrl,
+      workoutSha256: workoutSha256,
+      workoutSize: workoutSize,
+      assetsUrl: assetsUrl,
+      assetsSha256: assetsSha256,
+      assetsSize: assetsSize,
       tags: tags,
       author: _optionalString(json, 'author'),
       minAppVersion: _optionalString(json, 'minAppVersion'),
-      size: size as int?,
     );
   }
 }
@@ -259,16 +286,16 @@ class InstalledWorkoutProvenance {
   });
 
   Map<String, dynamic> toJson() => {
-        'workoutId': workoutId,
-        'sourceId': sourceId,
-        if (sourceName != null) 'sourceName': sourceName,
-        'entryId': entryId,
-        if (originalName != null) 'originalName': originalName,
-        'version': version,
-        'packageUrl': packageUrl,
-        'sha256': sha256,
-        'installedAt': installedAt.toIso8601String(),
-      };
+    'workoutId': workoutId,
+    'sourceId': sourceId,
+    if (sourceName != null) 'sourceName': sourceName,
+    'entryId': entryId,
+    if (originalName != null) 'originalName': originalName,
+    'version': version,
+    'packageUrl': packageUrl,
+    'sha256': sha256,
+    'installedAt': installedAt.toIso8601String(),
+  };
 
   static InstalledWorkoutProvenance fromJson(Map<String, dynamic> json) {
     final packageUrl = _requiredString(json, 'packageUrl');

@@ -115,7 +115,10 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                 const SizedBox(height: 16),
                 Text('Version ${entry.version}'),
                 if (entry.author != null) Text('By ${entry.author}'),
-                if (entry.size != null) Text(_formatBytes(entry.size!)),
+                Text(
+                  '${_formatBytes(entry.workoutSize)} YAML + '
+                  '${_formatBytes(entry.assetsSize)} assets',
+                ),
                 if (entry.tags.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(
@@ -168,9 +171,7 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
           'Browse Workouts',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
-        leading: BackButton(
-          onPressed: () => Navigator.maybePop(context),
-        ),
+        leading: BackButton(onPressed: () => Navigator.maybePop(context)),
         actions: [
           IconButton(
             tooltip: 'Manage workout sources',
@@ -232,9 +233,7 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                       Expanded(
                         child: Text(
                           '${entries.length} workout${entries.length == 1 ? '' : 's'}',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
+                          style: Theme.of(context).textTheme.titleMedium
                               ?.copyWith(fontWeight: FontWeight.w700),
                         ),
                       ),
@@ -242,22 +241,28 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                         tooltip: 'Filter workouts',
                         initialValue: _status,
                         onSelected: (value) => setState(() => _status = value),
-                        icon: Icon(_status == _CatalogStatus.all
-                            ? Icons.filter_list_outlined
-                            : Icons.filter_list),
+                        icon: Icon(
+                          _status == _CatalogStatus.all
+                              ? Icons.filter_list_outlined
+                              : Icons.filter_list,
+                        ),
                         itemBuilder: (_) => const [
                           PopupMenuItem(
-                              value: _CatalogStatus.all,
-                              child: Text('All workouts')),
+                            value: _CatalogStatus.all,
+                            child: Text('All workouts'),
+                          ),
                           PopupMenuItem(
-                              value: _CatalogStatus.notInstalled,
-                              child: Text('Not installed')),
+                            value: _CatalogStatus.notInstalled,
+                            child: Text('Not installed'),
+                          ),
                           PopupMenuItem(
-                              value: _CatalogStatus.installed,
-                              child: Text('Installed')),
+                            value: _CatalogStatus.installed,
+                            child: Text('Installed'),
+                          ),
                           PopupMenuItem(
-                              value: _CatalogStatus.updates,
-                              child: Text('Updates available')),
+                            value: _CatalogStatus.updates,
+                            child: Text('Updates available'),
+                          ),
                         ],
                       ),
                       if (widget.controller.bucketSources.length > 1)
@@ -266,16 +271,22 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                           initialValue: _sourceId,
                           onSelected: (value) =>
                               setState(() => _sourceId = value),
-                          icon: Icon(_sourceId == null
-                              ? Icons.cloud_outlined
-                              : Icons.cloud),
+                          icon: Icon(
+                            _sourceId == null
+                                ? Icons.cloud_outlined
+                                : Icons.cloud,
+                          ),
                           itemBuilder: (_) => [
                             const PopupMenuItem(
-                                value: null, child: Text('All sources')),
+                              value: null,
+                              child: Text('All sources'),
+                            ),
                             for (final source
                                 in widget.controller.bucketSources)
                               PopupMenuItem(
-                                  value: source.id, child: Text(source.name)),
+                                value: source.id,
+                                child: Text(source.name),
+                              ),
                           ],
                         ),
                       PopupMenuButton<_CatalogSort>(
@@ -285,14 +296,17 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                         icon: const Icon(Icons.sort),
                         itemBuilder: (_) => const [
                           PopupMenuItem(
-                              value: _CatalogSort.recommended,
-                              child: Text('Recommended')),
+                            value: _CatalogSort.recommended,
+                            child: Text('Recommended'),
+                          ),
                           PopupMenuItem(
-                              value: _CatalogSort.nameAscending,
-                              child: Text('Name A–Z')),
+                            value: _CatalogSort.nameAscending,
+                            child: Text('Name A–Z'),
+                          ),
                           PopupMenuItem(
-                              value: _CatalogSort.nameDescending,
-                              child: Text('Name Z–A')),
+                            value: _CatalogSort.nameDescending,
+                            child: Text('Name Z–A'),
+                          ),
                         ],
                       ),
                     ],
@@ -309,7 +323,8 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                         ),
                       ),
                     ),
-                  if (!widget.controller.bucketCatalogLoading && entries.isEmpty)
+                  if (!widget.controller.bucketCatalogLoading &&
+                      entries.isEmpty)
                     Padding(
                       padding: const EdgeInsets.all(32),
                       child: Column(
@@ -392,16 +407,16 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 6),
                     Text(
                       '${_sourceName(entry.sourceId)}  ·  Version ${entry.version}',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
+                        color: colors.onSurfaceVariant,
+                      ),
                     ),
                     if (entry.tags.isNotEmpty) ...[
                       const SizedBox(height: 3),
@@ -410,8 +425,8 @@ class _BucketCatalogScreenState extends State<BucketCatalogScreen> {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                          color: colors.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ],

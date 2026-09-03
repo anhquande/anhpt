@@ -77,3 +77,10 @@ option is retained but not executed on Android, iOS, and Web, where ordinary
 apps do not have a safe unprivileged screen-lock API.
 Updates require an explicit keep/copy/replace choice. Private credentials and
 signatures are deferred; Web sources must support CORS.
+
+Dashboard startup and refresh download catalog metadata only; workout artifacts
+and their media are never installed automatically. Uninstalled catalog entries
+appear beside local workouts using `bucket.json` metadata. Selecting one opens
+a metadata-only detail screen. Pressing Download fetches an independently
+checksummed YAML definition and assets ZIP; installation becomes visible only
+after both validate successfully.

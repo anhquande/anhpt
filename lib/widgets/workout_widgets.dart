@@ -2,20 +2,15 @@ import 'package:flutter/material.dart';
 
 import '../models/media_asset.dart';
 import '../models/workout.dart';
+import '../models/workout_bucket.dart';
 import 'common.dart';
 import 'step_demonstration_button.dart';
 import 'step_recording_mini_player.dart';
 
-typedef StepRecordingCallback = void Function(
-  BuildContext context,
-  WorkoutStep step,
-  String stepKey,
-);
-typedef StepMediaCallback = void Function(
-  BuildContext context,
-  WorkoutStep step,
-  String stepKey,
-);
+typedef StepRecordingCallback =
+    void Function(BuildContext context, WorkoutStep step, String stepKey);
+typedef StepMediaCallback =
+    void Function(BuildContext context, WorkoutStep step, String stepKey);
 
 class WorkoutCard extends StatelessWidget {
   final Workout workout;
@@ -37,8 +32,7 @@ class WorkoutCard extends StatelessWidget {
 
   IconData _thumbnailIcon() {
     final tags = workout.tags.map((tag) => tag.toLowerCase()).toSet();
-    if (tags.any(
-        (tag) => tag.contains('karate') || tag.contains('martial'))) {
+    if (tags.any((tag) => tag.contains('karate') || tag.contains('martial'))) {
       return Icons.sports_martial_arts;
     }
     if (tags.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
@@ -50,8 +44,8 @@ class WorkoutCard extends StatelessWidget {
     return Icons.fitness_center;
   }
 
-  bool get _recommended => workout.tags
-      .any((tag) => tag.trim().toLowerCase() == 'recommended');
+  bool get _recommended =>
+      workout.tags.any((tag) => tag.trim().toLowerCase() == 'recommended');
 
   bool get _isNew {
     if (workout.lastUsedAt != null) return false;
@@ -82,9 +76,9 @@ class WorkoutCard extends StatelessWidget {
       child: Text(
         '✨ Recommended',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.onSecondaryContainer,
-              fontWeight: FontWeight.w700,
-            ),
+          color: cs.onSecondaryContainer,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -103,9 +97,9 @@ class WorkoutCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
+                color: cs.primary,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],
@@ -122,9 +116,9 @@ class WorkoutCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                color: cs.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ],
@@ -134,9 +128,9 @@ class WorkoutCard extends StatelessWidget {
       return Text(
         'NEW',
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: cs.primary,
-              fontWeight: FontWeight.w800,
-            ),
+          color: cs.primary,
+          fontWeight: FontWeight.w800,
+        ),
       );
     }
     return const SizedBox.shrink();
@@ -213,8 +207,8 @@ class WorkoutCard extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: cs.onSurfaceVariant,
-                          ),
+                        color: cs.onSurfaceVariant,
+                      ),
                     ),
                     const SizedBox(height: 3),
                     SizedBox(height: 18, child: _statusLine(context)),
@@ -242,6 +236,111 @@ class WorkoutCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class CatalogWorkoutCard extends StatelessWidget {
+  final WorkoutBucketEntry entry;
+  final String sourceName;
+  final VoidCallback onTap;
+
+  const CatalogWorkoutCard({
+    super.key,
+    required this.entry,
+    required this.sourceName,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: onTap,
+        child: SizedBox(
+          height: 96,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 96,
+                color: colors.surfaceContainerHighest,
+                alignment: Alignment.center,
+                child: Icon(
+                  _catalogThumbnailIcon(entry.tags),
+                  size: 32,
+                  color: colors.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      entry.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '${_formatCatalogBytes(entry.totalSize)}  |  v${entry.version}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'From $sourceName · Not downloaded',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 14),
+                child: Icon(Icons.cloud_download_outlined),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  static IconData _catalogThumbnailIcon(List<String> tags) {
+    final values = tags.map((tag) => tag.toLowerCase()).toSet();
+    if (values.any(
+      (tag) => tag.contains('karate') || tag.contains('martial'),
+    )) {
+      return Icons.sports_martial_arts;
+    }
+    if (values.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
+      return Icons.self_improvement;
+    }
+    if (values.any((tag) => tag.contains('hiit') || tag.contains('cardio'))) {
+      return Icons.bolt;
+    }
+    return Icons.fitness_center;
+  }
+
+  static String _formatCatalogBytes(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
+    if (bytes >= 1024) return '${(bytes / 1024).toStringAsFixed(0)} KB';
+    return '$bytes B';
   }
 }
 
@@ -275,23 +374,23 @@ class WorkoutStructure extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Column(
-        children: List.generate(nodes.length, (index) {
-          final stepKey = pathPrefix.isEmpty ? '$index' : '$pathPrefix.$index';
-          return _NodeView(
-            node: nodes[index],
-            depth: depth,
-            stepKey: stepKey,
-            onRecordStep: onRecordStep,
-            recordedStepKeys: recordedStepKeys,
-            onBrowseStepMedia: onBrowseStepMedia,
-            resolveStepRecording: resolveStepRecording,
-            demoMediaIdForStep: demoMediaIdForStep,
-            resolveMediaAsset: resolveMediaAsset,
-            resolveMediaUri: resolveMediaUri,
-            onRemoveStepMedia: onRemoveStepMedia,
-          );
-        }),
+    children: List.generate(nodes.length, (index) {
+      final stepKey = pathPrefix.isEmpty ? '$index' : '$pathPrefix.$index';
+      return _NodeView(
+        node: nodes[index],
+        depth: depth,
+        stepKey: stepKey,
+        onRecordStep: onRecordStep,
+        recordedStepKeys: recordedStepKeys,
+        onBrowseStepMedia: onBrowseStepMedia,
+        resolveStepRecording: resolveStepRecording,
+        demoMediaIdForStep: demoMediaIdForStep,
+        resolveMediaAsset: resolveMediaAsset,
+        resolveMediaUri: resolveMediaUri,
+        onRemoveStepMedia: onRemoveStepMedia,
       );
+    }),
+  );
 }
 
 class _NodeView extends StatelessWidget {
@@ -341,7 +440,8 @@ class _NodeView extends StatelessWidget {
               children: [
                 SizedBox(
                   width: 76,
-                  child: mediaId != null &&
+                  child:
+                      mediaId != null &&
                           onBrowseStepMedia != null &&
                           onRemoveStepMedia != null &&
                           resolveMediaAsset != null &&
@@ -364,10 +464,10 @@ class _NodeView extends StatelessWidget {
                             onTap: onBrowseStepMedia == null
                                 ? null
                                 : () => onBrowseStepMedia!(
-                                      context,
-                                      step,
-                                      stepKey,
-                                    ),
+                                    context,
+                                    step,
+                                    stepKey,
+                                  ),
                             child: Center(
                               child: Icon(
                                 onBrowseStepMedia == null
@@ -399,9 +499,7 @@ class _NodeView extends StatelessWidget {
                           Text(
                             formatDuration(step.duration),
                             maxLines: 1,
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodySmall
+                            style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(
                                   color: cs.onSurfaceVariant,
                                   fontWeight: FontWeight.w600,
@@ -414,10 +512,8 @@ class _NodeView extends StatelessWidget {
                             guide,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style:
-                                Theme.of(context).textTheme.bodySmall?.copyWith(
-                                      color: cs.onSurfaceVariant,
-                                    ),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: cs.onSurfaceVariant),
                           ),
                         ],
                       ],

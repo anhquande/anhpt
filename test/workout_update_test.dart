@@ -5,11 +5,41 @@ import 'package:anhpt/services/workout_update_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('orphaned bucket provenance does not hide a missing workout', () {
+    final controller = AppController(LocalStore())
+      ..installedBucketWorkouts = [
+        InstalledWorkoutProvenance(
+          workoutId: 'missing-local-workout',
+          sourceId: 'official',
+          entryId: 'flow',
+          version: '1.0.0',
+          packageUrl: 'https://example.com/flow.zip',
+          sha256: 'a' * 64,
+          installedAt: DateTime.utc(2026),
+        ),
+      ];
+    const entry = WorkoutBucketEntry(
+      sourceId: 'official',
+      id: 'flow',
+      name: 'Flow',
+      version: '1.0.0',
+      workoutUrl: 'https://example.com/flow.yaml',
+      workoutSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      workoutSize: 512,
+    );
+
+    expect(controller.bucketInstallState(entry), 'notInstalled');
+  });
+
   test('workout versions compare semantically', () {
     expect(compareWorkoutVersions('1.10.0', '1.9.0'), greaterThan(0));
     expect(compareWorkoutVersions('v2.0', '1.99.99'), greaterThan(0));
     expect(compareWorkoutVersions('1.0.0', '1.0.0-beta.2'), greaterThan(0));
-    expect(compareWorkoutVersions('1.0.0-beta.10', '1.0.0-beta.2'), greaterThan(0));
+    expect(
+      compareWorkoutVersions('1.0.0-beta.10', '1.0.0-beta.2'),
+      greaterThan(0),
+    );
     expect(compareWorkoutVersions('1.0.0+5', '1.0.0+4'), 0);
   });
 
@@ -34,8 +64,9 @@ void main() {
           id: 'karate-1',
           name: 'Karate Workout',
           version: '1.10.0',
-          packageUrl: 'https://example.com/v2.zip',
-          sha256: 'b' * 64,
+          workoutUrl: 'https://example.com/v2.yaml',
+          workoutSha256: 'b' * 64,
+          workoutSize: 512,
         ),
       ];
 
@@ -50,8 +81,9 @@ void main() {
         id: 'karate-1',
         name: 'Karate Workout',
         version: '1.8.0',
-        packageUrl: 'https://example.com/old.zip',
-        sha256: 'c' * 64,
+        workoutUrl: 'https://example.com/old.yaml',
+        workoutSha256: 'c' * 64,
+        workoutSize: 512,
       ),
     ];
     expect(controller.updateForWorkout('local-workout'), isNull);

@@ -174,18 +174,30 @@ or when the card is disposed.
 
 ## Workout Buckets
 
-`WorkoutBucketService` fetches only public HTTPS catalogs/packages, limits
-redirects and response sizes, keeps a last-good catalog, and verifies SHA-256
-before calling the shared `WorkoutPackageService`. Package import rejects unsafe,
-duplicate, overlong, over-count, and oversized ZIP entries and stages extracted
-audio before exposing its final managed directory. Sources and installed-package
-provenance use versioned SharedPreferences records.
+`WorkoutBucketService` fetches only public HTTPS catalogs and split workout
+artifacts, limits redirects and response sizes, keeps a last-good catalog, and
+verifies each artifact's SHA-256 independently. A workout definition is a small
+`.workout.yaml` file; audio, video, images, and the package manifest live in a
+separate `.assets.zip`. Import rejects unsafe, duplicate, overlong, over-count,
+and oversized ZIP entries and stages extracted assets before exposing the final
+managed directory. Sources and installed provenance use versioned
+SharedPreferences records.
+
+On Web, package import does not attempt to access an application Documents
+directory. The workout definition is still installed, while package-local audio
+and music remain unavailable and follow the existing safe TTS/no-music fallback.
 
 Catalog search/filter/sort is client-side over the cached merged entry list, so
 it remains responsive and available offline. Search normalization is
 case-insensitive and removes Vietnamese diacritics; a short UI debounce avoids
 re-filtering on every keystroke. Source configuration remains separate from the
 Home-accessible browsing/install flow.
+
+Dashboard refresh fetches only each enabled source's `bucket.json`. Catalog
+entries are rendered directly from metadata and do not enter the persisted
+workout list. The two artifact downloads, checksum verification, media
+extraction, and workout persistence begin only from the Download action on the
+catalog detail screen. Nothing is committed unless both artifacts validate.
 
 Installed-workout provenance is stored internally, independently of editable
 workout YAML and display names. The durable identity is the bucket source plus
@@ -198,6 +210,10 @@ record. Multiple provenance records may therefore reference the same source and
 catalog workout ID without coupling edits between the local variants. Before a
 bucket import enters the local workout list, its trimmed name is compared
 case-insensitively and assigned the first available numeric suffix.
+
+At startup, installed-workout provenance whose local workout no longer exists
+is removed. Catalog install state also ignores such orphaned records, so a
+Dashboard refresh can download the missing workout again.
 
 Completion device actions remain UI/platform concerns and do not enter
 `SessionEngine`. When an opted-in workout completes successfully, Windows
@@ -216,7 +232,9 @@ The monitor command targets the current foreground window. It must never use
 shell processes and can be misinterpreted as a machine power action on some
 systems.
 
-Catalog schema v1 contains `schemaVersion`, bucket `name`, and `workouts` entries
-with stable `id`, display metadata, version, immutable `packageUrl`, and SHA-256.
-Packages may include `manifest.json` with `schemaVersion: 1` and
-`workoutFile: "workout.yaml"`; manifest-less manual packages remain compatible.
+Catalog schema v2 contains `schemaVersion`, bucket `name`, and `workouts` entries
+with stable `id`, display metadata, version, and required `workoutUrl`,
+`workoutSha256`, `workoutSize`, `assetsUrl`, `assetsSha256`, and `assetsSize`.
+Schema v1 catalogs are rejected. The assets archive contains the manifest and
+referenced media, but never workout YAML. Manual portable `.anhpt.zip`
+import/export remains a separate local sharing format.

@@ -33,6 +33,9 @@ class WorkoutParser {
   static const _voiceFields = {
     'language',
     'timing',
+    'mode',
+    'announce_every',
+    'countdown_from',
     'announce_step_name',
     'announce_start',
     'announce_finish',
@@ -197,36 +200,57 @@ class WorkoutParser {
       );
     }
 
+    final legacyMode = (map['mode'] ?? 'combined').toString();
+    if (!{
+      'continuous',
+      'interval',
+      'ending',
+      'combined',
+    }.contains(legacyMode)) {
+      throw const WorkoutValidationException(
+        'voice.mode must be continuous, interval, ending or combined.',
+      );
+    }
+    final legacyElapsed = legacyMode == 'continuous';
+    final legacyInterval = legacyMode == 'interval' || legacyMode == 'combined';
+    final legacyFinal = legacyMode == 'ending' || legacyMode == 'combined';
+
     final timing = map['timing'] == null
         ? <String, dynamic>{}
         : _map(map['timing']);
     _unknown(timing, _voiceTimingFields, 'voice.timing');
     final announceElapsedTime = _bool(
       timing['elapsed_time'],
-      false,
+      legacyElapsed,
       'voice.timing.elapsed_time',
     );
     final announceInterval = _bool(
       timing['interval'],
-      true,
+      legacyInterval,
       'voice.timing.interval',
     );
     final announceFinalCountdown = _bool(
       timing['final_countdown'],
-      true,
+      legacyFinal,
       'voice.timing.final_countdown',
     );
-    final announceEvery = timing['interval_every'] == null
+    final intervalEvery = timing['interval_every'] ?? map['announce_every'];
+    final announceEvery = intervalEvery == null
         ? const Duration(seconds: 10)
         : DurationParser.parse(
-            timing['interval_every'],
-            field: 'voice.timing.interval_every',
+            intervalEvery,
+            field: timing['interval_every'] == null
+                ? 'voice.announce_every'
+                : 'voice.timing.interval_every',
           );
-    final countdownFrom = timing['countdown_from'] == null
+    final countdownValue = timing['countdown_from'] ?? map['countdown_from'];
+    final countdownFrom = countdownValue == null
         ? const Duration(seconds: 5)
         : DurationParser.parse(
-            timing['countdown_from'],
-            field: 'voice.timing.countdown_from',
+            countdownValue,
+            field: timing['countdown_from'] == null
+                ? 'voice.countdown_from'
+                : 'voice.timing.countdown_from',
           );
 
     return VoiceConfig(

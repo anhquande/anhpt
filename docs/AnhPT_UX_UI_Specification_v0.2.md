@@ -294,4 +294,13 @@ a selected track even when workout music is disabled.
 - Updating asks to keep the local workout, install as a copy, or replace it.
 - Loading, cached-offline, empty, validation, download, and checksum failures are
   explicit and do not alter existing workouts.
+- Dashboard synchronization shows a transient inline status banner. While a
+  catalog refresh runs it reports metadata loading and the final listing count;
+  failures show the first useful error. Success messages dismiss automatically
+  after several seconds, while errors remain slightly longer.
+- An uninstalled catalog item opens a metadata-only detail screen. It shows the
+  source, version, author, separate YAML/assets sizes, description, and tags
+  without fetching either artifact. Download starts only after the user presses
+  Download; that screen distinguishes definition and assets progress, then shows
+  validation/import state and retryable errors.
 # AnhPT UX/UI Specification
