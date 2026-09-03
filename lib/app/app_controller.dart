@@ -26,7 +26,11 @@ class AppController extends ChangeNotifier {
   static const currentAppVersion = '0.8.2';
   final LocalStore store;
   final WorkoutYamlFileStore? yamlFileStore;
-  AppController(this.store, {this.yamlFileStore});
+  AppController(
+    this.store, {
+    this.yamlFileStore,
+    WorkoutBucketService? workoutBuckets,
+  }) : workoutBuckets = workoutBuckets ?? WorkoutBucketService();
 
   bool loading = true;
   bool onboarded = false;
@@ -42,7 +46,7 @@ class AppController extends ChangeNotifier {
   String? bucketCatalogError;
   final MusicLibraryService musicLibrary = MusicLibraryService();
   final WorkoutPackageService workoutPackages = WorkoutPackageService();
-  final WorkoutBucketService workoutBuckets = WorkoutBucketService();
+  final WorkoutBucketService workoutBuckets;
   final LocalMediaRepository mediaLibrary = LocalMediaRepository();
   final CoachRecordingService recordingFiles = CoachRecordingService();
   String? _documentsPath;

@@ -178,7 +178,11 @@ or when the card is disposed.
 artifacts, limits redirects and response sizes, keeps a last-good catalog, and
 verifies each artifact's SHA-256 independently. A workout definition is a small
 `.workout.yaml` file; audio, video, images, and the package manifest live in a
-separate `.assets.zip`. Import rejects unsafe, duplicate, overlong, over-count,
+separate `.assets.zip`. Verified YAML downloads are cached in memory by URL and
+checksum. Opening an uninstalled detail page parses this cached definition for a
+read-only structure preview, and later installation reuses the bytes before
+fetching media. Failed definition downloads are evicted so Retry performs a new
+request. Import rejects unsafe, duplicate, overlong, over-count,
 and oversized ZIP entries and stages extracted assets before exposing the final
 managed directory. Sources and installed provenance use versioned
 SharedPreferences records.

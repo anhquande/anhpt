@@ -314,8 +314,11 @@ a selected track even when workout music is disabled.
   catalog refresh runs it reports metadata loading and the final listing count;
   failures show the first useful error. Success messages dismiss automatically
   after several seconds, while errors remain slightly longer.
-- An uninstalled catalog item opens a metadata-only detail screen. It shows the
-  source, author, description, and tags without fetching either artifact. The
+- An uninstalled catalog item opens a detail screen and immediately fetches only
+  its small YAML definition. Overview continues to show catalog metadata while
+  Steps shows loading, retryable failure, or the same nested structure tree used
+  by an installed workout. This read-only preview omits microphone, camera,
+  recording, and demonstration-media widgets and never fetches media. The
   version and media download size share one compact label, such as
   `v1.0.0 (4.3 MB media)`; YAML size is not shown. Download starts only after
   the user presses Download; that screen distinguishes definition and media
