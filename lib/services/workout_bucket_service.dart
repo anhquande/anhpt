@@ -39,6 +39,8 @@ class BucketRefreshResult {
 class WorkoutBucketService {
   static const maxCatalogBytes = 2 * 1024 * 1024;
   static const maxPackageBytes = 100 * 1024 * 1024;
+  static const maxThumbnailBytes = 2 * 1024 * 1024;
+  static const maxFeatureImageBytes = 8 * 1024 * 1024;
   static final _packageProgressController =
       StreamController<BucketPackageProgressEvent>.broadcast();
 
@@ -46,6 +48,7 @@ class WorkoutBucketService {
       _packageProgressController.stream;
 
   final http.Client _client;
+  final Map<String, Future<Uint8List>> _artworkDownloads = {};
 
   WorkoutBucketService({http.Client? client})
     : _client = client ?? http.Client();
@@ -112,6 +115,53 @@ class WorkoutBucketService {
       maxBytes: maxPackageBytes,
       onProgress: onProgress,
     );
+  }
+
+  Future<Uint8List?> downloadThumbnail(WorkoutBucketEntry entry) {
+    final uri = entry.thumbnailUri;
+    final checksum = entry.thumbnailSha256;
+    final size = entry.thumbnailSize;
+    if (uri == null || checksum == null || size == null) return Future.value();
+    return _cachedArtwork(
+      uri: uri,
+      expectedSha256: checksum,
+      expectedBytes: size,
+      maxBytes: maxThumbnailBytes,
+    );
+  }
+
+  Future<Uint8List?> downloadFeatureImage(WorkoutBucketEntry entry) {
+    final uri = entry.featureImageUri;
+    final checksum = entry.featureImageSha256;
+    final size = entry.featureImageSize;
+    if (uri == null || checksum == null || size == null) return Future.value();
+    return _cachedArtwork(
+      uri: uri,
+      expectedSha256: checksum,
+      expectedBytes: size,
+      maxBytes: maxFeatureImageBytes,
+    );
+  }
+
+  Future<Uint8List> _cachedArtwork({
+    required Uri uri,
+    required String expectedSha256,
+    required int expectedBytes,
+    required int maxBytes,
+  }) {
+    final key = '$uri#$expectedSha256';
+    return _artworkDownloads.putIfAbsent(key, () async {
+      final bytes = await _download(
+        uri,
+        maxBytes: maxBytes,
+        expectedBytes: expectedBytes,
+      );
+      final actual = sha256.convert(bytes).toString();
+      if (actual.toLowerCase() != expectedSha256.toLowerCase()) {
+        throw StateError('Artwork checksum does not match the catalog.');
+      }
+      return bytes;
+    });
   }
 
   Future<Uint8List> _downloadEntryArtifact(

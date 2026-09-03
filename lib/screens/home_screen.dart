@@ -722,6 +722,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     for (final workout in visibleWorkouts) ...[
                       WorkoutCard(
                         workout: workout,
+                        bucketEntry: controller.bucketEntryForWorkout(
+                          workout.id,
+                        ),
+                        bucketService: controller.workoutBuckets,
                         sourceName: _sourceNameFor(workout),
                         originalName: _originalNameFor(workout),
                         availableUpdateVersion: controller
@@ -736,6 +740,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       CatalogWorkoutCard(
                         entry: entry,
                         sourceName: _bucketSourceName(entry.sourceId),
+                        bucketService: controller.workoutBuckets,
                         onTap: () => _openCatalogWorkout(entry),
                       ),
                       const SizedBox(height: 10),

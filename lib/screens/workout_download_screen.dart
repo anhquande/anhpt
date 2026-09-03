@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../models/workout_bucket.dart';
 import '../services/workout_bucket_service.dart';
+import '../widgets/workout_artwork.dart';
 import 'workout_detail_screen.dart';
 
 enum _DownloadPhase { preview, downloading, installing, ready, failed }
@@ -193,26 +194,48 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
             children: [
-              Container(
-                height: 180,
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  _thumbnailIcon(widget.entry.tags),
-                  size: 68,
-                  color: colors.onSurfaceVariant,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: SizedBox(
+                  height: 200,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      WorkoutArtwork(
+                        tags: widget.entry.tags,
+                        kind: WorkoutArtworkKind.feature,
+                        bucketEntry: widget.entry,
+                        bucketService: widget.controller.workoutBuckets,
+                      ),
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [Colors.transparent, Color(0xB3000000)],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        left: 18,
+                        right: 18,
+                        bottom: 16,
+                        child: Text(
+                          widget.entry.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.headlineSmall
+                              ?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                              ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 20),
-              Text(
-                widget.entry.name,
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+              const SizedBox(height: 16),
               if (_recommended) ...[
                 const SizedBox(height: 8),
                 const Align(
@@ -386,22 +409,6 @@ class _WorkoutDownloadScreenState extends State<WorkoutDownloadScreen> {
     final total = _totalBytes;
     if (total == null) return _formatBytes(_receivedBytes);
     return '${_formatBytes(_receivedBytes)} / ${_formatBytes(total)}';
-  }
-
-  IconData _thumbnailIcon(List<String> tags) {
-    final values = tags.map((tag) => tag.toLowerCase()).toSet();
-    if (values.any(
-      (tag) => tag.contains('karate') || tag.contains('martial'),
-    )) {
-      return Icons.sports_martial_arts;
-    }
-    if (values.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
-      return Icons.self_improvement;
-    }
-    if (values.any((tag) => tag.contains('hiit') || tag.contains('cardio'))) {
-      return Icons.bolt;
-    }
-    return Icons.fitness_center;
   }
 
   String _formatBytes(int bytes) {

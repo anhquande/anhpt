@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../models/media_asset.dart';
 import '../models/workout.dart';
 import '../models/workout_bucket.dart';
+import '../services/workout_bucket_service.dart';
 import 'common.dart';
 import 'step_demonstration_button.dart';
 import 'step_recording_mini_player.dart';
+import 'workout_artwork.dart';
 
 typedef StepRecordingCallback =
     void Function(BuildContext context, WorkoutStep step, String stepKey);
@@ -19,6 +21,8 @@ class WorkoutCard extends StatelessWidget {
   final String? sourceName;
   final String? originalName;
   final String? availableUpdateVersion;
+  final WorkoutBucketEntry? bucketEntry;
+  final WorkoutBucketService? bucketService;
 
   const WorkoutCard({
     super.key,
@@ -28,21 +32,9 @@ class WorkoutCard extends StatelessWidget {
     this.sourceName,
     this.originalName,
     this.availableUpdateVersion,
+    this.bucketEntry,
+    this.bucketService,
   });
-
-  IconData _thumbnailIcon() {
-    final tags = workout.tags.map((tag) => tag.toLowerCase()).toSet();
-    if (tags.any((tag) => tag.contains('karate') || tag.contains('martial'))) {
-      return Icons.sports_martial_arts;
-    }
-    if (tags.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
-      return Icons.self_improvement;
-    }
-    if (tags.any((tag) => tag.contains('hiit') || tag.contains('cardio'))) {
-      return Icons.bolt;
-    }
-    return Icons.fitness_center;
-  }
 
   bool get _recommended =>
       workout.tags.any((tag) => tag.trim().toLowerCase() == 'recommended');
@@ -168,14 +160,11 @@ class WorkoutCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Container(
-                      color: cs.surfaceContainerHighest,
-                      alignment: Alignment.center,
-                      child: Icon(
-                        _thumbnailIcon(),
-                        size: 32,
-                        color: cs.onSurfaceVariant,
-                      ),
+                    WorkoutArtwork(
+                      tags: workout.tags,
+                      kind: WorkoutArtworkKind.thumbnail,
+                      bucketEntry: bucketEntry,
+                      bucketService: bucketService,
                     ),
                     if (_isNew)
                       Positioned(
@@ -265,12 +254,14 @@ class CatalogWorkoutCard extends StatelessWidget {
   final WorkoutBucketEntry entry;
   final String sourceName;
   final VoidCallback onTap;
+  final WorkoutBucketService bucketService;
 
   const CatalogWorkoutCard({
     super.key,
     required this.entry,
     required this.sourceName,
     required this.onTap,
+    required this.bucketService,
   });
 
   @override
@@ -286,14 +277,13 @@ class CatalogWorkoutCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(
+              SizedBox(
                 width: 96,
-                color: colors.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: Icon(
-                  _catalogThumbnailIcon(entry.tags),
-                  size: 32,
-                  color: colors.onSurfaceVariant,
+                child: WorkoutArtwork(
+                  tags: entry.tags,
+                  kind: WorkoutArtworkKind.thumbnail,
+                  bucketEntry: entry,
+                  bucketService: bucketService,
                 ),
               ),
               const SizedBox(width: 12),
@@ -348,22 +338,6 @@ class CatalogWorkoutCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  static IconData _catalogThumbnailIcon(List<String> tags) {
-    final values = tags.map((tag) => tag.toLowerCase()).toSet();
-    if (values.any(
-      (tag) => tag.contains('karate') || tag.contains('martial'),
-    )) {
-      return Icons.sports_martial_arts;
-    }
-    if (values.any((tag) => tag.contains('yoga') || tag.contains('mobility'))) {
-      return Icons.self_improvement;
-    }
-    if (values.any((tag) => tag.contains('hiit') || tag.contains('cardio'))) {
-      return Icons.bolt;
-    }
-    return Icons.fitness_center;
   }
 
   static String _tagSummary(List<String> tags) {

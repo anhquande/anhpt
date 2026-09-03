@@ -43,3 +43,5 @@ flutter:
   assets:
     - assets/audio/
     - assets/content/
+    - assets/workout_artwork/feature/
+    - assets/workout_artwork/thumbnail/

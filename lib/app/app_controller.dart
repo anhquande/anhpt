@@ -755,6 +755,18 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
+  WorkoutBucketEntry? bucketEntryForWorkout(String workoutId) {
+    final provenance = bucketProvenanceFor(workoutId);
+    if (provenance == null) return null;
+    for (final entry in bucketCatalogEntries) {
+      if (entry.sourceId == provenance.sourceId &&
+          entry.id == provenance.entryId) {
+        return entry;
+      }
+    }
+    return null;
+  }
+
   Future<bool> installBucketEntry(
     WorkoutBucketEntry entry, {
     BucketInstallConflictResolution? resolution,

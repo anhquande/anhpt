@@ -195,7 +195,11 @@ Home-accessible browsing/install flow.
 
 Dashboard refresh fetches only each enabled source's `bucket.json`. Catalog
 entries are rendered directly from metadata and do not enter the persisted
-workout list. The two artifact downloads, checksum verification, media
+workout list. Visible cards start independent, checksummed thumbnail downloads
+after catalog parsing, so catalog retrieval is never blocked by image transfer.
+Opening details starts the larger feature-image download. Missing or failed
+artwork uses a bundled default selected only from the entry's first tag. The two
+install artifact downloads, checksum verification, media
 extraction, and workout persistence begin only from the Download action on the
 catalog detail screen. Download progress treats completion of the YAML artifact
 as an intermediate state and continues to show the subsequent assets transfer;
@@ -238,6 +242,9 @@ systems.
 Catalog schema v2 contains `schemaVersion`, bucket `name`, and `workouts` entries
 with stable `id`, display metadata, version, and required `workoutUrl`,
 `workoutSha256`, `workoutSize`, `assetsUrl`, `assetsSha256`, and `assetsSize`.
+Artwork uses `thumbnailUrl`/`thumbnailSha256`/`thumbnailSize` and
+`featureImageUrl`/`featureImageSha256`/`featureImageSize`; each group is either
+complete or absent.
 Schema v1 catalogs are rejected. The assets archive contains the manifest and
 referenced media, but never workout YAML. Manual portable `.anhpt.zip`
 import/export remains a separate local sharing format.

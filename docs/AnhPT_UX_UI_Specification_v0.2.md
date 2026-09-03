@@ -293,6 +293,10 @@ a selected track even when workout music is disabled.
   download status are omitted from list cards. A compact cloud icon identifies
   bucket content; downloaded entries use `cloud_done`, and a small dot on that
   icon signals an available update. Hovering the icon reveals the source name.
+- List cards use a small independently loaded thumbnail. Detail screens use a
+  larger feature image as their visual background. Until remote artwork is
+  available, the UI shows bundled category artwork selected strictly by the
+  workout's first tag; unknown or empty categories use the Strength default.
 - An installed entry exposes `Add another`, creating an independent local
   variant with the same source attribution. Duplicate local names receive the
   first available suffix, such as `Workout 2`, `Workout 3`, and `Workout 4`.
