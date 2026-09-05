@@ -95,6 +95,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   String? musicNotice;
   SessionStatus? _musicStatus;
   bool _disposed = false;
+  bool _androidDisplayDimmed = false;
   bool _cameraEnabled = false;
   bool _demonstrationEnabled = true;
   WorkoutCameraLayout _cameraLayout = WorkoutCameraLayout.pictureInPicture;
@@ -189,8 +190,30 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     final delay = engine.workout.screenOffAfterStart;
     if (delay == null) return;
     _screenOffTimer = Timer(delay, () {
-      if (!_disposed) unawaited(deviceActions.turnOffDisplay());
+      if (!_disposed) unawaited(_turnOffDisplay());
     });
+  }
+
+  Future<void> _turnOffDisplay() async {
+    final changed = await deviceActions.turnOffDisplay();
+    if (_disposed || !changed) return;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      _androidDisplayDimmed = true;
+    }
+  }
+
+  Future<void> _wakeAndroidDisplay() async {
+    if (!_androidDisplayDimmed) return;
+    _androidDisplayDimmed = false;
+    await deviceActions.restoreDisplay();
+  }
+
+  void _handleWorkoutTap() {
+    if (_androidDisplayDimmed) {
+      unawaited(_wakeAndroidDisplay());
+      return;
+    }
+    _togglePauseFromMedia();
   }
 
   Future<void> _initializeAndStart() async {
@@ -321,6 +344,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       if (status == SessionStatus.completed ||
           status == SessionStatus.incomplete) {
         _screenOffTimer?.cancel();
+        unawaited(_wakeAndroidDisplay());
         unawaited(music.stop());
         unawaited(voiceGuide.cancelCurrentWork());
       }
@@ -762,10 +786,10 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                   label: paused
                       ? 'Workout paused. Activate to resume.'
                       : 'Workout running. Activate to pause.',
-                  onTap: _togglePauseFromMedia,
+                  onTap: _handleWorkoutTap,
                   child: GestureDetector(
                     behavior: HitTestBehavior.opaque,
-                    onTap: _togglePauseFromMedia,
+                    onTap: _handleWorkoutTap,
                     onVerticalDragStart: (_) => _dragDistance = 0,
                     onVerticalDragUpdate: (details) {
                       _dragDistance += details.delta.dy;
@@ -916,6 +940,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     engine.removeListener(_changed);
     engine.dispose();
     voiceGuide.dispose();
+    unawaited(deviceActions.restoreDisplay());
     unawaited(audio.dispose());
     unawaited(music.dispose());
     super.dispose();

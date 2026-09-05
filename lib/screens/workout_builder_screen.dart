@@ -410,7 +410,7 @@ class _WorkoutBuilderScreenState extends State<WorkoutBuilderScreen>
           title: const Text('Turn off screen after starting'),
           subtitle: Text(
             draft.screenOffAfterStart.isNotEmpty
-                ? 'Enabled — Windows turns off the display 10 seconds after Start.'
+                ? 'Enabled — Windows turns off the monitor; Android blacks out the app display after 10 seconds.'
                 : 'Off — the display remains unchanged.',
           ),
           value: draft.screenOffAfterStart.isNotEmpty,

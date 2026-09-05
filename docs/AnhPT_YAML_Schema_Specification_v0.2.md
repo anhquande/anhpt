@@ -182,10 +182,14 @@ current Builder and Overview controls use `10s`. Windows turns off the monitor
 through the native `SC_MONITORPOWER` system command; normal mouse or keyboard
 activity can wake it again. The workout timer and audio continue running.
 
-The field remains portable on Android, iOS, and Web, but those targets ignore
-the action because ordinary applications cannot safely lock or power off the
-device display without privileged device-management capabilities. The timer is
-cancelled if the Player closes or the workout finishes before the delay.
+On Android, ordinary applications cannot safely power off or lock the physical
+display without privileged device-management capabilities. AnhPT therefore
+implements this option as an app-level blackout: application brightness is set
+to zero after the delay without changing system brightness or requiring special
+permissions. A tap wakes the AnhPT display again, and brightness is restored
+when the workout finishes or the Player closes. iOS and Web continue to ignore
+the action. The timer is cancelled if the Player closes or the workout finishes
+before the delay.
 
 ## 11. Marketplace artifact metadata
 

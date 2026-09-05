@@ -3,4 +3,6 @@ import 'device_action_service_stub.dart'
 
 class DeviceActionService {
   Future<bool> turnOffDisplay() => turnOffDisplayOnPlatform();
+
+  Future<bool> restoreDisplay() => restoreDisplayOnPlatform();
 }
