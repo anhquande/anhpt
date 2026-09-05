@@ -32,6 +32,37 @@ void main() {
     expect(controller.bucketInstallState(entry), 'notInstalled');
   });
 
+
+  test('bucket compatibility accepts the exact minimum app version', () {
+    final controller = AppController(LocalStore(), appVersion: '0.14.0');
+    const compatible = WorkoutBucketEntry(
+      id: 'feature-demo',
+      name: 'Feature Demo',
+      version: '1.0.0',
+      workoutUrl: 'https://example.com/workout.yaml',
+      workoutSha256:
+          'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      workoutSize: 512,
+      minAppVersion: '0.14.0',
+    );
+    const tooNew = WorkoutBucketEntry(
+      id: 'future-demo',
+      name: 'Future Demo',
+      version: '1.0.0',
+      workoutUrl: 'https://example.com/future.yaml',
+      workoutSha256:
+          'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      workoutSize: 512,
+      minAppVersion: '0.15.0',
+    );
+
+    expect(controller.bucketEntryCompatibilityError(compatible), isNull);
+    expect(
+      controller.bucketEntryCompatibilityError(tooNew),
+      'Requires AnhPT 0.15.0 or newer.',
+    );
+  });
+
   test('workout versions compare semantically', () {
     expect(compareWorkoutVersions('1.10.0', '1.9.0'), greaterThan(0));
     expect(compareWorkoutVersions('v2.0', '1.99.99'), greaterThan(0));
