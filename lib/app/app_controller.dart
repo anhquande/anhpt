@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../data/sample_data.dart';
 import '../models/coach_recording.dart';
 import '../models/background_music.dart';
@@ -23,14 +24,16 @@ import '../services/workout_yaml_file_store.dart';
 import '../services/coach_recording_service.dart';
 
 class AppController extends ChangeNotifier {
-  static const currentAppVersion = '0.8.2';
+  String currentAppVersion;
   final LocalStore store;
   final WorkoutYamlFileStore? yamlFileStore;
   AppController(
     this.store, {
     this.yamlFileStore,
     WorkoutBucketService? workoutBuckets,
-  }) : workoutBuckets = workoutBuckets ?? WorkoutBucketService();
+    String? appVersion,
+  }) : currentAppVersion = appVersion ?? '0.0.0',
+       workoutBuckets = workoutBuckets ?? WorkoutBucketService();
 
   bool loading = true;
   bool onboarded = false;
@@ -52,6 +55,14 @@ class AppController extends ChangeNotifier {
   String? _documentsPath;
 
   Future<void> initialize() async {
+    if (currentAppVersion == '0.0.0') {
+      try {
+        currentAppVersion = (await PackageInfo.fromPlatform()).version;
+      } catch (_) {
+        // Keep the unknown fallback instead of reporting a stale hard-coded
+        // app version. Production platforms normally resolve PackageInfo.
+      }
+    }
     if (!kIsWeb) {
       try {
         _documentsPath = (await getApplicationDocumentsDirectory()).path;
