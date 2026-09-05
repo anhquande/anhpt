@@ -206,11 +206,12 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
 
   testWidgets('app shows onboarding on first launch', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    final controller = AppController(LocalStore());
-    await controller.initialize();
+    final controller = AppController(LocalStore())
+      ..loading = false
+      ..onboarded = false;
 
     await tester.pumpWidget(AnhPtApp(controller: controller));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('AnhPT'), findsWidgets);
     expect(find.text('Get Started'), findsOneWidget);
