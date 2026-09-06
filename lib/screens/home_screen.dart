@@ -445,13 +445,7 @@ class _HomeScreenState extends State<HomeScreen> {
           IconButton(
             tooltip: 'Refresh workouts',
             onPressed: _isRefreshing ? null : _refreshWorkouts,
-            icon: _isRefreshing
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh),
           ),
           TextButton.icon(
             onPressed: _chooseActiveProfile,
