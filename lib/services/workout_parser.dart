@@ -56,8 +56,17 @@ class WorkoutParser {
     'duration',
     'guide',
     'countdown',
+    'voice_cues',
     'recording',
     'exercise_id',
+  };
+  static const _stepVoiceCueFields = {
+    'announce_next',
+    'get_ready',
+    'countdown',
+    'halfway',
+    'remaining_time',
+    'completion',
   };
   static const _repeatFields = {'repeat', 'steps'};
   static const _backgroundMusicFields = {
@@ -425,6 +434,7 @@ class WorkoutParser {
             ? null
             : _string(map['guide'], 'step.guide', 500);
         final countdown = _bool(map['countdown'], true, 'step.countdown');
+        final voiceCues = _stepVoiceCues(map['voice_cues']);
         final explicitId = map['id'] == null ? null : _stepId(map['id']);
         final recording = _recording(map['recording'], 'step.recording');
         final exerciseId = map['exercise_id'] == null
@@ -438,6 +448,7 @@ class WorkoutParser {
             duration: duration,
             guide: guide,
             countdown: countdown,
+            voiceCues: voiceCues,
             recording: recording,
             exerciseId: exerciseId,
           ),
@@ -445,6 +456,46 @@ class WorkoutParser {
       }
     }
     return out;
+  }
+
+  static StepVoiceCues _stepVoiceCues(Object? value) {
+    if (value == null) return const StepVoiceCues();
+    final map = _map(value);
+    _unknown(map, _stepVoiceCueFields, 'step.voice_cues');
+    final remainingTime = map['remaining_time'] ?? 0;
+    if (remainingTime is! int || remainingTime < 0 || remainingTime > 86400) {
+      throw const WorkoutValidationException(
+        'step.voice_cues.remaining_time must be an integer from 0 to 86400 seconds.',
+      );
+    }
+    return StepVoiceCues(
+      announceNext: _bool(
+        map['announce_next'],
+        false,
+        'step.voice_cues.announce_next',
+      ),
+      getReady: _bool(
+        map['get_ready'],
+        false,
+        'step.voice_cues.get_ready',
+      ),
+      startCountdown: _bool(
+        map['countdown'],
+        false,
+        'step.voice_cues.countdown',
+      ),
+      halfway: _bool(
+        map['halfway'],
+        false,
+        'step.voice_cues.halfway',
+      ),
+      remainingTimeSeconds: remainingTime,
+      completion: _bool(
+        map['completion'],
+        false,
+        'step.voice_cues.completion',
+      ),
+    );
   }
 
   static void _collectExplicitIds(YamlList list, Set<String> ids, int depth) {

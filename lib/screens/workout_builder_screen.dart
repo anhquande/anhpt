@@ -10,6 +10,7 @@ import '../widgets/coach_recording_card.dart';
 import '../widgets/demo_media_source_sheet.dart';
 import '../widgets/step_recording_mini_player.dart';
 import '../widgets/step_demonstration_button.dart';
+import '../widgets/step_voice_cues_editor.dart';
 import '../widgets/workout_music_card.dart';
 import 'workout_editor_screen.dart';
 
@@ -1071,7 +1072,7 @@ class _StepCard extends StatelessWidget {
           ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
-            title: const Text('Voice timing'),
+            title: const Text('Legacy voice timing'),
             subtitle: const Text('Interval / continuous / final countdown'),
             value: step.countdown,
             onChanged: (v) {
@@ -1079,6 +1080,7 @@ class _StepCard extends StatelessWidget {
               changed();
             },
           ),
+          StepVoiceCuesEditor(step: step, changed: changed),
         ],
       ),
     ),

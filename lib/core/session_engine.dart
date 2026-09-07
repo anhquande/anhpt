@@ -30,6 +30,8 @@ class SessionEngine extends ChangeNotifier {
 
   bool _announcementComplete = false;
   bool _timerFinished = false;
+  bool _timerStarted = false;
+  bool _transitionCueComplete = true;
 
   SessionEngine(this.workout)
       : status = workout.startCountdown > Duration.zero
@@ -62,17 +64,20 @@ class SessionEngine extends ChangeNotifier {
 
   bool get announcementComplete => _announcementComplete;
   bool get timerFinished => _timerFinished;
+  bool get stepTimerStarted => _timerStarted;
   bool get waitingForAnnouncement => _timerFinished && !_announcementComplete;
+  bool get waitingForTransitionCue =>
+      _timerFinished && _announcementComplete && !_transitionCueComplete;
 
   Duration get activeElapsed =>
       _activeElapsedBefore +
-      (status == SessionStatus.running && !_timerFinished
+      (status == SessionStatus.running && !_timerFinished && _timerStarted
           ? _activeWatch.elapsed
           : Duration.zero);
 
   Duration get stepElapsed =>
       _stepElapsedBefore +
-      (status == SessionStatus.running && !_timerFinished
+      (status == SessionStatus.running && !_timerFinished && _timerStarted
           ? _stepWatch.elapsed
           : Duration.zero);
 
@@ -137,11 +142,13 @@ class SessionEngine extends ChangeNotifier {
 
     if (status != SessionStatus.running) return;
 
-    if (!_timerFinished && stepElapsed >= currentStep.duration) {
+    if (!_timerFinished &&
+        _timerStarted &&
+        stepElapsed >= currentStep.duration) {
       _finishCurrentStepTimer();
     }
 
-    if (_timerFinished && _announcementComplete) {
+    if (_timerFinished && _announcementComplete && _transitionCueComplete) {
       _advanceOrComplete();
       return;
     }
@@ -152,6 +159,8 @@ class SessionEngine extends ChangeNotifier {
   void _startCurrentStepTimer() {
     _announcementComplete = false;
     _timerFinished = false;
+    _timerStarted = false;
+    _transitionCueComplete = !currentStep.voiceCues.completion;
     _stepElapsedBefore = Duration.zero;
 
     if (currentStep.duration <= Duration.zero) {
@@ -159,6 +168,14 @@ class SessionEngine extends ChangeNotifier {
       return;
     }
 
+    if (!currentStep.voiceCues.hasPreStartCue) {
+      _beginCurrentStepTimer();
+    }
+  }
+
+  void _beginCurrentStepTimer() {
+    if (_timerStarted || _timerFinished) return;
+    _timerStarted = true;
     _activeWatch
       ..reset()
       ..start();
@@ -171,8 +188,11 @@ class SessionEngine extends ChangeNotifier {
     if (_timerFinished) return;
 
     _timerFinished = true;
-    _activeElapsedBefore += _activeWatch.elapsed;
+    if (_timerStarted) {
+      _activeElapsedBefore += _activeWatch.elapsed;
+    }
     _stepElapsedBefore = currentStep.duration;
+    _timerStarted = false;
 
     _activeWatch
       ..stop()
@@ -182,8 +202,9 @@ class SessionEngine extends ChangeNotifier {
       ..reset();
   }
 
-  /// Called by VoiceGuideController after the current step's
-  /// name + guide announcement has fully finished.
+  /// Called by VoiceGuideController after the current step's protected
+  /// announcement has finished. Steps with a pre-start coach cue begin their
+  /// configured duration only after this point.
   void completeAnnouncement() {
     if (status == SessionStatus.completed ||
         status == SessionStatus.incomplete) {
@@ -194,7 +215,16 @@ class SessionEngine extends ChangeNotifier {
 
     _announcementComplete = true;
 
-    if (_timerFinished && status == SessionStatus.running) {
+    if (status == SessionStatus.running &&
+        !_timerFinished &&
+        !_timerStarted &&
+        currentStep.voiceCues.hasPreStartCue) {
+      _beginCurrentStepTimer();
+    }
+
+    if (_timerFinished &&
+        _transitionCueComplete &&
+        status == SessionStatus.running) {
       _advanceOrComplete();
       return;
     }
@@ -202,8 +232,25 @@ class SessionEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Releases a step that opted into a completion/transition coach cue.
+  void completeTransitionCue() {
+    if (_transitionCueComplete ||
+        status == SessionStatus.completed ||
+        status == SessionStatus.incomplete) {
+      return;
+    }
+    _transitionCueComplete = true;
+    if (_timerFinished && _announcementComplete && status == SessionStatus.running) {
+      _advanceOrComplete();
+      return;
+    }
+    notifyListeners();
+  }
+
   void _advanceOrComplete() {
-    if (!_timerFinished || !_announcementComplete) return;
+    if (!_timerFinished || !_announcementComplete || !_transitionCueComplete) {
+      return;
+    }
 
     if (stepIndex + 1 >= _steps.length) {
       _completeWorkout();
@@ -239,7 +286,8 @@ class SessionEngine extends ChangeNotifier {
     }
 
     final wasRunning = status == SessionStatus.running;
-    final timerWasActive = wasRunning && _ticker != null && !_timerFinished;
+    final shouldRunTimer = wasRunning && _ticker != null;
+    final timerWasActive = shouldRunTimer && !_timerFinished && _timerStarted;
     if (timerWasActive) {
       _activeElapsedBefore += _activeWatch.elapsed;
     }
@@ -255,10 +303,13 @@ class SessionEngine extends ChangeNotifier {
     _announcementComplete = false;
     _stepElapsedBefore = Duration.zero;
     _timerFinished = currentStep.duration <= Duration.zero;
+    _timerStarted = false;
+    _transitionCueComplete = !currentStep.voiceCues.completion;
 
-    if (timerWasActive && !_timerFinished) {
-      _activeWatch.start();
-      _stepWatch.start();
+    if (shouldRunTimer &&
+        !_timerFinished &&
+        !currentStep.voiceCues.hasPreStartCue) {
+      _beginCurrentStepTimer();
     }
 
     notifyListeners();
@@ -268,8 +319,10 @@ class SessionEngine extends ChangeNotifier {
   void pause() {
     if (status != SessionStatus.running || _timerFinished) return;
 
-    _activeElapsedBefore += _activeWatch.elapsed;
-    _stepElapsedBefore += _stepWatch.elapsed;
+    if (_timerStarted) {
+      _activeElapsedBefore += _activeWatch.elapsed;
+      _stepElapsedBefore += _stepWatch.elapsed;
+    }
 
     _activeWatch
       ..stop()
@@ -286,7 +339,7 @@ class SessionEngine extends ChangeNotifier {
     if (status != SessionStatus.paused) return;
 
     status = SessionStatus.running;
-    if (!_timerFinished) {
+    if (!_timerFinished && _timerStarted) {
       _activeWatch.start();
       _stepWatch.start();
     }
@@ -299,7 +352,7 @@ class SessionEngine extends ChangeNotifier {
       return;
     }
 
-    if (status == SessionStatus.running && !_timerFinished) {
+    if (status == SessionStatus.running && !_timerFinished && _timerStarted) {
       _activeElapsedBefore += _activeWatch.elapsed;
       _stepElapsedBefore += _stepWatch.elapsed;
     }

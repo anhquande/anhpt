@@ -119,6 +119,33 @@ class WorkoutSerializer {
         b.writeln('$pad  countdown: false');
       }
 
+      if (node.announceNext ||
+          node.getReady ||
+          node.cueCountdown ||
+          node.halfway ||
+          node.remainingTimeSeconds > 0 ||
+          node.completionCue) {
+        b.writeln('$pad  voice_cues:');
+        if (node.announceNext) {
+          b.writeln('$pad    announce_next: true');
+        }
+        if (node.getReady) {
+          b.writeln('$pad    get_ready: true');
+        }
+        if (node.cueCountdown) {
+          b.writeln('$pad    countdown: true');
+        }
+        if (node.halfway) {
+          b.writeln('$pad    halfway: true');
+        }
+        if (node.remainingTimeSeconds > 0) {
+          b.writeln('$pad    remaining_time: ${node.remainingTimeSeconds}');
+        }
+        if (node.completionCue) {
+          b.writeln('$pad    completion: true');
+        }
+      }
+
       if (node.guide.trim().isNotEmpty) {
         b.writeln('$pad  guide: >');
         for (final line in node.guide.trim().split('\n')) {

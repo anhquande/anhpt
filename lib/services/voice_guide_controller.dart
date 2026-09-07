@@ -5,6 +5,11 @@ import '../models/workout.dart';
 import 'audio_feedback_service.dart';
 
 class VoiceGuideController {
+  static const _coachCueMinSpacingMs = 3500;
+  static const _announceNextLeadSeconds = 5;
+  static const _minimumAnnounceNextDurationSeconds = 12;
+  static const _minimumHalfwayDurationMs = 8000;
+
   final Workout workout;
   final SessionEngine engine;
   final AudioFeedbackService audio;
@@ -13,7 +18,14 @@ class VoiceGuideController {
 
   SessionStatus? _lastStatus;
   int _lastStepIndex = -1;
+  int _cueStepIndex = -1;
   int? _lastSpokenSecond;
+  int? _lastTimedSpeechElapsedMs;
+  bool _lastTimedSpeechWasCustom = false;
+  bool _halfwaySpoken = false;
+  bool _remainingTimeSpoken = false;
+  bool _nextSpoken = false;
+  bool _completionSpoken = false;
   bool _started = false;
   bool _finished = false;
   bool _processing = false;
@@ -50,6 +62,9 @@ class VoiceGuideController {
           !engine.announcementComplete) {
         engine.completeAnnouncement();
       }
+      if (!_disposed && engine.waitingForTransitionCue) {
+        engine.completeTransitionCue();
+      }
     }
   }
 
@@ -77,6 +92,11 @@ class VoiceGuideController {
     final previousStatus = _lastStatus;
     _lastStatus = status;
 
+    if (status == SessionStatus.running && _cueStepIndex != engine.stepIndex) {
+      _cueStepIndex = engine.stepIndex;
+      _resetStepCueState();
+    }
+
     if (!_muted &&
         previousStatus == SessionStatus.running &&
         status == SessionStatus.paused) {
@@ -93,9 +113,9 @@ class VoiceGuideController {
       );
     }
 
-    // A new step starts its timer immediately. In parallel we speak
-    // the step name + guide. The engine advances only after both
-    // the timer and this announcement have finished.
+    // A new step normally starts its timer immediately while the protected
+    // step announcement plays. If get-ready/start-countdown is enabled, the
+    // engine intentionally holds the timer until this announcement finishes.
     if (status == SessionStatus.running && _lastStepIndex != engine.stepIndex) {
       _lastStepIndex = engine.stepIndex;
       _lastSpokenSecond = null;
@@ -188,6 +208,35 @@ class VoiceGuideController {
         if (!recordingPlayed && parts.isNotEmpty) {
           await audio.speakAndWait(parts.join('. '), interrupt: true);
         }
+
+        if (!_isCurrentAnnouncement(
+          announcementGeneration,
+          announcementStepIndex,
+          announcementStepId,
+        )) {
+          return;
+        }
+
+        // Pre-start cues are only played before the timer begins. A paused
+        // step that is replayed on resume already has a running timer and must
+        // not receive another get-ready/countdown sequence.
+        if (!engine.stepTimerStarted &&
+            step.duration > Duration.zero &&
+            step.voiceCues.hasPreStartCue) {
+          final preStartParts = <String>[];
+          if (step.voiceCues.getReady) {
+            preStartParts.add(audio.getReadyPhrase());
+          }
+          if (step.voiceCues.startCountdown) {
+            preStartParts.add(audio.startCountdownPhrase());
+          }
+          if (preStartParts.isNotEmpty) {
+            await audio.speakAndWait(
+              preStartParts.join('. '),
+              interrupt: true,
+            );
+          }
+        }
       } catch (e) {
         // Voice failure must never block progression permanently.
         // ignore: avoid_print
@@ -204,12 +253,22 @@ class VoiceGuideController {
       return;
     }
 
-    // Timing voice starts only after the step announcement is finished,
-    // so interval/final-countdown speech cannot cut off name/guide speech.
+    if (_muted && engine.waitingForTransitionCue) {
+      engine.completeTransitionCue();
+      return;
+    }
+
+    // Timing voice starts only after the protected announcement is finished.
     if (!_muted &&
         status == SessionStatus.running &&
-        engine.announcementComplete) {
+        engine.announcementComplete &&
+        !engine.timerFinished) {
       await _handleTimingVoice();
+    }
+
+    if (status == SessionStatus.running && engine.waitingForTransitionCue) {
+      await _handleCompletionCue();
+      return;
     }
 
     if (status == SessionStatus.completed && !_finished) {
@@ -224,6 +283,15 @@ class VoiceGuideController {
     if (status == SessionStatus.incomplete) {
       await audio.stopSpeech();
     }
+  }
+
+  void _resetStepCueState() {
+    _halfwaySpoken = false;
+    _remainingTimeSpoken = false;
+    _nextSpoken = false;
+    _completionSpoken = false;
+    _lastTimedSpeechElapsedMs = null;
+    _lastTimedSpeechWasCustom = false;
   }
 
   bool _isCurrentAnnouncement(int generation, int stepIndex, String stepId) {
@@ -256,13 +324,67 @@ class VoiceGuideController {
     unawaited(audio.cancelCurrentAudio());
   }
 
+  Future<void> _handleCompletionCue() async {
+    if (_completionSpoken || !engine.currentStep.voiceCues.completion) {
+      if (engine.waitingForTransitionCue) engine.completeTransitionCue();
+      return;
+    }
+
+    _completionSpoken = true;
+    final generation = _generation;
+    final stepIndex = engine.stepIndex;
+    final stepId = engine.currentStep.id;
+    final elapsedMs = engine.currentStep.duration.inMilliseconds;
+
+    try {
+      // The final workout already has its own finish phrase. On intermediate
+      // steps, suppress a completion word if another timed cue was spoken too
+      // recently, rather than stacking TTS back-to-back.
+      if (!_muted &&
+          engine.nextStep != null &&
+          _canSpeakCustomCue(elapsedMs)) {
+        _markTimedSpeech(elapsedMs, custom: true);
+        await audio.speakAndWait(audio.stepCompletePhrase(), interrupt: true);
+      }
+    } catch (_) {
+      // Completion speech is optional; transition must always be released.
+    } finally {
+      if (!_disposed &&
+          generation == _generation &&
+          engine.status == SessionStatus.running &&
+          engine.stepIndex == stepIndex &&
+          engine.currentStep.id == stepId &&
+          engine.waitingForTransitionCue) {
+        engine.completeTransitionCue();
+      }
+    }
+  }
+
+  bool _canSpeakCustomCue(int elapsedMs) {
+    final previous = _lastTimedSpeechElapsedMs;
+    return previous == null || elapsedMs - previous >= _coachCueMinSpacingMs;
+  }
+
+  bool _legacyTimingBlockedByCustomCue(int elapsedMs) {
+    final previous = _lastTimedSpeechElapsedMs;
+    return _lastTimedSpeechWasCustom &&
+        previous != null &&
+        elapsedMs - previous < _coachCueMinSpacingMs;
+  }
+
+  void _markTimedSpeech(int elapsedMs, {required bool custom}) {
+    _lastTimedSpeechElapsedMs = elapsedMs;
+    _lastTimedSpeechWasCustom = custom;
+  }
+
   Future<void> _handleTimingVoice() async {
-    if (!engine.currentStep.countdown) return;
-    if (engine.timerFinished) return;
+    if (engine.timerFinished || !engine.stepTimerStarted) return;
 
     const speechLeadMs = 200;
+    final step = engine.currentStep;
+    final cues = step.voiceCues;
     final remainingMs = engine.remaining.inMilliseconds;
-    final durationMs = engine.currentStep.duration.inMilliseconds;
+    final durationMs = step.duration.inMilliseconds;
 
     if (remainingMs <= 0) return;
 
@@ -274,7 +396,54 @@ class VoiceGuideController {
     final elapsedMs = durationMs - remainingMs + speechLeadMs;
     final elapsedSec = elapsedMs <= 0 ? 0 : elapsedMs ~/ 1000;
 
+    final configuredRemaining = cues.remainingTimeSeconds;
+    if (!_remainingTimeSpoken &&
+        configuredRemaining > 0 &&
+        configuredRemaining < step.duration.inSeconds &&
+        remainingSec <= configuredRemaining) {
+      _remainingTimeSpoken = true;
+      if (_canSpeakCustomCue(elapsedMs)) {
+        _markTimedSpeech(elapsedMs, custom: true);
+        await audio.speak(
+          audio.remainingPhrase(configuredRemaining),
+          interrupt: true,
+        );
+        return;
+      }
+    }
+
+    if (!_nextSpoken &&
+        cues.announceNext &&
+        engine.nextStep != null &&
+        step.duration.inSeconds >= _minimumAnnounceNextDurationSeconds &&
+        remainingSec <= _announceNextLeadSeconds) {
+      _nextSpoken = true;
+      if (_canSpeakCustomCue(elapsedMs)) {
+        _markTimedSpeech(elapsedMs, custom: true);
+        await audio.speak(
+          audio.nextPhrase(engine.nextStep!.name),
+          interrupt: true,
+        );
+        return;
+      }
+    }
+
+    if (!_halfwaySpoken &&
+        cues.halfway &&
+        durationMs >= _minimumHalfwayDurationMs &&
+        elapsedMs >= durationMs ~/ 2) {
+      _halfwaySpoken = true;
+      if (_canSpeakCustomCue(elapsedMs)) {
+        _markTimedSpeech(elapsedMs, custom: true);
+        await audio.speak(audio.halfwayPhrase(), interrupt: true);
+        return;
+      }
+    }
+
+    // Legacy timing remains supported per existing workout configuration.
+    if (!step.countdown) return;
     if (_lastSpokenSecond == remainingSec) return;
+    if (_legacyTimingBlockedByCustomCue(elapsedMs)) return;
 
     final countdownFrom = workout.voice.countdownFrom.inSeconds;
     final interval = workout.voice.announceEvery.inSeconds;
@@ -282,6 +451,7 @@ class VoiceGuideController {
 
     if (workout.voice.announceFinalCountdown && inEnding) {
       _lastSpokenSecond = remainingSec;
+      _markTimedSpeech(elapsedMs, custom: false);
       await audio.speak('$remainingSec', interrupt: true);
       return;
     }
@@ -289,9 +459,10 @@ class VoiceGuideController {
     if (workout.voice.announceInterval &&
         remainingSec > 0 &&
         interval > 0 &&
-        remainingSec < engine.currentStep.duration.inSeconds &&
+        remainingSec < step.duration.inSeconds &&
         remainingSec % interval == 0) {
       _lastSpokenSecond = remainingSec;
+      _markTimedSpeech(elapsedMs, custom: false);
       await audio.speak(audio.remainingPhrase(remainingSec));
       return;
     }
@@ -300,6 +471,7 @@ class VoiceGuideController {
       final spokenElapsedKey = -elapsedSec;
       if (_lastSpokenSecond != spokenElapsedKey) {
         _lastSpokenSecond = spokenElapsedKey;
+        _markTimedSpeech(elapsedMs, custom: false);
         await audio.speak('$elapsedSec', interrupt: true);
       }
     }
