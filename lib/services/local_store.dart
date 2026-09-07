@@ -66,8 +66,40 @@ class LocalStore {
   Future<void> saveDraft(String value) async { final p = await SharedPreferences.getInstance(); await p.setString(_draft, value); }
   Future<String?> loadDraft() async { final p = await SharedPreferences.getInstance(); return p.getString(_draft); }
   Future<void> clearDraft() async { final p = await SharedPreferences.getInstance(); await p.remove(_draft); }
-  Future<bool> isOnboarded() async { final p = await SharedPreferences.getInstance(); return p.getBool(_onboarded) ?? false; }
-  Future<void> setOnboarded() async { final p = await SharedPreferences.getInstance(); await p.setBool(_onboarded, true); }
+  Future<bool> isOnboarded() async {
+    final p = await SharedPreferences.getInstance();
+    final explicit = p.getBool(_onboarded);
+    if (explicit != null) return explicit;
+
+    // The onboarding flag was added after early AnhPT alpha versions.
+    // Existing installations should not suddenly receive first-run onboarding
+    // merely because they upgraded to a version that introduces the tutorial.
+    final existingInstallKeys = <String>{
+      _workouts,
+      _draft,
+      _voice,
+      _coachRecordings,
+      _musicTracks,
+      _workoutMusic,
+      _bucketSources,
+      _installedBucketWorkouts,
+      _quickFilterTagOrder,
+      _quickFilterHiddenTags,
+      _seenWorkoutIds,
+    };
+    final hasExistingInstallData =
+        p.getKeys().any(existingInstallKeys.contains);
+    if (hasExistingInstallData) {
+      await p.setBool(_onboarded, true);
+      return true;
+    }
+    return false;
+  }
+
+  Future<void> setOnboarded() async {
+    final p = await SharedPreferences.getInstance();
+    await p.setBool(_onboarded, true);
+  }
   Future<String> defaultVoiceLanguage() async { final p = await SharedPreferences.getInstance(); return p.getString(_voice) ?? 'vi'; }
   Future<void> setDefaultVoiceLanguage(String value) async { final p = await SharedPreferences.getInstance(); await p.setString(_voice, value); }
 
