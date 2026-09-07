@@ -69,8 +69,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _finish({required bool launchDemo}) async {
     if (_finishing) return;
     setState(() => _finishing = true);
-    await widget.onComplete(launchDemo: launchDemo);
-    if (mounted) setState(() => _finishing = false);
+    await widget.onComplete(launchDemo: widget.replayMode ? false : launchDemo);
+    if (!mounted) return;
+    if (widget.replayMode) {
+      Navigator.pop(context, launchDemo);
+      return;
+    }
+    setState(() => _finishing = false);
   }
 
   void _next() {
