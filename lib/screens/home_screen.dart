@@ -48,7 +48,26 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadProfiles();
     _loadTagPreferences();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshWorkouts());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _openPendingDemoWorkout();
+      _refreshWorkouts();
+    });
+  }
+
+  Future<void> _openPendingDemoWorkout() async {
+    if (!mounted) return;
+    final demo = controller.takePendingDemoWorkout();
+    if (demo == null) return;
+    await _openWorkout(context, demo);
+  }
+
+  Future<void> _openDemoWorkout() async {
+    final demo = controller.workouts
+        .where((workout) => workout.tags.any((tag) => tag.toLowerCase() == 'demo'))
+        .cast<Workout?>()
+        .firstWhere((workout) => workout != null, orElse: () => null);
+    if (demo == null || !mounted) return;
+    await _openWorkout(context, demo);
   }
 
   Future<void> _refreshWorkouts() async {
@@ -467,12 +486,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           IconButton(
             tooltip: 'Settings',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => SettingsScreen(controller: controller),
-              ),
-            ),
+            onPressed: () async {
+              final launchDemo = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => SettingsScreen(controller: controller),
+                ),
+              );
+              if (launchDemo == true && mounted) {
+                await _openDemoWorkout();
+              }
+            },
             icon: const Icon(Icons.settings_outlined),
           ),
         ],
