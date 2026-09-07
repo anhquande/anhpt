@@ -10,6 +10,7 @@ void main() {
   const baseYaml = '''
 version: 2
 name: Coach cues
+start_countdown: 0s
 voice:
   language: en
   timing:
