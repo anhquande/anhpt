@@ -321,6 +321,7 @@ steps:
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
 
@@ -329,12 +330,19 @@ steps:
     );
     await tester.pump();
 
-    expect(find.text('Microphone access'), findsOneWidget);
     expect(find.text('Workout sources'), findsOneWidget);
-    expect(find.text('Replay AnhPT tutorial'), findsOneWidget);
+
+    final microphone = find.text('Microphone access');
+    await tester.ensureVisible(microphone);
+    await tester.pumpAndSettle();
+    expect(microphone, findsOneWidget);
     expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
     expect(find.text('Open settings'), findsOneWidget);
-    debugDefaultTargetPlatformOverride = null;
+
+    final tutorial = find.text('Replay AnhPT tutorial');
+    await tester.ensureVisible(tutorial);
+    await tester.pumpAndSettle();
+    expect(tutorial, findsOneWidget);
   });
 
   testWidgets('Home no longer exposes Browse Workouts', (tester) async {
