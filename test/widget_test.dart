@@ -332,17 +332,21 @@ steps:
 
     expect(find.text('Workout sources'), findsOneWidget);
 
-    final microphone = find.text('Microphone access');
-    await tester.ensureVisible(microphone);
-    await tester.pumpAndSettle();
-    expect(microphone, findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Microphone access'),
+      260,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Microphone access'), findsOneWidget);
     expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
     expect(find.text('Open settings'), findsOneWidget);
 
-    final tutorial = find.text('Replay AnhPT tutorial');
-    await tester.ensureVisible(tutorial);
-    await tester.pumpAndSettle();
-    expect(tutorial, findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Replay AnhPT tutorial'),
+      260,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Replay AnhPT tutorial'), findsOneWidget);
   });
 
   testWidgets('Home no longer exposes Browse Workouts', (tester) async {
