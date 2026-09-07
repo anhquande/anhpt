@@ -12,6 +12,12 @@ class StepDraft extends WorkoutDraftNode {
   String duration;
   String guide;
   bool countdown;
+  bool announceNext;
+  bool getReady;
+  bool cueCountdown;
+  bool halfway;
+  int remainingTimeSeconds;
+  bool completionCue;
   String recording;
   String exerciseId;
 
@@ -22,6 +28,12 @@ class StepDraft extends WorkoutDraftNode {
     this.duration = '30s',
     this.guide = '',
     this.countdown = true,
+    this.announceNext = false,
+    this.getReady = false,
+    this.cueCountdown = false,
+    this.halfway = false,
+    this.remainingTimeSeconds = 0,
+    this.completionCue = false,
     this.recording = '',
     this.exerciseId = '',
   });
@@ -34,6 +46,12 @@ class StepDraft extends WorkoutDraftNode {
     duration: duration,
     guide: guide,
     countdown: countdown,
+    announceNext: announceNext,
+    getReady: getReady,
+    cueCountdown: cueCountdown,
+    halfway: halfway,
+    remainingTimeSeconds: remainingTimeSeconds,
+    completionCue: completionCue,
     recording: '',
     exerciseId: exerciseId,
   );
@@ -167,6 +185,12 @@ class WorkoutDraft {
             : _duration(node.duration),
         guide: node.guide ?? '',
         countdown: node.countdown,
+        announceNext: node.voiceCues.announceNext,
+        getReady: node.voiceCues.getReady,
+        cueCountdown: node.voiceCues.startCountdown,
+        halfway: node.voiceCues.halfway,
+        remainingTimeSeconds: node.voiceCues.remainingTimeSeconds,
+        completionCue: node.voiceCues.completion,
         recording: node.recording ?? '',
         exerciseId: node.exerciseId ?? '',
       );
