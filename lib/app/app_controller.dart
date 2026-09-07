@@ -37,6 +37,7 @@ class AppController extends ChangeNotifier {
 
   bool loading = true;
   bool onboarded = false;
+  bool _launchDemoAfterOnboarding = false;
   String defaultVoiceLanguage = 'vi';
   List<Workout> workouts = [];
   Map<String, CoachRecording> coachRecordings = {};
@@ -554,10 +555,22 @@ class AppController extends ChangeNotifier {
     return null;
   }
 
-  Future<void> completeOnboarding() async {
+  Future<void> completeOnboarding({bool launchDemo = false}) async {
     onboarded = true;
+    _launchDemoAfterOnboarding = launchDemo;
     await store.setOnboarded();
     notifyListeners();
+  }
+
+  Workout? takePendingDemoWorkout() {
+    if (!_launchDemoAfterOnboarding) return null;
+    for (final workout in workouts) {
+      if (workout.tags.any((tag) => tag.toLowerCase() == 'demo')) {
+        _launchDemoAfterOnboarding = false;
+        return workout;
+      }
+    }
+    return null;
   }
 
   Workout? byId(String id) {
