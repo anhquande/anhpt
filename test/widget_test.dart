@@ -204,7 +204,7 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     expect(find.text('Original name: Original Sticky Workout'), findsOneWidget);
   });
 
-  testWidgets('app shows onboarding on first launch', (tester) async {
+  testWidgets('app shows product onboarding on first launch', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
       ..loading = false
@@ -214,7 +214,35 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
     await tester.pump();
 
     expect(find.text('AnhPT'), findsWidgets);
-    expect(find.text('Get Started'), findsOneWidget);
+    expect(find.text('WATCH'), findsOneWidget);
+    expect(find.text('Follow the demonstration'), findsOneWidget);
+    expect(find.text('Skip'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+  });
+
+  testWidgets('skipping onboarding persists completion', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore();
+    final controller = AppController(store)
+      ..loading = false
+      ..onboarded = false;
+
+    await tester.pumpWidget(AnhPtApp(controller: controller));
+    await tester.pump();
+    await tester.tap(find.text('Skip'));
+    await tester.pump();
+
+    expect(controller.onboarded, isTrue);
+    expect(await store.isOnboarded(), isTrue);
+    expect(find.text('Workouts'), findsOneWidget);
+  });
+
+  test('existing alpha install is migrated as already onboarded', () async {
+    SharedPreferences.setMockInitialValues({
+      'anhpt.defaultVoice': 'vi',
+    });
+
+    expect(await LocalStore().isOnboarded(), isTrue);
   });
 
   testWidgets('Home is compact and searches local workouts without accents', (
@@ -293,19 +321,35 @@ steps:
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    SharedPreferences.setMockInitialValues({});
-    final controller = AppController(LocalStore());
+    try {
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(LocalStore());
 
-    await tester.pumpWidget(
-      MaterialApp(home: SettingsScreen(controller: controller)),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        MaterialApp(home: SettingsScreen(controller: controller)),
+      );
+      await tester.pump();
 
-    expect(find.text('Microphone access'), findsOneWidget);
-    expect(find.text('Workout sources'), findsOneWidget);
-    expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
-    expect(find.text('Open settings'), findsOneWidget);
-    debugDefaultTargetPlatformOverride = null;
+      expect(find.text('Workout sources'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('Microphone access'),
+        260,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Microphone access'), findsOneWidget);
+      expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
+      expect(find.text('Open settings'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('Replay AnhPT tutorial'),
+        260,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Replay AnhPT tutorial'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('Home no longer exposes Browse Workouts', (tester) async {

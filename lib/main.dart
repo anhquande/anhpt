@@ -294,7 +294,7 @@ class AnhPtApp extends StatelessWidget {
               : controller.onboarded
                   ? HomeScreen(controller: controller)
                   : OnboardingScreen(
-                      onContinue: controller.completeOnboarding,
+                      onComplete: controller.completeOnboarding,
                     ),
         ),
       ),
