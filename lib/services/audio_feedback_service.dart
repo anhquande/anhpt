@@ -205,6 +205,19 @@ class AudioFeedbackService {
     return '$seconds seconds remaining';
   }
 
+  String nextPhrase(String stepName) =>
+      _language == 'vi' ? 'Tiếp theo: $stepName' : 'Next: $stepName';
+
+  String getReadyPhrase() => _language == 'vi' ? 'Chuẩn bị' : 'Get ready';
+
+  String startCountdownPhrase() =>
+      _language == 'vi' ? '3. 2. 1. Bắt đầu' : '3. 2. 1. Go';
+
+  String halfwayPhrase() =>
+      _language == 'vi' ? 'Đã được nửa chặng' : 'Halfway there';
+
+  String stepCompletePhrase() => _language == 'vi' ? 'Xong' : 'Done';
+
   String startPhrase(String workoutName) {
     if (_language == 'vi') return 'Bắt đầu $workoutName';
     return 'Starting $workoutName';
