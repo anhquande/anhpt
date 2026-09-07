@@ -23,6 +23,46 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate release version
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TITLE='${{ github.event.pull_request.title }}'
+          if [[ "$TITLE" != feat:* && "$TITLE" != fix:* ]]; then
+            echo "Non-release PR; version validation skipped."
+            exit 0
+          fi
+
+          PUBSPEC_VERSION=$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)
+          SOURCE_VERSION=${PUBSPEC_VERSION%%+*}
+          LATEST_TAG=$(git tag --list 'v[0-9]*' --sort=-v:refname | head -n 1 || true)
+
+          if [[ -z "$LATEST_TAG" ]]; then
+            echo "No previous release tag found; accepting pubspec version $SOURCE_VERSION."
+            exit 0
+          fi
+
+          BASE_VERSION=${LATEST_TAG#v}
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$BASE_VERSION"
+
+          if [[ "$TITLE" == feat:* ]]; then
+            EXPECTED_VERSION="$MAJOR.$((MINOR + 1)).0"
+          else
+            EXPECTED_VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          fi
+
+          if [[ "$SOURCE_VERSION" != "$EXPECTED_VERSION" ]]; then
+            echo "::error::pubspec.yaml version is $SOURCE_VERSION, but this PR title requires $EXPECTED_VERSION (latest release: $LATEST_TAG)."
+            echo "Update pubspec.yaml before merging so local builds, package metadata and GitHub releases stay in sync."
+            exit 1
+          fi
+
+          echo "Release version validated: $SOURCE_VERSION"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
