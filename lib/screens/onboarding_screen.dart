@@ -122,12 +122,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               fontWeight: FontWeight.w900,
                             ),
                       ),
-                      const Spacer(),
-                      Text(
-                        'Watch  ·  Listen  ·  Compare  ·  Train',
-                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                            ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text(
+                          'Watch · Listen · Compare · Train',
+                          textAlign: TextAlign.end,
+                          maxLines: 2,
+                          overflow: TextOverflow.fade,
+                          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                                color: scheme.onSurfaceVariant,
+                              ),
+                        ),
                       ),
                     ],
                   ),
