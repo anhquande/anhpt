@@ -40,7 +40,16 @@ steps:
         ),
       ),
     );
-    await tester.pump();
+
+    // WorkoutPlayerScreen initializes VoiceGuide asynchronously before it
+    // starts SessionEngine. Wait until the active step is actually visible,
+    // then advance the workout timer. This keeps the test independent from
+    // plugin initialization speed on CI.
+    for (var i = 0; i < 20 && find.text('Short step').evaluate().isEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(find.text('Short step'), findsWidgets);
+
     await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
