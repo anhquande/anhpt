@@ -24,7 +24,7 @@ voice:
   announce_finish: false
 steps:
   - name: Short step
-    duration: 1s
+    duration: 0s
 ''',
         id: 'completion-flow-test',
         defaultVoiceLanguage: 'en',
@@ -41,16 +41,15 @@ steps:
       ),
     );
 
-    // WorkoutPlayerScreen initializes VoiceGuide asynchronously before it
-    // starts SessionEngine. Wait until the active step is actually visible,
-    // then advance the workout timer. This keeps the test independent from
-    // plugin initialization speed on CI.
-    for (var i = 0; i < 20 && find.text('Short step').evaluate().isEmpty; i++) {
+    // SessionEngine measures timed steps with a real Stopwatch, which is not
+    // advanced by WidgetTester.pump. A zero-duration step is valid AnhPT YAML
+    // and lets this integration test verify the Player -> Summary transition
+    // without depending on wall-clock timing or plugin initialization speed.
+    for (var i = 0;
+        i < 30 && find.text('Workout complete 🎉').evaluate().isEmpty;
+        i++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
-    expect(find.text('Short step'), findsWidgets);
-
-    await tester.pump(const Duration(seconds: 2));
     await tester.pumpAndSettle();
 
     expect(find.text('Workout complete 🎉'), findsOneWidget);
