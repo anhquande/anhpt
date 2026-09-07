@@ -32,10 +32,10 @@ enum _VideoDisplayMode {
 extension on _VideoDisplayMode {
   String get label => switch (this) {
         _VideoDisplayMode.demonstrationOnly => 'Demonstration only',
-        _VideoDisplayMode.split => 'Split',
-        _VideoDisplayMode.pictureInPicture => 'Demo main / Camera PiP',
-        _VideoDisplayMode.cameraPictureInPicture => 'Camera main / Demo PiP',
-        _VideoDisplayMode.overlay => 'Overlay',
+        _VideoDisplayMode.split => 'Side by side',
+        _VideoDisplayMode.pictureInPicture => 'Demo main / You small',
+        _VideoDisplayMode.cameraPictureInPicture => 'You main / Demo small',
+        _VideoDisplayMode.overlay => 'Overlay comparison',
       };
 
   WorkoutCameraLayout? get cameraLayout => switch (this) {
@@ -544,7 +544,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     };
 
     return Semantics(
-      label: '${mode.label} layout preview',
+      label: 'Mirror Mode: ${mode.label} layout preview',
       child: SizedBox(width: width, height: height, child: preview),
     );
   }
@@ -678,11 +678,36 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             color: cs.surface.withValues(alpha: .68),
             shape: const CircleBorder(),
             child: PopupMenuButton<_VideoDisplayMode>(
-              tooltip: 'Video layout',
+              tooltip: 'Mirror Mode',
               initialValue: _displayMode,
               onSelected: _setVideoDisplayMode,
               icon: const Icon(Icons.grid_view_rounded),
               itemBuilder: (_) => [
+                PopupMenuItem<_VideoDisplayMode>(
+                  enabled: false,
+                  height: 64,
+                  child: SizedBox(
+                    width: 250,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text(
+                          'Mirror Mode',
+                          style: TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Compare your movement with the demonstration.',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const PopupMenuDivider(),
                 for (final mode in _VideoDisplayMode.values)
                   PopupMenuItem(
                     value: mode,
