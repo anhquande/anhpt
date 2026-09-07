@@ -48,8 +48,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       icon: Icons.compare_outlined,
       eyebrow: 'COMPARE',
       title: 'Check your form with Mirror Mode',
-      description:
-          'Place your camera beside the demonstration and compare your movement live.',
+      description: 'Compare your movement with the demonstration.',
     ),
     _OnboardingStep(
       icon: Icons.fitness_center_outlined,
