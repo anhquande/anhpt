@@ -62,10 +62,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _openDemoWorkout() async {
-    final demo = controller.workouts
-        .where((workout) => workout.tags.any((tag) => tag.toLowerCase() == 'demo'))
-        .cast<Workout?>()
-        .firstWhere((workout) => workout != null, orElse: () => null);
+    Workout? demo;
+    for (final workout in controller.workouts) {
+      if (workout.tags.any((tag) => tag.toLowerCase() == 'demo')) {
+        demo = workout;
+        break;
+      }
+    }
     if (demo == null || !mounted) return;
     await _openWorkout(context, demo);
   }
