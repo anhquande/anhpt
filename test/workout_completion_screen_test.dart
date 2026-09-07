@@ -59,6 +59,7 @@ void main() {
     expect(find.text('You trained 3 times this week.'), findsOneWidget);
     expect(find.text('View progress'), findsOneWidget);
 
+    await tester.ensureVisible(find.text('View progress'));
     await tester.tap(find.text('View progress'));
     expect(viewedProgress, isTrue);
   });
@@ -79,6 +80,7 @@ void main() {
       ),
     );
 
+    await tester.ensureVisible(find.text('Done'));
     await tester.tap(find.text('Done'));
     expect(done, isTrue);
   });
