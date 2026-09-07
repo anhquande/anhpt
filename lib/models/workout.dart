@@ -24,6 +24,51 @@ class Exercise {
   );
 }
 
+class StepVoiceCues {
+  final bool announceNext;
+  final bool getReady;
+  final bool startCountdown;
+  final bool halfway;
+  final int remainingTimeSeconds;
+  final bool completion;
+
+  const StepVoiceCues({
+    this.announceNext = false,
+    this.getReady = false,
+    this.startCountdown = false,
+    this.halfway = false,
+    this.remainingTimeSeconds = 0,
+    this.completion = false,
+  });
+
+  bool get hasPreStartCue => getReady || startCountdown;
+  bool get hasAny =>
+      announceNext ||
+      getReady ||
+      startCountdown ||
+      halfway ||
+      remainingTimeSeconds > 0 ||
+      completion;
+
+  Map<String, dynamic> toJson() => {
+    'announceNext': announceNext,
+    'getReady': getReady,
+    'startCountdown': startCountdown,
+    'halfway': halfway,
+    'remainingTimeSeconds': remainingTimeSeconds,
+    'completion': completion,
+  };
+
+  static StepVoiceCues fromJson(Map<String, dynamic> json) => StepVoiceCues(
+    announceNext: json['announceNext'] as bool? ?? false,
+    getReady: json['getReady'] as bool? ?? false,
+    startCountdown: json['startCountdown'] as bool? ?? false,
+    halfway: json['halfway'] as bool? ?? false,
+    remainingTimeSeconds: json['remainingTimeSeconds'] as int? ?? 0,
+    completion: json['completion'] as bool? ?? false,
+  );
+}
+
 class WorkoutStep extends WorkoutNode {
   final String id;
   final bool hasExplicitId;
@@ -31,6 +76,7 @@ class WorkoutStep extends WorkoutNode {
   final Duration duration;
   final String? guide;
   final bool countdown;
+  final StepVoiceCues voiceCues;
   final String? recording;
   final String? exerciseId;
 
@@ -41,6 +87,7 @@ class WorkoutStep extends WorkoutNode {
     required this.duration,
     this.guide,
     this.countdown = true,
+    this.voiceCues = const StepVoiceCues(),
     this.recording,
     this.exerciseId,
   });
@@ -54,6 +101,7 @@ class WorkoutStep extends WorkoutNode {
     'durationMs': duration.inMilliseconds,
     'guide': guide,
     'countdown': countdown,
+    'voiceCues': voiceCues.toJson(),
     'recording': recording,
     'exerciseId': exerciseId,
   };
@@ -65,6 +113,11 @@ class WorkoutStep extends WorkoutNode {
     duration: Duration(milliseconds: j['durationMs'] as int),
     guide: j['guide'] as String?,
     countdown: j['countdown'] as bool? ?? true,
+    voiceCues: j['voiceCues'] == null
+        ? const StepVoiceCues()
+        : StepVoiceCues.fromJson(
+            Map<String, dynamic>.from(j['voiceCues'] as Map),
+          ),
     recording: j['recording'] as String?,
     exerciseId: j['exerciseId'] as String?,
   );
