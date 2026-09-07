@@ -321,32 +321,35 @@ steps:
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    SharedPreferences.setMockInitialValues({});
-    final controller = AppController(LocalStore());
+    try {
+      SharedPreferences.setMockInitialValues({});
+      final controller = AppController(LocalStore());
 
-    await tester.pumpWidget(
-      MaterialApp(home: SettingsScreen(controller: controller)),
-    );
-    await tester.pump();
+      await tester.pumpWidget(
+        MaterialApp(home: SettingsScreen(controller: controller)),
+      );
+      await tester.pump();
 
-    expect(find.text('Workout sources'), findsOneWidget);
+      expect(find.text('Workout sources'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('Microphone access'),
-      260,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('Microphone access'), findsOneWidget);
-    expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
-    expect(find.text('Open settings'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Microphone access'),
+        260,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Microphone access'), findsOneWidget);
+      expect(find.textContaining('Windows Privacy settings'), findsOneWidget);
+      expect(find.text('Open settings'), findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.text('Replay AnhPT tutorial'),
-      260,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('Replay AnhPT tutorial'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('Replay AnhPT tutorial'),
+        260,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('Replay AnhPT tutorial'), findsOneWidget);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('Home no longer exposes Browse Workouts', (tester) async {
