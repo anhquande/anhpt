@@ -66,6 +66,23 @@ The upcoming item should contain:
 
 This preview visually teaches that more workout content exists below and supports swipe-up navigation.
 
+## Mirror Mode product language
+
+**Mirror Mode** is the user-facing name for comparing the live user camera with the exercise demonstration in the Workout Player.
+
+Use the benefit-oriented explanation:
+
+> Compare your movement with the demonstration.
+
+In the Workout Player:
+
+- keep the existing grid-style layout icon because it communicates that multiple arrangements are available;
+- label the control `Mirror Mode` rather than `Video layout`;
+- describe the live user view as `You` in layout choices rather than exposing the implementation term `Camera`;
+- keep technical wording such as `Camera`, camera permission, front/rear camera, and camera errors in Settings, permission prompts, diagnostics, and YAML/editor surfaces where the hardware concept is clearer.
+
+This keeps onboarding and the Workout Player aligned around `Watch → Listen → Compare → Train` without renaming technical camera configuration throughout the application.
+
 ## Camera lifecycle
 
 Camera is session-scoped, not step-scoped.
@@ -85,17 +102,17 @@ Preserve the source aspect ratio. Prefer a sensible preview container such as 4:
 
 Never stretch camera frames to arbitrary dimensions. Use fit/crop/letterbox behavior where necessary while preserving proportions.
 
-## Video display modes
+## Mirror Mode display modes
 
-Use one grid-style `Video layout` control for both camera enable/disable and layout selection. Do not expose a separate camera on/off button in the normal Player overlay.
+Use one grid-style `Mirror Mode` control for both camera enable/disable and layout selection. Do not expose a separate camera on/off button in the normal Player overlay.
 
-The popup contains visual thumbnails and these modes:
+The popup starts with the explanation `Compare your movement with the demonstration.` and contains visual thumbnails for these modes:
 
 1. `Demonstration only` — camera off.
-2. `Demo main / Camera PiP` — camera on.
-3. `Camera main / Demo PiP` — camera on.
-4. `Split` — camera on.
-5. `Overlay` — camera on.
+2. `Demo main / You small` — camera on.
+3. `You main / Demo small` — camera on.
+4. `Side by side` — camera on.
+5. `Overlay comparison` — camera on.
 
 Selecting `Demonstration only` stops/disables the camera for the session view. Selecting any camera-enabled mode automatically enables the camera if needed. If the camera is already running, changing between camera-enabled modes must reuse the same stream and must not restart the timer, TTS, or demonstration playback.
 
