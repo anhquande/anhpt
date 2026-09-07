@@ -7,6 +7,7 @@ import '../services/coach_recording_service.dart';
 import '../services/update_service.dart';
 import 'bucket_sources_screen.dart';
 import 'music_library_screen.dart';
+import 'onboarding_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   final AppController controller;
@@ -142,6 +143,28 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ],
                     );
+                  },
+                ),
+                const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.school_outlined),
+                  title: const Text('Replay AnhPT tutorial'),
+                  subtitle: const Text('Watch · Listen · Compare · Train'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () async {
+                    final launchDemo = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => OnboardingScreen(
+                          replayMode: true,
+                          onComplete: ({bool launchDemo = false}) =>
+                              controller.completeOnboarding(),
+                        ),
+                      ),
+                    );
+                    if (launchDemo == true && context.mounted) {
+                      Navigator.pop(context, true);
+                    }
                   },
                 ),
                 const Divider(),
