@@ -28,6 +28,8 @@ Metrics must only be shown when backed by persisted or computed data.
 
 The completion screen must not invent calorie estimates or weekly workout counts just to fill space.
 
+The current implementation intentionally supplies none of these optional metrics because AnhPT does not yet persist workout-session calorie or weekly-training history.
+
 ## Incomplete workouts
 
 Ending a workout early remains a separate incomplete state. It does not use celebratory completion wording.
