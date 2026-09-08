@@ -30,7 +30,7 @@ class WorkoutSessionHistory {
       startedAt: end.subtract(activeDuration),
       endedAt: end,
       activeDuration: activeDuration,
-      completedSteps: completedSteps.clamp(0, totalSteps),
+      completedSteps: completedSteps.clamp(0, totalSteps).toInt(),
       totalSteps: totalSteps,
       status: status,
     );
