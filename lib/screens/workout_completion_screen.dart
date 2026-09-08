@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../models/workout_session.dart';
 import '../services/health_store.dart';
 import '../services/local_store.dart';
+import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
 import '../widgets/common.dart';
 import '../widgets/weekly_workout_feedback.dart';
