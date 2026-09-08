@@ -1,4 +1,7 @@
+import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/models/workout_session.dart';
+import 'package:anhpt/screens/home_screen.dart';
+import 'package:anhpt/services/health_store.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/services/workout_session_history.dart';
 import 'package:anhpt/widgets/home_weekly_workout_feedback.dart';
@@ -98,4 +101,40 @@ void main() {
 
     expect(find.text('1 workout • 7 min'), findsOneWidget);
   });
+
+  testWidgets('Home mounts weekly feedback for the active local profile',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = LocalStore();
+    final activeProfile = await HealthStore().activeLocalProfile();
+    await store.saveWorkoutSessions([
+      _session(
+        id: 'home',
+        profileId: activeProfile.id,
+        duration: const Duration(minutes: 12),
+        endedAt: DateTime.now(),
+      ),
+    ]);
+    final controller = _HomeController(store);
+
+    await tester.pumpWidget(
+      MaterialApp(home: HomeScreen(controller: controller)),
+    );
+    for (var attempt = 0;
+        attempt < 20 && find.text('This week').evaluate().isEmpty;
+        attempt++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('1 workout • 12 min'), findsOneWidget);
+    expect(find.text('Search workouts'), findsOneWidget);
+  });
+}
+
+class _HomeController extends AppController {
+  _HomeController(LocalStore store) : super(store);
+
+  @override
+  Future<void> refreshAllBucketSources() async {}
 }
