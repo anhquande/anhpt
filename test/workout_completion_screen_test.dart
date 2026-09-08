@@ -19,6 +19,7 @@ void main() {
           completedSteps: 6,
           totalSteps: 6,
           progress: 1,
+          persistSession: false,
         ),
       ),
     );
@@ -50,6 +51,7 @@ void main() {
           estimatedCalories: 85,
           progressContext: 'You trained 3 times this week.',
           onViewProgress: () => viewedProgress = true,
+          persistSession: false,
         ),
       ),
     );
@@ -76,6 +78,7 @@ void main() {
           totalSteps: 3,
           progress: 1,
           onDone: () => done = true,
+          persistSession: false,
         ),
       ),
     );
