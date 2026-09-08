@@ -46,6 +46,8 @@ When a profile id is supplied, only that profile's sessions are included. Withou
 
 ## UI surfaces
 
+Both UI surfaces consume the same persisted weekly summary; neither keeps a separate counter.
+
 ### Workout Completed
 
 After persistence finishes, a lightweight `This week` card shows the updated count and active minutes, for example:
