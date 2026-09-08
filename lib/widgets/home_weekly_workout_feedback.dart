@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../screens/workout_history_screen.dart';
 import '../services/local_store.dart';
 import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
@@ -31,7 +32,18 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
             // second progress indicator for this tiny local-data read.
             return const SizedBox.shrink();
           }
-          return WeeklyWorkoutFeedbackCard(summary: snapshot.data!);
+          return WeeklyWorkoutFeedbackCard(
+            summary: snapshot.data!,
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => WorkoutHistoryScreen(
+                  store: store,
+                  profileId: profileId,
+                ),
+              ),
+            ),
+          );
         },
       ),
     );

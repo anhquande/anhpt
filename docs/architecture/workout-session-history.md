@@ -4,7 +4,7 @@
 
 AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week.
 
-Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries.
 
 ## Stored session
 
@@ -46,7 +46,7 @@ When a profile id is supplied, only that profile's sessions are included. Withou
 
 ## UI surfaces
 
-Both UI surfaces consume the same persisted weekly summary; neither keeps a separate counter.
+All UI surfaces consume the same persisted history; none keeps a separate session counter.
 
 ### Workout Completed
 
@@ -66,16 +66,32 @@ Home shows the same `This week` card above workout search for the active local p
 
 The local history read does not add another loading spinner to Home. While the small local read is pending, the weekly card simply stays hidden.
 
+The Home weekly card is navigable and opens Workout History for the same active profile.
+
+### Workout History
+
+Workout History is a read-only session browser in the first version.
+
+- sessions are filtered to the selected local profile;
+- sessions are sorted by `endedAt`, newest first;
+- sessions are grouped by local calendar day;
+- each row shows workout name, local completion time, active duration, and completed/total steps;
+- incomplete sessions remain visible but are labeled neutrally and are still excluded from weekly completed-workout totals;
+- the screen listens to the same lightweight history revision signal, so newly persisted sessions can appear without restarting the app.
+
+The first version intentionally does not provide edit or delete actions. Those actions would need explicit product rules for history integrity and analytics recalculation.
+
 For zero activity, wording stays neutral and instructional. No streaks, badges, penalties, or pressure language are introduced.
 
 ## Future extensions
 
 The session model can support later additions without inferring data from `lastUsedAt`:
 
-- workout history screen;
+- session detail view;
 - calorie estimates backed by real profile/session inputs;
 - monthly and yearly activity analytics;
 - Health/progress integration;
-- explicit incomplete-session history if the product needs it.
+- explicit incomplete-session recording earlier in the player lifecycle;
+- history edit/delete rules if the product needs them.
 
 If history grows beyond the scale appropriate for `SharedPreferences`, persistence can migrate to a local database while keeping `WorkoutSession` as the domain model.
