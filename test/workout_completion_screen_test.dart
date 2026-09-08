@@ -1,6 +1,8 @@
 import 'package:anhpt/screens/workout_completion_screen.dart';
+import 'package:anhpt/services/local_store.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   testWidgets('completion summary fits a small phone and hides unavailable data',
@@ -19,6 +21,7 @@ void main() {
           completedSteps: 6,
           totalSteps: 6,
           progress: 1,
+          persistSession: false,
         ),
       ),
     );
@@ -50,6 +53,7 @@ void main() {
           estimatedCalories: 85,
           progressContext: 'You trained 3 times this week.',
           onViewProgress: () => viewedProgress = true,
+          persistSession: false,
         ),
       ),
     );
@@ -76,6 +80,7 @@ void main() {
           totalSteps: 3,
           progress: 1,
           onDone: () => done = true,
+          persistSession: false,
         ),
       ),
     );
@@ -83,5 +88,32 @@ void main() {
     await tester.ensureVisible(find.text('Done'));
     await tester.tap(find.text('Done'));
     expect(done, isTrue);
+  });
+
+  testWidgets('completed workout persists and appears in weekly feedback',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: WorkoutCompletionScreen(
+          workoutName: 'Weekly Demo',
+          activeTime: Duration(minutes: 7),
+          completedSteps: 4,
+          totalSteps: 4,
+          progress: 1,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('1 workout • 7 min'), findsOneWidget);
+
+    final sessions = await LocalStore().loadWorkoutSessions();
+    expect(sessions, hasLength(1));
+    expect(sessions.single.workoutName, 'Weekly Demo');
+    expect(sessions.single.completed, isTrue);
+    expect(sessions.single.activeDuration, const Duration(minutes: 7));
   });
 }
