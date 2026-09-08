@@ -30,8 +30,14 @@ WorkoutSession _session({
       status: status,
     );
 
+Future<void> _useTallHistorySurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(900, 1400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
 void main() {
   testWidgets('history is scoped to the selected local profile', (tester) async {
+    await _useTallHistorySurface(tester);
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     final now = DateTime.now();
@@ -63,6 +69,7 @@ void main() {
 
   testWidgets('history sorts newest first, groups by day, and marks incomplete',
       (tester) async {
+    await _useTallHistorySurface(tester);
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     final now = DateTime.now();
@@ -131,6 +138,7 @@ void main() {
   });
 
   testWidgets('Home weekly feedback opens workout history', (tester) async {
+    await _useTallHistorySurface(tester);
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     await store.saveWorkoutSessions([

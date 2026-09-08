@@ -68,4 +68,14 @@ class WorkoutSessionHistory {
         now: now,
         profileId: profileId,
       );
+
+  Future<YearlyWorkoutSummary> yearlySummary({
+    DateTime? now,
+    String? profileId,
+  }) async =>
+      WorkoutSessionAnalytics.yearlySummary(
+        await load(),
+        now: now,
+        profileId: profileId,
+      );
 }
