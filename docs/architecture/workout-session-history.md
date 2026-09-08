@@ -2,9 +2,9 @@
 
 ## Purpose
 
-AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week or month.
+AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week, month, or year.
 
-Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries. Issue #79 adds monthly progress to that same History surface.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries. Issue #79 adds monthly progress to that same History surface. Issue #83 extends the same analytics layer with yearly totals and month-by-month context.
 
 ## Stored session
 
@@ -56,6 +56,19 @@ Monthly progress uses the same rules as weekly feedback:
 
 The comparison is informational only. AnhPT does not infer targets, streaks, success/failure, or motivational pressure from month-over-month changes.
 
+## Yearly calculation
+
+A year uses local calendar boundaries from January 1 at 00:00 through January 1 of the next year.
+
+Yearly progress is calculated from the same persisted sessions and the same profile filter:
+
+- completed workout count and total active duration for the current year;
+- previous-year count and duration only when previous-year activity exists;
+- twelve current-year monthly buckets containing completed workout count and active duration;
+- incomplete sessions are excluded from yearly totals and monthly buckets.
+
+The month-by-month breakdown is factual context only. Zero-activity months are shown neutrally and do not imply failure or a missed target.
+
 When a profile id is supplied, only that profile's sessions are included. Without a profile filter, analytics can aggregate all local sessions.
 
 ## UI surfaces
@@ -87,13 +100,13 @@ The Home weekly card is navigable and opens Workout History for the same active 
 Workout History is a read-only session browser in the first version.
 
 - a monthly progress card appears above session groups;
-- the monthly card shows current-month workouts and active duration;
-- previous-month context appears only when previous-month activity exists;
+- a yearly overview card appears below monthly progress;
+- the yearly card shows current-year totals, optional previous-year context, and twelve compact monthly buckets;
 - sessions are filtered to the selected local profile;
 - sessions are sorted by `endedAt`, newest first;
 - sessions are grouped by local calendar day;
 - each row shows workout name, local completion time, active duration, and completed/total steps;
-- incomplete sessions remain visible but are labeled neutrally and are excluded from weekly/monthly completed-workout totals;
+- incomplete sessions remain visible but are labeled neutrally and are excluded from weekly/monthly/yearly completed-workout totals;
 - the screen listens to the same lightweight history revision signal, so newly persisted sessions can appear without restarting the app.
 
 The first version intentionally does not provide edit or delete actions. Those actions would need explicit product rules for history integrity and analytics recalculation.
@@ -106,9 +119,9 @@ The session model can support later additions without inferring data from `lastU
 
 - session detail view;
 - calorie estimates backed by real profile/session inputs;
-- yearly activity analytics;
 - Health/progress integration;
 - explicit incomplete-session recording earlier in the player lifecycle;
-- history edit/delete rules if the product needs them.
+- history edit/delete rules if the product needs them;
+- richer charts if real user feedback shows the compact summaries are insufficient.
 
 If history grows beyond the scale appropriate for `SharedPreferences`, persistence can migrate to a local database while keeping `WorkoutSession` as the domain model.
