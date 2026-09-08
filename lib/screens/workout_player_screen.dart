@@ -18,6 +18,7 @@ import '../services/voice_guide_controller.dart';
 import '../widgets/common.dart';
 import '../widgets/demonstration_media.dart';
 import '../widgets/workout_camera_comparison.dart';
+import 'workout_completion_screen.dart';
 
 enum CompletionDeviceAction { shutdownWindows, exitAndroid }
 
@@ -372,11 +373,30 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
         return;
       }
     }
+
+    if (complete) {
+      final totalSteps = engine.workout.expand().length;
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => WorkoutCompletionScreen(
+            workoutName: engine.workout.name,
+            profileName: widget.profileName,
+            activeTime: engine.activeElapsed,
+            completedSteps: totalSteps,
+            totalSteps: totalSteps,
+            progress: engine.progress,
+          ),
+        ),
+      );
+      return;
+    }
+
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Text(complete ? 'Workout Complete 🎉' : 'Workout Incomplete'),
+        title: const Text('Workout Incomplete'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,12 +409,6 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             const SizedBox(height: 10),
             Text('Active time: ${formatDuration(engine.activeElapsed)}'),
             Text('Progress: ${(engine.progress * 100).round()}%'),
-            const SizedBox(height: 8),
-            Text(
-              audioReady
-                  ? 'Voice guide: ${engine.workout.voice.language.toUpperCase()}'
-                  : 'Voice guide unavailable on this device.',
-            ),
           ],
         ),
         actions: [
@@ -403,7 +417,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
               Navigator.pop(context);
               Navigator.of(context).popUntil((r) => r.isFirst);
             },
-            child: const Text('OK'),
+            child: const Text('Done'),
           ),
         ],
       ),
