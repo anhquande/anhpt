@@ -48,7 +48,7 @@ class WorkoutHistoryScreen extends StatelessWidget {
 
             if (sessions.isEmpty) {
               return _HistoryMessage(
-                icon: Icons.history_toggle_off_outlined,
+                icon: Icons.history_toggle_off,
                 title: 'No workout history yet',
                 message: profileName == null || profileName!.trim().isEmpty
                     ? 'Workout sessions for this profile will appear here.'
