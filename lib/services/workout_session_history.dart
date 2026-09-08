@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/workout_session.dart';
 import 'local_store.dart';
 import 'workout_session_analytics.dart';
@@ -6,6 +8,12 @@ class WorkoutSessionHistory {
   final LocalStore store;
 
   const WorkoutSessionHistory(this.store);
+
+  /// Lightweight local change signal used by read-only progress surfaces.
+  ///
+  /// Session persistence remains the source of truth. The revision only tells
+  /// widgets that they should reload that persisted data.
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   Future<List<WorkoutSession>> load() => store.loadWorkoutSessions();
 
@@ -37,6 +45,7 @@ class WorkoutSessionHistory {
     final sessions = await load();
     sessions.insert(0, session);
     await store.saveWorkoutSessions(sessions);
+    revision.value++;
     return session;
   }
 

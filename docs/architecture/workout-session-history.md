@@ -4,7 +4,7 @@
 
 AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week.
 
-Issue #68 introduces a small local session history as the source of truth for weekly activity feedback.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed.
 
 ## Stored session
 
@@ -44,9 +44,13 @@ Incomplete sessions are deliberately excluded from weekly totals.
 
 When a profile id is supplied, only that profile's sessions are included. Without a profile filter, analytics can aggregate all local sessions.
 
-## UX
+## UI surfaces
 
-The first UI surface is Workout Completed. After persistence finishes, a lightweight `This week` card shows the updated count and active minutes, for example:
+Both UI surfaces consume the same persisted weekly summary; neither keeps a separate counter.
+
+### Workout Completed
+
+After persistence finishes, a lightweight `This week` card shows the updated count and active minutes, for example:
 
 > 3 workouts • 47 min
 
@@ -54,13 +58,20 @@ If the previous week has activity, the card can also show factual context such a
 
 > Last week: 2 workouts • 31 min
 
+### Home
+
+Home shows the same `This week` card above workout search for the active local profile. It reads from `WorkoutSessionHistory`; it does not derive activity from workout cards or `lastUsedAt`.
+
+`WorkoutSessionHistory.revision` is a lightweight change signal only. Persisted session data remains the source of truth. After `record()` saves a session, the revision changes and Home reloads its weekly summary immediately. Changing the active profile rebuilds the Home card with that profile id.
+
+The local history read does not add another loading spinner to Home. While the small local read is pending, the weekly card simply stays hidden.
+
 For zero activity, wording stays neutral and instructional. No streaks, badges, penalties, or pressure language are introduced.
 
 ## Future extensions
 
-The session model is intended to support later additions without inferring data from `lastUsedAt`:
+The session model can support later additions without inferring data from `lastUsedAt`:
 
-- Home/dashboard weekly summary;
 - workout history screen;
 - calorie estimates backed by real profile/session inputs;
 - monthly and yearly activity analytics;
