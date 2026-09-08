@@ -8,6 +8,7 @@ import '../models/workout.dart';
 import '../models/workout_bucket.dart';
 import '../services/health_store.dart';
 import '../services/workout_update_service.dart';
+import '../widgets/home_weekly_workout_feedback.dart';
 import '../widgets/profile_avatar.dart';
 import '../widgets/workout_widgets.dart';
 import 'bucket_sources_screen.dart';
@@ -538,6 +539,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                   children: [
+                    if (_activeProfile != null) ...[
+                      HomeWeeklyWorkoutFeedback(
+                        store: controller.store,
+                        profileId: _activeProfile!.id,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     Row(
                       children: [
                         Expanded(
