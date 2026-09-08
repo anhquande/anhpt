@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 
 import '../models/workout_session.dart';
 import '../services/local_store.dart';
+import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
+import '../widgets/monthly_workout_progress.dart';
 
 class WorkoutHistoryScreen extends StatelessWidget {
   final LocalStore store;
@@ -56,6 +58,10 @@ class WorkoutHistoryScreen extends StatelessWidget {
               );
             }
 
+            final monthlySummary = WorkoutSessionAnalytics.monthlySummary(
+              sessions,
+              profileId: profileId,
+            );
             final groups = _groupByDay(sessions);
             return Center(
               child: ConstrainedBox(
@@ -75,6 +81,8 @@ class WorkoutHistoryScreen extends StatelessWidget {
                               ),
                         ),
                       ),
+                    MonthlyWorkoutProgressCard(summary: monthlySummary),
+                    const SizedBox(height: 20),
                     for (final entry in groups.entries) ...[
                       _DayHeading(day: entry.key),
                       const SizedBox(height: 8),
