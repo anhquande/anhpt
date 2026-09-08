@@ -1,10 +1,10 @@
-# Workout Session History and Weekly Feedback
+# Workout Session History and Progress Feedback
 
 ## Purpose
 
-AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week.
+AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week or month.
 
-Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries. Issue #79 adds monthly progress to that same History surface.
 
 ## Stored session
 
@@ -42,6 +42,20 @@ Weekly feedback counts only sessions whose status is `completed`:
 
 Incomplete sessions are deliberately excluded from weekly totals.
 
+## Monthly calculation
+
+A month uses local calendar boundaries: day 1 at 00:00 through the first day of the next month at 00:00.
+
+Monthly progress uses the same rules as weekly feedback:
+
+- completed workout count;
+- sum of active workout duration;
+- previous-month count and duration when available;
+- incomplete sessions are excluded;
+- profile filtering is applied before totals are presented.
+
+The comparison is informational only. AnhPT does not infer targets, streaks, success/failure, or motivational pressure from month-over-month changes.
+
 When a profile id is supplied, only that profile's sessions are included. Without a profile filter, analytics can aggregate all local sessions.
 
 ## UI surfaces
@@ -72,11 +86,14 @@ The Home weekly card is navigable and opens Workout History for the same active 
 
 Workout History is a read-only session browser in the first version.
 
+- a monthly progress card appears above session groups;
+- the monthly card shows current-month workouts and active duration;
+- previous-month context appears only when previous-month activity exists;
 - sessions are filtered to the selected local profile;
 - sessions are sorted by `endedAt`, newest first;
 - sessions are grouped by local calendar day;
 - each row shows workout name, local completion time, active duration, and completed/total steps;
-- incomplete sessions remain visible but are labeled neutrally and are still excluded from weekly completed-workout totals;
+- incomplete sessions remain visible but are labeled neutrally and are excluded from weekly/monthly completed-workout totals;
 - the screen listens to the same lightweight history revision signal, so newly persisted sessions can appear without restarting the app.
 
 The first version intentionally does not provide edit or delete actions. Those actions would need explicit product rules for history integrity and analytics recalculation.
@@ -89,7 +106,7 @@ The session model can support later additions without inferring data from `lastU
 
 - session detail view;
 - calorie estimates backed by real profile/session inputs;
-- monthly and yearly activity analytics;
+- yearly activity analytics;
 - Health/progress integration;
 - explicit incomplete-session recording earlier in the player lifecycle;
 - history edit/delete rules if the product needs them.
