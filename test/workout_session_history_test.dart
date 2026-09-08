@@ -115,6 +115,73 @@ void main() {
     expect(all.activeDuration, const Duration(minutes: 35));
   });
 
+  test('monthly summary uses local month boundary and previous month context', () {
+    final summary = WorkoutSessionAnalytics.monthlySummary(
+      [
+        session(
+          id: 'month-start',
+          endedAt: DateTime(2026, 9, 1),
+          duration: const Duration(minutes: 10),
+        ),
+        session(
+          id: 'current',
+          endedAt: DateTime(2026, 9, 8, 20),
+          duration: const Duration(minutes: 20),
+        ),
+        session(
+          id: 'incomplete',
+          endedAt: DateTime(2026, 9, 8, 21),
+          duration: const Duration(minutes: 8),
+          status: WorkoutSessionStatus.incomplete,
+        ),
+        session(
+          id: 'previous-last-day',
+          endedAt: DateTime(2026, 8, 31, 23, 59),
+          duration: const Duration(minutes: 15),
+        ),
+        session(
+          id: 'older',
+          endedAt: DateTime(2026, 7, 31, 23, 59),
+          duration: const Duration(minutes: 30),
+        ),
+      ],
+      now: DateTime(2026, 9, 8, 22),
+      profileId: 'me',
+    );
+
+    expect(summary.monthStart, DateTime(2026, 9));
+    expect(summary.completedWorkouts, 2);
+    expect(summary.activeDuration, const Duration(minutes: 30));
+    expect(summary.previousCompletedWorkouts, 1);
+    expect(summary.previousActiveDuration, const Duration(minutes: 15));
+  });
+
+  test('monthly summary keeps profiles separate', () {
+    final sessions = [
+      session(
+        id: 'me',
+        endedAt: DateTime(2026, 9, 8),
+        duration: const Duration(minutes: 10),
+        profileId: 'me',
+      ),
+      session(
+        id: 'other',
+        endedAt: DateTime(2026, 9, 9),
+        duration: const Duration(minutes: 25),
+        profileId: 'other',
+      ),
+    ];
+
+    final me = WorkoutSessionAnalytics.monthlySummary(
+      sessions,
+      now: DateTime(2026, 9, 10),
+      profileId: 'me',
+    );
+
+    expect(me.completedWorkouts, 1);
+    expect(me.activeDuration, const Duration(minutes: 10));
+  });
+
   test('history record immediately contributes to current weekly feedback', () async {
     SharedPreferences.setMockInitialValues({});
     final history = WorkoutSessionHistory(LocalStore());
@@ -132,12 +199,18 @@ void main() {
       endedAt: endedAt,
     );
 
-    final summary = await history.weeklySummary(
+    final weekly = await history.weeklySummary(
+      now: endedAt,
+      profileId: 'me',
+    );
+    final monthly = await history.monthlySummary(
       now: endedAt,
       profileId: 'me',
     );
 
-    expect(summary.completedWorkouts, 1);
-    expect(summary.activeDuration, const Duration(minutes: 7));
+    expect(weekly.completedWorkouts, 1);
+    expect(weekly.activeDuration, const Duration(minutes: 7));
+    expect(monthly.completedWorkouts, 1);
+    expect(monthly.activeDuration, const Duration(minutes: 7));
   });
 }
