@@ -1,6 +1,6 @@
-# AnhPT 0.8.2
+# AnhPT 0.25.0
 
-AnhPT is a Flutter voice-guided personal workout trainer with structured YAML workouts, local coach recordings, background music, demonstration media, downloadable workout buckets, local health profiles, and automated Android releases.
+AnhPT is a Flutter voice-guided personal workout trainer with structured YAML workouts, local coach recordings, background music, demonstration media, downloadable workout buckets, local health profiles, and automated Android and Windows releases.
 
 ## Voice behavior
 
