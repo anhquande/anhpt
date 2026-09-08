@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../models/workout_session.dart';
+import '../services/health_store.dart';
+import '../services/local_store.dart';
+import '../services/workout_session_history.dart';
 import '../widgets/common.dart';
+import '../widgets/weekly_workout_feedback.dart';
 
-class WorkoutCompletionScreen extends StatelessWidget {
+class WorkoutCompletionScreen extends StatefulWidget {
   final String workoutName;
   final String? profileName;
   final Duration activeTime;
@@ -13,6 +20,7 @@ class WorkoutCompletionScreen extends StatelessWidget {
   final String? progressContext;
   final VoidCallback? onViewProgress;
   final VoidCallback? onDone;
+  final bool persistSession;
 
   const WorkoutCompletionScreen({
     super.key,
@@ -26,21 +34,91 @@ class WorkoutCompletionScreen extends StatelessWidget {
     this.progressContext,
     this.onViewProgress,
     this.onDone,
+    this.persistSession = true,
   });
+
+  @override
+  State<WorkoutCompletionScreen> createState() => _WorkoutCompletionScreenState();
+}
+
+class _WorkoutCompletionScreenState extends State<WorkoutCompletionScreen> {
+  WeeklyWorkoutSummary? _weeklySummary;
+  String? _resolvedProfileName;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolvedProfileName = widget.profileName;
+    if (widget.persistSession) {
+      unawaited(_persistSessionAndLoadFeedback());
+    }
+  }
+
+  Future<void> _persistSessionAndLoadFeedback() async {
+    try {
+      final store = LocalStore();
+      final history = WorkoutSessionHistory(store);
+
+      String? profileId;
+      var profileName = widget.profileName;
+      try {
+        final profile = await HealthStore().activeLocalProfile();
+        profileId = profile.id;
+        profileName ??= profile.name;
+      } catch (_) {
+        // Workout history must still work if profile storage is unavailable.
+      }
+
+      var workoutId = 'snapshot:${widget.workoutName}';
+      try {
+        final workouts = await store.loadWorkouts();
+        for (final workout in workouts) {
+          if (workout.name == widget.workoutName) {
+            workoutId = workout.id;
+            break;
+          }
+        }
+      } catch (_) {
+        // The name snapshot is enough for weekly activity accounting.
+      }
+
+      await history.record(
+        workoutId: workoutId,
+        workoutName: widget.workoutName,
+        profileId: profileId,
+        profileName: profileName,
+        activeDuration: widget.activeTime,
+        completedSteps: widget.completedSteps,
+        totalSteps: widget.totalSteps,
+        status: WorkoutSessionStatus.completed,
+      );
+
+      final summary = await history.weeklySummary(profileId: profileId);
+      if (!mounted) return;
+      setState(() {
+        _weeklySummary = summary;
+        _resolvedProfileName = profileName;
+      });
+    } catch (error) {
+      // Session persistence is useful feedback, but it must never make a
+      // successfully completed workout look like a failure.
+      debugPrint('Could not persist workout session: $error');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final percent = (progress.clamp(0.0, 1.0) * 100).round();
+    final percent = (widget.progress.clamp(0.0, 1.0) * 100).round();
     final metrics = <_SummaryMetric>[
       _SummaryMetric(
         icon: Icons.timer_outlined,
-        value: formatDuration(activeTime),
+        value: formatDuration(widget.activeTime),
         label: 'Active time',
       ),
       _SummaryMetric(
         icon: Icons.checklist_rounded,
-        value: '$completedSteps / $totalSteps',
+        value: '${widget.completedSteps} / ${widget.totalSteps}',
         label: 'Steps completed',
       ),
       _SummaryMetric(
@@ -48,10 +126,10 @@ class WorkoutCompletionScreen extends StatelessWidget {
         value: '$percent%',
         label: 'Workout progress',
       ),
-      if (estimatedCalories != null && estimatedCalories! > 0)
+      if (widget.estimatedCalories != null && widget.estimatedCalories! > 0)
         _SummaryMetric(
           icon: Icons.local_fire_department_outlined,
-          value: '~$estimatedCalories kcal',
+          value: '~${widget.estimatedCalories} kcal',
           label: 'Estimated calories',
         ),
     ];
@@ -97,17 +175,18 @@ class WorkoutCompletionScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        workoutName,
+                        widget.workoutName,
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: scheme.onSurfaceVariant,
                               fontWeight: FontWeight.w700,
                             ),
                       ),
-                      if (profileName != null && profileName!.trim().isNotEmpty) ...[
+                      if (_resolvedProfileName != null &&
+                          _resolvedProfileName!.trim().isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
-                          profileName!,
+                          _resolvedProfileName!,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: scheme.onSurfaceVariant,
@@ -136,16 +215,20 @@ class WorkoutCompletionScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 24),
                       Text(
-                        completedSteps >= totalSteps
+                        widget.completedSteps >= widget.totalSteps
                             ? 'You finished every planned step. Nice work.'
-                            : 'You completed $completedSteps of $totalSteps planned steps.',
+                            : 'You completed ${widget.completedSteps} of ${widget.totalSteps} planned steps.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: scheme.onSurfaceVariant,
                             ),
                       ),
-                      if (progressContext != null &&
-                          progressContext!.trim().isNotEmpty) ...[
+                      if (_weeklySummary != null) ...[
+                        const SizedBox(height: 16),
+                        WeeklyWorkoutFeedbackCard(summary: _weeklySummary!),
+                      ],
+                      if (widget.progressContext != null &&
+                          widget.progressContext!.trim().isNotEmpty) ...[
                         const SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(16),
@@ -154,7 +237,7 @@ class WorkoutCompletionScreen extends StatelessWidget {
                             borderRadius: BorderRadius.circular(16),
                           ),
                           child: Text(
-                            progressContext!,
+                            widget.progressContext!,
                             textAlign: TextAlign.center,
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
@@ -162,14 +245,14 @@ class WorkoutCompletionScreen extends StatelessWidget {
                       ],
                       const SizedBox(height: 28),
                       FilledButton(
-                        onPressed: onDone ??
+                        onPressed: widget.onDone ??
                             () => Navigator.of(context).popUntil((route) => route.isFirst),
                         child: const Text('Done'),
                       ),
-                      if (onViewProgress != null) ...[
+                      if (widget.onViewProgress != null) ...[
                         const SizedBox(height: 8),
                         TextButton(
-                          onPressed: onViewProgress,
+                          onPressed: widget.onViewProgress,
                           child: const Text('View progress'),
                         ),
                       ],
