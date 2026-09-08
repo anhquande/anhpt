@@ -18,10 +18,12 @@ String weeklyCompletionContext(WeeklyWorkoutSummary summary) {
 
 class WeeklyWorkoutFeedbackCard extends StatelessWidget {
   final WeeklyWorkoutSummary summary;
+  final VoidCallback? onTap;
 
   const WeeklyWorkoutFeedbackCard({
     super.key,
     required this.summary,
+    this.onTap,
   });
 
   @override
@@ -29,69 +31,88 @@ class WeeklyWorkoutFeedbackCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final count = summary.completedWorkouts;
     final countLabel = count == 1 ? '1 workout' : '$count workouts';
+    final borderRadius = BorderRadius.circular(18);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(
-              Icons.calendar_view_week_outlined,
-              color: scheme.onPrimaryContainer,
-            ),
+    return Semantics(
+      button: onTap != null,
+      label: onTap == null ? null : 'This week. Open workout history.',
+      child: InkWell(
+        borderRadius: borderRadius,
+        onTap: onTap,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: scheme.surfaceContainerLow,
+            borderRadius: borderRadius,
+            border: Border.all(color: scheme.outlineVariant),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'This week',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  Icons.calendar_view_week_outlined,
+                  color: scheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'This week',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      summary.hasActivity
+                          ? '$countLabel • ${formatWorkoutMinutes(summary.activeDuration)}'
+                          : 'No completed workouts yet',
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                    if (summary.hasPreviousActivity) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Last week: ${summary.previousCompletedWorkouts} ${summary.previousCompletedWorkouts == 1 ? 'workout' : 'workouts'} • ${formatWorkoutMinutes(summary.previousActiveDuration)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
                       ),
+                    ] else if (!summary.hasActivity) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Complete a workout to start your weekly activity summary.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  summary.hasActivity
-                      ? '$countLabel • ${formatWorkoutMinutes(summary.activeDuration)}'
-                      : 'No completed workouts yet',
-                  style: Theme.of(context).textTheme.bodyLarge,
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.only(top: 9),
+                  child: Icon(
+                    Icons.chevron_right,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
-                if (summary.hasPreviousActivity) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Last week: ${summary.previousCompletedWorkouts} ${summary.previousCompletedWorkouts == 1 ? 'workout' : 'workouts'} • ${formatWorkoutMinutes(summary.previousActiveDuration)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                  ),
-                ] else if (!summary.hasActivity) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    'Complete a workout to start your weekly activity summary.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
