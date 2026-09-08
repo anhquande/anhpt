@@ -19,6 +19,25 @@ class WeeklyWorkoutSummary {
   bool get hasPreviousActivity => previousCompletedWorkouts > 0;
 }
 
+class MonthlyWorkoutSummary {
+  final DateTime monthStart;
+  final int completedWorkouts;
+  final Duration activeDuration;
+  final int previousCompletedWorkouts;
+  final Duration previousActiveDuration;
+
+  const MonthlyWorkoutSummary({
+    required this.monthStart,
+    required this.completedWorkouts,
+    required this.activeDuration,
+    required this.previousCompletedWorkouts,
+    required this.previousActiveDuration,
+  });
+
+  bool get hasActivity => completedWorkouts > 0;
+  bool get hasPreviousActivity => previousCompletedWorkouts > 0;
+}
+
 class WorkoutSessionAnalytics {
   static WeeklyWorkoutSummary weeklySummary(
     Iterable<WorkoutSession> sessions, {
@@ -52,6 +71,44 @@ class WorkoutSessionAnalytics {
 
     return WeeklyWorkoutSummary(
       weekStart: weekStart,
+      completedWorkouts: completedWorkouts,
+      activeDuration: activeDuration,
+      previousCompletedWorkouts: previousCompletedWorkouts,
+      previousActiveDuration: previousActiveDuration,
+    );
+  }
+
+  static MonthlyWorkoutSummary monthlySummary(
+    Iterable<WorkoutSession> sessions, {
+    DateTime? now,
+    String? profileId,
+  }) {
+    final reference = now ?? DateTime.now();
+    final monthStart = DateTime(reference.year, reference.month);
+    final nextMonthStart = DateTime(reference.year, reference.month + 1);
+    final previousMonthStart = DateTime(reference.year, reference.month - 1);
+
+    var completedWorkouts = 0;
+    var activeDuration = Duration.zero;
+    var previousCompletedWorkouts = 0;
+    var previousActiveDuration = Duration.zero;
+
+    for (final session in sessions) {
+      if (!session.completed) continue;
+      if (profileId != null && session.profileId != profileId) continue;
+      final endedAt = session.endedAt;
+      if (!endedAt.isBefore(monthStart) && endedAt.isBefore(nextMonthStart)) {
+        completedWorkouts++;
+        activeDuration += session.activeDuration;
+      } else if (!endedAt.isBefore(previousMonthStart) &&
+          endedAt.isBefore(monthStart)) {
+        previousCompletedWorkouts++;
+        previousActiveDuration += session.activeDuration;
+      }
+    }
+
+    return MonthlyWorkoutSummary(
+      monthStart: monthStart,
       completedWorkouts: completedWorkouts,
       activeDuration: activeDuration,
       previousCompletedWorkouts: previousCompletedWorkouts,
