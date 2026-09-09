@@ -53,7 +53,7 @@ class _WorkoutCompletionScreenState extends State<WorkoutCompletionScreen> {
     try {
       final history = WorkoutSessionHistory(LocalStore());
       final summary = await history.weeklySummary(profileId: widget.profileId);
-      if (!mounted || summary.completedCount == 0) return;
+      if (!mounted || summary.completedWorkouts == 0) return;
       setState(() => _weeklySummary = summary);
     } catch (error) {
       // Completion feedback is optional presentation. A history read failure
