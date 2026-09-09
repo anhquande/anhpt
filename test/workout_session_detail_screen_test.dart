@@ -1,11 +1,9 @@
 import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/models/workout_session.dart';
 import 'package:anhpt/screens/workout_history_screen.dart';
-import 'package:anhpt/screens/workout_player_screen.dart';
 import 'package:anhpt/screens/workout_session_detail_screen.dart';
 import 'package:anhpt/services/local_store.dart';
 import 'package:anhpt/services/workout_parser.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -57,6 +55,16 @@ steps:
     ];
   }
   return controller;
+}
+
+class _RecordingNavigatorObserver extends NavigatorObserver {
+  int pushes = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushes += 1;
+    super.didPush(route, previousRoute);
+  }
 }
 
 void main() {
@@ -194,28 +202,24 @@ void main() {
     );
   });
 
-  testWidgets('repeat action opens the existing Workout Player', (tester) async {
+  testWidgets('repeat action pushes the existing workout flow', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    debugDefaultTargetPlatformOverride = TargetPlatform.windows;
-    try {
-      final controller = _controller();
+    final controller = _controller();
+    final observer = _RecordingNavigatorObserver();
 
-      await tester.pumpWidget(
-        MaterialApp(
-          home: WorkoutSessionDetailScreen(
-            session: _session(id: 'repeat-navigation'),
-            controller: controller,
-          ),
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorObservers: [observer],
+        home: WorkoutSessionDetailScreen(
+          session: _session(id: 'repeat-navigation'),
+          controller: controller,
         ),
-      );
+      ),
+    );
 
-      await tester.tap(find.text('Repeat workout'));
-      await tester.pump();
+    expect(observer.pushes, 1);
+    await tester.tap(find.text('Repeat workout'));
 
-      expect(find.byType(WorkoutPlayerScreen), findsOneWidget);
-    } finally {
-      await tester.pumpWidget(const SizedBox.shrink());
-      debugDefaultTargetPlatformOverride = null;
-    }
+    expect(observer.pushes, 2);
   });
 }
