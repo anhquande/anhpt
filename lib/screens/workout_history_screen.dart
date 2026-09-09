@@ -34,6 +34,8 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   WorkoutHistorySort _sort = WorkoutHistorySort.newestFirst;
   String? _workoutId;
   String _searchQuery = '';
+  DateTime? _customStartDate;
+  DateTime? _customEndDate;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
 
@@ -47,6 +49,8 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
         workoutId: _workoutId,
         searchQuery: _searchQuery,
         sort: _sort,
+        customStartDate: _customStartDate,
+        customEndDate: _customEndDate,
       );
 
   @override
@@ -60,9 +64,13 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   void didUpdateWidget(covariant WorkoutHistoryScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.store != widget.store || oldWidget.profileId != widget.profileId) {
+      _status = WorkoutHistoryStatusFilter.all;
+      _period = WorkoutHistoryPeriodFilter.allTime;
       _workoutId = null;
       _searchQuery = '';
       _sort = WorkoutHistorySort.newestFirst;
+      _customStartDate = null;
+      _customEndDate = null;
       _searchController.clear();
       _loadHistory();
     }
@@ -103,6 +111,37 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
     }
   }
 
+  Future<void> _changePeriod(WorkoutHistoryPeriodFilter value) async {
+    if (value != WorkoutHistoryPeriodFilter.customRange) {
+      setState(() => _period = value);
+      return;
+    }
+    await _selectCustomRange();
+  }
+
+  Future<void> _selectCustomRange() async {
+    final now = DateUtils.dateOnly(DateTime.now());
+    final initialRange = _customStartDate != null && _customEndDate != null
+        ? DateTimeRange(start: _customStartDate!, end: _customEndDate!)
+        : DateTimeRange(
+            start: DateTime(now.year, now.month),
+            end: now,
+          );
+    final selected = await showDateRangePicker(
+      context: context,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(now.year + 1, 12, 31),
+      initialDateRange: initialRange,
+      helpText: 'Select workout history range',
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      _customStartDate = DateUtils.dateOnly(selected.start);
+      _customEndDate = DateUtils.dateOnly(selected.end);
+      _period = WorkoutHistoryPeriodFilter.customRange;
+    });
+  }
+
   void _clearFilters() {
     _searchController.clear();
     setState(() {
@@ -111,6 +150,8 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
       _workoutId = null;
       _searchQuery = '';
       _sort = WorkoutHistorySort.newestFirst;
+      _customStartDate = null;
+      _customEndDate = null;
     });
   }
 
@@ -200,8 +241,11 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
               workouts: workouts,
               resultCount: filteredSessions.length,
               showClear: !_filter.isDefault,
+              customStartDate: _customStartDate,
+              customEndDate: _customEndDate,
               onStatusChanged: (value) => setState(() => _status = value),
-              onPeriodChanged: (value) => setState(() => _period = value),
+              onPeriodChanged: _changePeriod,
+              onEditCustomRange: _selectCustomRange,
               onWorkoutChanged: (value) => setState(() => _workoutId = value),
               onSearchChanged: (value) => setState(() => _searchQuery = value),
               onSortChanged: (value) => setState(() => _sort = value),
@@ -260,8 +304,11 @@ class _HistoryFilters extends StatelessWidget {
   final List<(String, String)> workouts;
   final int resultCount;
   final bool showClear;
+  final DateTime? customStartDate;
+  final DateTime? customEndDate;
   final ValueChanged<WorkoutHistoryStatusFilter> onStatusChanged;
   final ValueChanged<WorkoutHistoryPeriodFilter> onPeriodChanged;
+  final VoidCallback onEditCustomRange;
   final ValueChanged<String?> onWorkoutChanged;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<WorkoutHistorySort> onSortChanged;
@@ -276,8 +323,11 @@ class _HistoryFilters extends StatelessWidget {
     required this.workouts,
     required this.resultCount,
     required this.showClear,
+    required this.customStartDate,
+    required this.customEndDate,
     required this.onStatusChanged,
     required this.onPeriodChanged,
+    required this.onEditCustomRange,
     required this.onWorkoutChanged,
     required this.onSearchChanged,
     required this.onSortChanged,
@@ -287,6 +337,10 @@ class _HistoryFilters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final localizations = MaterialLocalizations.of(context);
+    final customRangeLabel = customStartDate != null && customEndDate != null
+        ? '${localizations.formatMediumDate(customStartDate!)} – ${localizations.formatMediumDate(customEndDate!)}'
+        : 'Choose dates';
     return Container(
       key: const Key('workout-history-filters'),
       padding: const EdgeInsets.all(16),
@@ -368,6 +422,10 @@ class _HistoryFilters extends StatelessWidget {
                       value: WorkoutHistoryPeriodFilter.thisYear,
                       child: Text('This year', overflow: TextOverflow.ellipsis),
                     ),
+                    DropdownMenuItem(
+                      value: WorkoutHistoryPeriodFilter.customRange,
+                      child: Text('Custom range', overflow: TextOverflow.ellipsis),
+                    ),
                   ],
                   onChanged: (value) {
                     if (value != null) onPeriodChanged(value);
@@ -439,6 +497,15 @@ class _HistoryFilters extends StatelessWidget {
               );
             },
           ),
+          if (period == WorkoutHistoryPeriodFilter.customRange) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('workout-history-custom-range'),
+              onPressed: onEditCustomRange,
+              icon: const Icon(Icons.date_range_outlined),
+              label: Text(customRangeLabel),
+            ),
+          ],
           const SizedBox(height: 12),
           Row(
             children: [

@@ -94,6 +94,58 @@ void main() {
     ]);
   });
 
+  test('custom range includes both local calendar boundaries', () {
+    final rangeSessions = [
+      session(
+        id: 'before',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 1, 23, 59, 59),
+      ),
+      session(
+        id: 'start',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 2),
+      ),
+      session(
+        id: 'middle',
+        workoutId: 'plank',
+        endedAt: DateTime(2026, 9, 4, 12),
+      ),
+      session(
+        id: 'end',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 5, 23, 59, 59),
+      ),
+      session(
+        id: 'after',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 6),
+      ),
+    ];
+
+    final result = WorkoutHistoryFilter(
+      period: WorkoutHistoryPeriodFilter.customRange,
+      customStartDate: DateTime(2026, 9, 2, 18),
+      customEndDate: DateTime(2026, 9, 5, 8),
+    ).apply(rangeSessions, now: now);
+
+    expect(result.map((item) => item.id), ['end', 'middle', 'start']);
+  });
+
+  test('custom range combines with existing filters and sort', () {
+    final result = WorkoutHistoryFilter(
+      status: WorkoutHistoryStatusFilter.completed,
+      period: WorkoutHistoryPeriodFilter.customRange,
+      workoutId: 'plank',
+      searchQuery: 'high',
+      sort: WorkoutHistorySort.oldestFirst,
+      customStartDate: DateTime(2026, 9, 1),
+      customEndDate: DateTime(2026, 9, 9),
+    ).apply(sessions, now: now);
+
+    expect(result.map((item) => item.id), ['month-completed']);
+  });
+
   test('workout filter uses persisted workout id', () {
     final result = const WorkoutHistoryFilter(workoutId: 'plank').apply(
       sessions,
@@ -190,6 +242,14 @@ void main() {
     );
     expect(
       const WorkoutHistoryFilter(sort: WorkoutHistorySort.oldestFirst).isDefault,
+      isFalse,
+    );
+    expect(
+      WorkoutHistoryFilter(
+        period: WorkoutHistoryPeriodFilter.customRange,
+        customStartDate: DateTime(2026, 9, 1),
+        customEndDate: DateTime(2026, 9, 2),
+      ).isDefault,
       isFalse,
     );
   });
