@@ -10,139 +10,131 @@ WorkoutSession _session({
   required String workoutId,
   required String workoutName,
   required WorkoutSessionStatus status,
+  Duration duration = const Duration(minutes: 10),
+  int hoursAgo = 1,
 }) {
-  final endedAt = DateTime.now().subtract(Duration(hours: id == 'done' ? 1 : 2));
+  final endedAt = DateTime.now().subtract(Duration(hours: hoursAgo));
   return WorkoutSession(
     id: id,
     workoutId: workoutId,
     workoutName: workoutName,
     profileId: 'me',
     profileName: 'Me',
-    startedAt: endedAt.subtract(const Duration(minutes: 10)),
+    startedAt: endedAt.subtract(duration),
     endedAt: endedAt,
-    activeDuration: const Duration(minutes: 10),
+    activeDuration: duration,
     completedSteps: status == WorkoutSessionStatus.completed ? 4 : 2,
     totalSteps: 4,
     status: status,
   );
 }
 
-void main() {
-  testWidgets('history shows filter controls and matching session count',
-      (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    final store = LocalStore();
-    await store.saveWorkoutSessions([
-      _session(
-        id: 'done',
-        workoutId: 'mobility',
-        workoutName: 'Mobility',
-        status: WorkoutSessionStatus.completed,
-      ),
-      _session(
-        id: 'partial',
-        workoutId: 'plank',
-        workoutName: 'Plank',
-        status: WorkoutSessionStatus.incomplete,
-      ),
-    ]);
-    await tester.binding.setSurfaceSize(const Size(900, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+Future<LocalStore> _pumpHistory(WidgetTester tester) async {
+  SharedPreferences.setMockInitialValues({});
+  final store = LocalStore();
+  await store.saveWorkoutSessions([
+    _session(
+      id: 'mobility',
+      workoutId: 'mobility',
+      workoutName: 'Morning Mobility',
+      status: WorkoutSessionStatus.completed,
+      duration: const Duration(minutes: 12),
+      hoursAgo: 1,
+    ),
+    _session(
+      id: 'plank',
+      workoutId: 'plank',
+      workoutName: 'High Plank',
+      status: WorkoutSessionStatus.incomplete,
+      duration: const Duration(minutes: 5),
+      hoursAgo: 2,
+    ),
+  ]);
+  await tester.binding.setSurfaceSize(const Size(900, 1800));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.pumpWidget(
+    MaterialApp(
+      home: WorkoutHistoryScreen(store: store, profileId: 'me'),
+    ),
+  );
+  await tester.pumpAndSettle();
+  return store;
+}
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: WorkoutHistoryScreen(store: store, profileId: 'me'),
-      ),
-    );
-    await tester.pumpAndSettle();
+void main() {
+  testWidgets('history shows search sort controls and matching session count',
+      (tester) async {
+    await _pumpHistory(tester);
 
     expect(find.byKey(const Key('workout-history-filters')), findsOneWidget);
+    expect(find.byKey(const Key('workout-history-search')), findsOneWidget);
+    expect(find.byKey(const Key('workout-history-sort')), findsOneWidget);
     expect(find.text('2 sessions'), findsOneWidget);
-    expect(find.text('Mobility'), findsOneWidget);
-    expect(find.text('Plank'), findsOneWidget);
   });
 
-  testWidgets('status filter updates results and clear restores all sessions',
-      (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    final store = LocalStore();
-    await store.saveWorkoutSessions([
-      _session(
-        id: 'done',
-        workoutId: 'mobility',
-        workoutName: 'Mobility',
-        status: WorkoutSessionStatus.completed,
-      ),
-      _session(
-        id: 'partial',
-        workoutId: 'plank',
-        workoutName: 'Plank',
-        status: WorkoutSessionStatus.incomplete,
-      ),
-    ]);
-    await tester.binding.setSurfaceSize(const Size(900, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('search narrows sessions by workout name', (tester) async {
+    await _pumpHistory(tester);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: WorkoutHistoryScreen(store: store, profileId: 'me'),
-      ),
+    await tester.enterText(
+      find.byKey(const Key('workout-history-search')),
+      'MOBILITY',
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
+    expect(find.text('1 session'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('workout-history-session-mobility')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('workout-history-session-plank')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('workout-history-clear-filters')), findsOneWidget);
+  });
+
+  testWidgets('search combines with status filter and clear restores defaults',
+      (tester) async {
+    await _pumpHistory(tester);
+
+    await tester.enterText(
+      find.byKey(const Key('workout-history-search')),
+      'plank',
+    );
     await tester.tap(
       find.byKey(const ValueKey('workout-history-status-incomplete')),
     );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('1 session'), findsOneWidget);
-    expect(find.byKey(const ValueKey('workout-history-session-partial')),
-        findsOneWidget);
-    expect(find.byKey(const ValueKey('workout-history-session-done')),
-        findsNothing);
-    expect(find.byKey(const Key('workout-history-clear-filters')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('workout-history-session-plank')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('workout-history-clear-filters')));
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('2 sessions'), findsOneWidget);
-    expect(find.byKey(const ValueKey('workout-history-session-done')),
-        findsOneWidget);
-    expect(find.byKey(const ValueKey('workout-history-session-partial')),
-        findsOneWidget);
+    final search = tester.widget<TextField>(
+      find.byKey(const Key('workout-history-search')),
+    );
+    expect(search.controller?.text, isEmpty);
     expect(find.byKey(const Key('workout-history-clear-filters')), findsNothing);
   });
 
-  testWidgets('empty filtered results keep filter controls visible',
-      (tester) async {
-    SharedPreferences.setMockInitialValues({});
-    final store = LocalStore();
-    await store.saveWorkoutSessions([
-      _session(
-        id: 'done',
-        workoutId: 'mobility',
-        workoutName: 'Mobility',
-        status: WorkoutSessionStatus.completed,
-      ),
-    ]);
-    await tester.binding.setSurfaceSize(const Size(900, 1800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('empty search keeps controls visible', (tester) async {
+    await _pumpHistory(tester);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: WorkoutHistoryScreen(store: store, profileId: 'me'),
-      ),
+    await tester.enterText(
+      find.byKey(const Key('workout-history-search')),
+      'does-not-exist',
     );
-    await tester.pumpAndSettle();
-
-    await tester.tap(
-      find.byKey(const ValueKey('workout-history-status-incomplete')),
-    );
-    await tester.pumpAndSettle();
+    await tester.pump();
 
     expect(find.text('0 sessions'), findsOneWidget);
     expect(find.byKey(const Key('workout-history-filter-empty')), findsOneWidget);
-    expect(find.byKey(const Key('workout-history-filters')), findsOneWidget);
-    expect(find.byKey(const Key('workout-history-clear-filters')), findsOneWidget);
+    expect(find.byKey(const Key('workout-history-search')), findsOneWidget);
+    expect(find.byKey(const Key('workout-history-sort')), findsOneWidget);
   });
 }
