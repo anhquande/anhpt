@@ -9,10 +9,6 @@ class WorkoutSessionHistory {
 
   const WorkoutSessionHistory(this.store);
 
-  /// Lightweight local change signal used by read-only progress surfaces.
-  ///
-  /// Session persistence remains the source of truth. The revision only tells
-  /// widgets that they should reload that persisted data.
   static final ValueNotifier<int> revision = ValueNotifier<int>(0);
 
   Future<List<WorkoutSession>> load() => store.loadWorkoutSessions();
@@ -28,7 +24,16 @@ class WorkoutSessionHistory {
     required WorkoutSessionStatus status,
     DateTime? startedAt,
     DateTime? endedAt,
+    int? estimatedCalories,
+    WorkoutSessionEffort? effort,
   }) async {
+    if (estimatedCalories != null && estimatedCalories < 0) {
+      throw ArgumentError.value(
+        estimatedCalories,
+        'estimatedCalories',
+        'must be non-negative',
+      );
+    }
     final end = endedAt ?? DateTime.now();
     final start = startedAt ?? end.subtract(activeDuration);
     final session = WorkoutSession(
@@ -43,6 +48,8 @@ class WorkoutSessionHistory {
       completedSteps: completedSteps.clamp(0, totalSteps).toInt(),
       totalSteps: totalSteps,
       status: status,
+      estimatedCalories: estimatedCalories,
+      effort: effort,
     );
     final sessions = await load();
     sessions.insert(0, session);
@@ -61,6 +68,40 @@ class WorkoutSessionHistory {
 
     final updated = sessions[index].copyWithNote(note);
     if (updated.note == sessions[index].note) return updated;
+
+    sessions[index] = updated;
+    await store.saveWorkoutSessions(sessions);
+    revision.value++;
+    return updated;
+  }
+
+  Future<WorkoutSession?> updateMetrics({
+    required String sessionId,
+    required int? estimatedCalories,
+    required WorkoutSessionEffort? effort,
+  }) async {
+    if (estimatedCalories != null && estimatedCalories < 0) {
+      throw ArgumentError.value(
+        estimatedCalories,
+        'estimatedCalories',
+        'must be non-negative',
+      );
+    }
+    final sessions = await load();
+    final index = sessions.indexWhere((session) => session.id == sessionId);
+    if (index < 0) return null;
+
+    final current = sessions[index];
+    final updated = current.copyWithMetrics(
+      estimatedCalories: estimatedCalories,
+      effort: effort,
+      replaceCalories: true,
+      replaceEffort: true,
+    );
+    if (updated.estimatedCalories == current.estimatedCalories &&
+        updated.effort == current.effort) {
+      return updated;
+    }
 
     sessions[index] = updated;
     await store.saveWorkoutSessions(sessions);
