@@ -69,9 +69,12 @@ void main() {
     expect(updated?.effort, WorkoutSessionEffort.hard);
 
     var persisted = await store.loadWorkoutSessions();
-    expect(persisted.first.estimatedCalories, 210);
-    expect(persisted.first.effort, WorkoutSessionEffort.hard);
-    expect(persisted.last.estimatedCalories, isNull);
+    final persistedFirst = persisted.firstWhere((session) => session.id == 'first');
+    final persistedSecond = persisted.firstWhere((session) => session.id == 'second');
+    expect(persistedFirst.estimatedCalories, 210);
+    expect(persistedFirst.effort, WorkoutSessionEffort.hard);
+    expect(persistedSecond.estimatedCalories, isNull);
+    expect(persistedSecond.effort, isNull);
 
     final cleared = await history.updateMetrics(
       sessionId: 'first',
