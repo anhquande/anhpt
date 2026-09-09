@@ -284,8 +284,8 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
       if (duration.inMinutes == 0) return '<1 min';
       return '${duration.inMinutes} min';
     }
-    if (minutes == 0) return '${hours}h';
-    return '${hours}h $minutes min';
+    if (minutes == 0) return '$hours h';
+    return '$hours h $minutes min';
   }
 }
 
