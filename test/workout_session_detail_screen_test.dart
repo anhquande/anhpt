@@ -1,7 +1,9 @@
+import 'package:anhpt/app/app_controller.dart';
 import 'package:anhpt/models/workout_session.dart';
 import 'package:anhpt/screens/workout_history_screen.dart';
 import 'package:anhpt/screens/workout_session_detail_screen.dart';
 import 'package:anhpt/services/local_store.dart';
+import 'package:anhpt/services/workout_parser.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +29,42 @@ WorkoutSession _session({
     totalSteps: totalSteps,
     status: status,
   );
+}
+
+AppController _controller({bool includeWorkout = true}) {
+  final controller = AppController(LocalStore());
+  if (includeWorkout) {
+    controller.workouts = [
+      WorkoutParser.parse(
+        '''
+version: 2
+name: Morning Mobility
+start_countdown: 0s
+voice:
+  language: en
+  announce_start: false
+  announce_step_name: false
+  announce_finish: false
+steps:
+  - name: Reach up
+    duration: 30s
+''',
+        id: 'demo-workout',
+        defaultVoiceLanguage: 'en',
+      ),
+    ];
+  }
+  return controller;
+}
+
+class _RecordingNavigatorObserver extends NavigatorObserver {
+  int pushes = 0;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushes += 1;
+    super.didPush(route, previousRoute);
+  }
 }
 
 void main() {
@@ -121,5 +159,67 @@ void main() {
     expect(find.text('Session details'), findsOneWidget);
     expect(find.text('Morning Mobility'), findsOneWidget);
     expect(find.text('100%'), findsOneWidget);
+  });
+
+  testWidgets('installed workout exposes repeat action', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = _controller();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkoutSessionDetailScreen(
+          session: _session(id: 'repeat-installed'),
+          controller: controller,
+        ),
+      ),
+    );
+
+    expect(find.text('Repeat workout'), findsOneWidget);
+    expect(
+      find.byKey(const Key('session-detail-repeat-workout')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('removed workout does not expose a broken repeat action',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = _controller(includeWorkout: false);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: WorkoutSessionDetailScreen(
+          session: _session(id: 'repeat-missing'),
+          controller: controller,
+        ),
+      ),
+    );
+
+    expect(find.text('Repeat workout'), findsNothing);
+    expect(
+      find.byKey(const Key('session-detail-repeat-workout')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('repeat action pushes the existing workout flow', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = _controller();
+    final observer = _RecordingNavigatorObserver();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorObservers: [observer],
+        home: WorkoutSessionDetailScreen(
+          session: _session(id: 'repeat-navigation'),
+          controller: controller,
+        ),
+      ),
+    );
+
+    expect(observer.pushes, 1);
+    await tester.tap(find.text('Repeat workout'));
+
+    expect(observer.pushes, 2);
   });
 }

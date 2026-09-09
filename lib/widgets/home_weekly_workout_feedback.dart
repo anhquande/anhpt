@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_controller.dart';
 import '../screens/workout_history_screen.dart';
 import '../services/local_store.dart';
 import '../services/workout_session_analytics.dart';
@@ -9,11 +10,13 @@ import 'weekly_workout_feedback.dart';
 class HomeWeeklyWorkoutFeedback extends StatelessWidget {
   final LocalStore store;
   final String profileId;
+  final AppController? controller;
 
   const HomeWeeklyWorkoutFeedback({
     super.key,
     required this.store,
     required this.profileId,
+    this.controller,
   });
 
   @override
@@ -40,6 +43,7 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
                 builder: (_) => WorkoutHistoryScreen(
                   store: store,
                   profileId: profileId,
+                  controller: controller,
                 ),
               ),
             ),

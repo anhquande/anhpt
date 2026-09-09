@@ -4,7 +4,7 @@
 
 AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week, month, or year.
 
-Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries. Issue #79 adds monthly progress to that same History surface. Issue #83 extends the same analytics layer with yearly totals and month-by-month context. Issue #86 makes each persisted session inspectable through a read-only detail screen.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home so progress remains visible after the completion screen is closed. Issue #77 adds a read-only Workout History screen so users can inspect the sessions behind those summaries. Issue #79 adds monthly progress to that same History surface. Issue #83 extends the same analytics layer with yearly totals and month-by-month context. Issue #86 makes each persisted session inspectable through a read-only detail screen. Issue #88 lets an installed workout be started again directly from that session detail.
 
 ## Stored session
 
@@ -125,6 +125,8 @@ It shows only data that is actually persisted in the session snapshot:
 - profile name when one was stored.
 
 Incomplete sessions use neutral wording. Zero-total-step sessions render 0% progress rather than dividing by zero. Calories, heart rate, notes and other metrics are intentionally omitted until the session model stores real values for them.
+
+When the snapshot's `workoutId` still resolves to an installed local workout, Session Details also shows `Repeat workout`. The action opens the existing `WorkoutPlayerScreen` with the session profile context; it does not clone the session, modify history, or create a second workout execution path. If the workout was removed, the historical snapshot remains readable and the repeat action stays hidden.
 
 The first version intentionally does not provide edit or delete actions. Those actions would need explicit product rules for history integrity and analytics recalculation.
 
