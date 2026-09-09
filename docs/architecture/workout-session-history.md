@@ -4,7 +4,7 @@
 
 AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week, month, or year.
 
-Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home. Issue #77 adds Workout History, #79 and #83 add monthly/yearly context, #86 adds Session Details, #88 adds Repeat workout, #95 adds lightweight History filters as the list grows, and #97 makes the workout player lifecycle the owner of terminal session persistence.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home. Issue #77 adds Workout History, #79 and #83 add monthly/yearly context, #86 adds Session Details, #88 adds Repeat workout, #95 adds lightweight History filters, #97 makes the workout player lifecycle the owner of terminal session persistence, and #99 adds search and sorting as the list grows.
 
 ## Stored session
 
@@ -18,7 +18,7 @@ Each `WorkoutSession` stores a snapshot of:
 - completed and total resolved steps;
 - status: `completed` or `incomplete`.
 
-The v1 persistence key is `anhpt.workoutSessions.v1` in `SharedPreferences`. Filtering never writes to this store.
+The v1 persistence key is `anhpt.workoutSessions.v1` in `SharedPreferences`. Filtering, searching and sorting never write to this store.
 
 ## Player lifecycle persistence
 
@@ -55,15 +55,16 @@ Home shows the same `This week` card for the active local profile. `WorkoutSessi
 Workout History is a read-only session browser.
 
 - monthly and yearly progress cards remain based on the full selected-profile history;
-- sessions are sorted newest first and grouped by local calendar day;
 - each row opens Session Details;
 - incomplete sessions remain visible but are excluded from completed-workout totals;
-- filters can narrow the visible rows by status (`All`, `Completed`, `Incomplete`), local period (`This week`, `This month`, `This year`, `All time`) and persisted workout id;
-- workout choices come only from sessions belonging to the selected profile;
-- status, period and workout filters combine without mutating history;
-- a matching-session count reflects the visible filtered rows;
-- `Clear filters` restores the default unfiltered list;
-- a zero-result filter state keeps the controls visible so the user can recover immediately.
+- filters can narrow visible rows by status (`All`, `Completed`, `Incomplete`), local period (`This week`, `This month`, `This year`, `All time`) and persisted workout id;
+- search matches the stored workout-name snapshot case-insensitively;
+- sort options are `Newest first`, `Oldest first`, `Longest duration` and `Shortest duration`;
+- search, sort and all existing filters operate only on the already-loaded selected-profile sessions and never reload or mutate persistence;
+- a matching-session count reflects the final searched/filtered result set;
+- `Clear filters` clears search and restores all filter defaults plus `Newest first`;
+- a zero-result state keeps all controls visible so the user can recover immediately;
+- changing search, sort or filters keeps the History list mounted so scroll position is not reset by a storage reload.
 
 Period boundaries are local-time calendar boundaries: Monday-to-Monday for week, first-day-to-first-day for month, and January-1-to-January-1 for year.
 
@@ -75,6 +76,6 @@ When the historical `workoutId` still resolves to an installed workout, `Repeat 
 
 ## Future extensions
 
-Possible later extensions include free-text history search, custom date ranges, calorie/Health metrics backed by real stored inputs, history edit/delete rules, and richer charts if user feedback justifies them.
+Possible later extensions include custom date ranges, calorie/Health metrics backed by real stored inputs, session notes, history edit/delete rules, CSV export, and richer charts if user feedback justifies them.
 
 If history grows beyond the scale appropriate for `SharedPreferences`, persistence can migrate to a local database while keeping `WorkoutSession` as the domain model.

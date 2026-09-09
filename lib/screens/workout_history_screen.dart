@@ -31,8 +31,11 @@ class WorkoutHistoryScreen extends StatefulWidget {
 class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   WorkoutHistoryStatusFilter _status = WorkoutHistoryStatusFilter.all;
   WorkoutHistoryPeriodFilter _period = WorkoutHistoryPeriodFilter.allTime;
+  WorkoutHistorySort _sort = WorkoutHistorySort.newestFirst;
   String? _workoutId;
+  String _searchQuery = '';
   final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
 
   List<WorkoutSession> _sessions = const [];
   bool _loading = true;
@@ -42,6 +45,8 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
         status: _status,
         period: _period,
         workoutId: _workoutId,
+        searchQuery: _searchQuery,
+        sort: _sort,
       );
 
   @override
@@ -56,6 +61,9 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.store != widget.store || oldWidget.profileId != widget.profileId) {
       _workoutId = null;
+      _searchQuery = '';
+      _sort = WorkoutHistorySort.newestFirst;
+      _searchController.clear();
       _loadHistory();
     }
   }
@@ -96,10 +104,13 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   }
 
   void _clearFilters() {
+    _searchController.clear();
     setState(() {
       _status = WorkoutHistoryStatusFilter.all;
       _period = WorkoutHistoryPeriodFilter.allTime;
       _workoutId = null;
+      _searchQuery = '';
+      _sort = WorkoutHistorySort.newestFirst;
     });
   }
 
@@ -107,6 +118,7 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   void dispose() {
     WorkoutSessionHistory.revision.removeListener(_onHistoryRevisionChanged);
     _scrollController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -183,12 +195,16 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
               status: _status,
               period: _period,
               workoutId: _workoutId,
+              searchController: _searchController,
+              sort: _sort,
               workouts: workouts,
               resultCount: filteredSessions.length,
               showClear: !_filter.isDefault,
               onStatusChanged: (value) => setState(() => _status = value),
               onPeriodChanged: (value) => setState(() => _period = value),
               onWorkoutChanged: (value) => setState(() => _workoutId = value),
+              onSearchChanged: (value) => setState(() => _searchQuery = value),
+              onSortChanged: (value) => setState(() => _sort = value),
               onClear: _clearFilters,
             ),
             const SizedBox(height: 20),
@@ -239,24 +255,32 @@ class _HistoryFilters extends StatelessWidget {
   final WorkoutHistoryStatusFilter status;
   final WorkoutHistoryPeriodFilter period;
   final String? workoutId;
+  final TextEditingController searchController;
+  final WorkoutHistorySort sort;
   final List<(String, String)> workouts;
   final int resultCount;
   final bool showClear;
   final ValueChanged<WorkoutHistoryStatusFilter> onStatusChanged;
   final ValueChanged<WorkoutHistoryPeriodFilter> onPeriodChanged;
   final ValueChanged<String?> onWorkoutChanged;
+  final ValueChanged<String> onSearchChanged;
+  final ValueChanged<WorkoutHistorySort> onSortChanged;
   final VoidCallback onClear;
 
   const _HistoryFilters({
     required this.status,
     required this.period,
     required this.workoutId,
+    required this.searchController,
+    required this.sort,
     required this.workouts,
     required this.resultCount,
     required this.showClear,
     required this.onStatusChanged,
     required this.onPeriodChanged,
     required this.onWorkoutChanged,
+    required this.onSearchChanged,
+    required this.onSortChanged,
     required this.onClear,
   });
 
@@ -274,6 +298,20 @@ class _HistoryFilters extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          TextField(
+            key: const Key('workout-history-search'),
+            controller: searchController,
+            onChanged: onSearchChanged,
+            textInputAction: TextInputAction.search,
+            decoration: const InputDecoration(
+              labelText: 'Search workouts',
+              hintText: 'Workout name',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -299,11 +337,15 @@ class _HistoryFilters extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: DropdownButtonFormField<WorkoutHistoryPeriodFilter>(
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final fieldWidth = constraints.maxWidth >= 680
+                  ? (constraints.maxWidth - 24) / 3
+                  : constraints.maxWidth;
+              final fields = [
+                DropdownButtonFormField<WorkoutHistoryPeriodFilter>(
                   key: const Key('workout-history-period-filter'),
+                  isExpanded: true,
                   initialValue: period,
                   decoration: const InputDecoration(
                     labelText: 'Period',
@@ -312,30 +354,28 @@ class _HistoryFilters extends StatelessWidget {
                   items: const [
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.allTime,
-                      child: Text('All time'),
+                      child: Text('All time', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.thisWeek,
-                      child: Text('This week'),
+                      child: Text('This week', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.thisMonth,
-                      child: Text('This month'),
+                      child: Text('This month', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.thisYear,
-                      child: Text('This year'),
+                      child: Text('This year', overflow: TextOverflow.ellipsis),
                     ),
                   ],
                   onChanged: (value) {
                     if (value != null) onPeriodChanged(value);
                   },
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: DropdownButtonFormField<String?>(
+                DropdownButtonFormField<String?>(
                   key: const Key('workout-history-workout-filter'),
+                  isExpanded: true,
                   initialValue: workoutId,
                   decoration: const InputDecoration(
                     labelText: 'Workout',
@@ -344,7 +384,7 @@ class _HistoryFilters extends StatelessWidget {
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('All workouts'),
+                      child: Text('All workouts', overflow: TextOverflow.ellipsis),
                     ),
                     for (final workout in workouts)
                       DropdownMenuItem<String?>(
@@ -357,8 +397,47 @@ class _HistoryFilters extends StatelessWidget {
                   ],
                   onChanged: onWorkoutChanged,
                 ),
-              ),
-            ],
+                DropdownButtonFormField<WorkoutHistorySort>(
+                  key: const Key('workout-history-sort'),
+                  isExpanded: true,
+                  initialValue: sort,
+                  decoration: const InputDecoration(
+                    labelText: 'Sort',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: WorkoutHistorySort.newestFirst,
+                      child: Text('Newest first', overflow: TextOverflow.ellipsis),
+                    ),
+                    DropdownMenuItem(
+                      value: WorkoutHistorySort.oldestFirst,
+                      child: Text('Oldest first', overflow: TextOverflow.ellipsis),
+                    ),
+                    DropdownMenuItem(
+                      value: WorkoutHistorySort.longestDuration,
+                      child: Text('Longest duration', overflow: TextOverflow.ellipsis),
+                    ),
+                    DropdownMenuItem(
+                      value: WorkoutHistorySort.shortestDuration,
+                      child: Text('Shortest duration', overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) onSortChanged(value);
+                  },
+                ),
+              ];
+
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  for (final field in fields)
+                    SizedBox(width: fieldWidth, child: field),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           Row(

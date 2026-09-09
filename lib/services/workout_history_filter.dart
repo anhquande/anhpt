@@ -4,21 +4,34 @@ enum WorkoutHistoryStatusFilter { all, completed, incomplete }
 
 enum WorkoutHistoryPeriodFilter { allTime, thisWeek, thisMonth, thisYear }
 
+enum WorkoutHistorySort {
+  newestFirst,
+  oldestFirst,
+  longestDuration,
+  shortestDuration,
+}
+
 class WorkoutHistoryFilter {
   final WorkoutHistoryStatusFilter status;
   final WorkoutHistoryPeriodFilter period;
   final String? workoutId;
+  final String searchQuery;
+  final WorkoutHistorySort sort;
 
   const WorkoutHistoryFilter({
     this.status = WorkoutHistoryStatusFilter.all,
     this.period = WorkoutHistoryPeriodFilter.allTime,
     this.workoutId,
+    this.searchQuery = '',
+    this.sort = WorkoutHistorySort.newestFirst,
   });
 
   bool get isDefault =>
       status == WorkoutHistoryStatusFilter.all &&
       period == WorkoutHistoryPeriodFilter.allTime &&
-      workoutId == null;
+      workoutId == null &&
+      searchQuery.trim().isEmpty &&
+      sort == WorkoutHistorySort.newestFirst;
 
   List<WorkoutSession> apply(
     Iterable<WorkoutSession> sessions, {
@@ -26,17 +39,54 @@ class WorkoutHistoryFilter {
   }) {
     final reference = now ?? DateTime.now();
     final bounds = _periodBounds(reference);
-    return sessions.where((session) {
+    final query = searchQuery.trim().toLowerCase();
+    final result = sessions.where((session) {
       if (!_matchesStatus(session)) return false;
       if (workoutId != null && session.workoutId != workoutId) return false;
+      if (query.isNotEmpty &&
+          !session.workoutName.toLowerCase().contains(query)) {
+        return false;
+      }
       if (bounds != null &&
           (session.endedAt.isBefore(bounds.$1) ||
               !session.endedAt.isBefore(bounds.$2))) {
         return false;
       }
       return true;
-    }).toList()
-      ..sort((a, b) => b.endedAt.compareTo(a.endedAt));
+    }).toList();
+
+    result.sort(_compare);
+    return result;
+  }
+
+  int _compare(WorkoutSession a, WorkoutSession b) => switch (sort) {
+        WorkoutHistorySort.newestFirst => _withIdTieBreak(
+            b.endedAt.compareTo(a.endedAt),
+            a,
+            b,
+          ),
+        WorkoutHistorySort.oldestFirst => _withIdTieBreak(
+            a.endedAt.compareTo(b.endedAt),
+            a,
+            b,
+          ),
+        WorkoutHistorySort.longestDuration => _withIdTieBreak(
+            b.activeDuration.compareTo(a.activeDuration),
+            a,
+            b,
+          ),
+        WorkoutHistorySort.shortestDuration => _withIdTieBreak(
+            a.activeDuration.compareTo(b.activeDuration),
+            a,
+            b,
+          ),
+      };
+
+  int _withIdTieBreak(int comparison, WorkoutSession a, WorkoutSession b) {
+    if (comparison != 0) return comparison;
+    final endedAtComparison = b.endedAt.compareTo(a.endedAt);
+    if (endedAtComparison != 0) return endedAtComparison;
+    return a.id.compareTo(b.id);
   }
 
   bool _matchesStatus(WorkoutSession session) => switch (status) {
