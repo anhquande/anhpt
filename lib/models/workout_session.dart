@@ -12,6 +12,7 @@ class WorkoutSession {
   final int completedSteps;
   final int totalSteps;
   final WorkoutSessionStatus status;
+  final String? note;
 
   const WorkoutSession({
     required this.id,
@@ -25,9 +26,28 @@ class WorkoutSession {
     required this.completedSteps,
     required this.totalSteps,
     required this.status,
+    this.note,
   });
 
   bool get completed => status == WorkoutSessionStatus.completed;
+
+  WorkoutSession copyWithNote(String? value) {
+    final normalized = value?.trim();
+    return WorkoutSession(
+      id: id,
+      workoutId: workoutId,
+      workoutName: workoutName,
+      profileId: profileId,
+      profileName: profileName,
+      startedAt: startedAt,
+      endedAt: endedAt,
+      activeDuration: activeDuration,
+      completedSteps: completedSteps,
+      totalSteps: totalSteps,
+      status: status,
+      note: normalized == null || normalized.isEmpty ? null : normalized,
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -41,6 +61,7 @@ class WorkoutSession {
         'completedSteps': completedSteps,
         'totalSteps': totalSteps,
         'status': status.name,
+        if (note != null && note!.trim().isNotEmpty) 'note': note!.trim(),
       };
 
   factory WorkoutSession.fromJson(Map<String, dynamic> json) {
@@ -49,6 +70,7 @@ class WorkoutSession {
       (value) => value.name == statusName,
       orElse: () => WorkoutSessionStatus.incomplete,
     );
+    final rawNote = (json['note'] as String?)?.trim();
     return WorkoutSession(
       id: json['id'] as String,
       workoutId: json['workoutId'] as String,
@@ -63,6 +85,7 @@ class WorkoutSession {
       completedSteps: (json['completedSteps'] as num?)?.round() ?? 0,
       totalSteps: (json['totalSteps'] as num?)?.round() ?? 0,
       status: status,
+      note: rawNote == null || rawNote.isEmpty ? null : rawNote,
     );
   }
 }
