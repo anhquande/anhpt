@@ -22,7 +22,8 @@ WorkoutSession _session(int index, DateTime endedAt) => WorkoutSession(
     );
 
 void main() {
-  testWidgets('changing history filter preserves scroll position', (tester) async {
+  testWidgets('changing history filter preserves scroll position both ways',
+      (tester) async {
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     final now = DateTime.now();
@@ -51,28 +52,32 @@ void main() {
     final completedFilter = find.byKey(
       const ValueKey('workout-history-status-completed'),
     );
+    final allFilter = find.byKey(
+      const ValueKey('workout-history-status-all'),
+    );
     expect(listFinder, findsOneWidget);
 
-    // Scroll the actual history ListView instead of asking scrollUntilVisible
-    // to infer a Scrollable. The filter controls contain other scrollable
-    // widgets (dropdown internals), so a generic Scrollable finder is
-    // ambiguous in widget tests even though the production page has one
-    // primary vertical history list.
     await tester.drag(listFinder, const Offset(0, -650));
     await tester.pumpAndSettle();
 
     expect(completedFilter.hitTestable(), findsOneWidget);
+    expect(allFilter.hitTestable(), findsOneWidget);
 
-    final beforeController = tester.widget<ListView>(listFinder).controller!;
-    final before = beforeController.offset;
-    expect(before, greaterThan(0));
+    final controller = tester.widget<ListView>(listFinder).controller!;
+    final allOffset = controller.offset;
+    expect(allOffset, greaterThan(0));
 
     await tester.tap(completedFilter);
     await tester.pumpAndSettle();
 
-    final afterController = tester.widget<ListView>(listFinder).controller!;
-    final after = afterController.offset;
-    expect(after, closeTo(before, 1));
-    expect(completedFilter, findsOneWidget);
+    final completedOffset = controller.offset;
+    expect(completedOffset, closeTo(allOffset, 1));
+
+    await tester.tap(allFilter);
+    await tester.pumpAndSettle();
+
+    final restoredAllOffset = controller.offset;
+    expect(restoredAllOffset, closeTo(completedOffset, 1));
+    expect(restoredAllOffset, closeTo(allOffset, 1));
   });
 }
