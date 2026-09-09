@@ -39,14 +39,15 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
   }
 
   Future<void> _editNote() async {
-    final controller = TextEditingController(text: _session.note ?? '');
+    var draftNote = _session.note ?? '';
     final result = await showDialog<_NoteEditResult>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Session note'),
-        content: TextField(
+        content: TextFormField(
           key: const Key('session-detail-note-editor'),
-          controller: controller,
+          initialValue: draftNote,
+          onChanged: (value) => draftNote = value,
           autofocus: true,
           minLines: 3,
           maxLines: 6,
@@ -65,14 +66,13 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
           FilledButton(
             key: const Key('session-detail-save-note'),
             onPressed: () => Navigator.of(context).pop(
-              _NoteEditResult(controller.text),
+              _NoteEditResult(draftNote),
             ),
             child: const Text('Save'),
           ),
         ],
       ),
     );
-    controller.dispose();
     if (result == null || !mounted) return;
 
     try {
@@ -285,7 +285,7 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
       return '${duration.inMinutes} min';
     }
     if (minutes == 0) return '${hours}h';
-    return '${hours}h ${minutes} min';
+    return '${hours}h $minutes min';
   }
 }
 
