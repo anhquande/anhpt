@@ -1,8 +1,14 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout_session.dart';
 import '../services/local_store.dart';
+import '../services/workout_history_csv_exporter.dart';
 import '../services/workout_history_filter.dart';
 import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
@@ -142,6 +148,45 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
     });
   }
 
+  Future<void> _exportHistory() async {
+    final sessions = _filter.apply(_sessions);
+    if (sessions.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No workout sessions to export.')),
+        );
+      }
+      return;
+    }
+
+    const exporter = WorkoutHistoryCsvExporter();
+    final bytes = Uint8List.fromList(utf8.encode(exporter.encode(sessions)));
+    try {
+      final path = await FilePicker.platform.saveFile(
+        dialogTitle: 'Export workout history',
+        fileName: exporter.fileName(profileName: widget.profileName),
+        type: FileType.custom,
+        allowedExtensions: const ['csv'],
+        bytes: kIsWeb ? bytes : null,
+      );
+      if (path == null) return;
+      if (!kIsWeb) await File(path).writeAsBytes(bytes, flush: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Exported ${sessions.length} ${sessions.length == 1 ? 'session' : 'sessions'}.',
+          ),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not export workout history.')),
+      );
+    }
+  }
+
   void _clearFilters() {
     _searchController.clear();
     setState(() {
@@ -171,6 +216,14 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
           'Workout history',
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
+        actions: [
+          IconButton(
+            key: const Key('workout-history-export-csv'),
+            tooltip: 'Export CSV',
+            onPressed: _loading || _sessions.isEmpty ? null : _exportHistory,
+            icon: const Icon(Icons.download_outlined),
+          ),
+        ],
       ),
       body: _buildBody(context),
     );
