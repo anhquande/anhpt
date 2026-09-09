@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../models/workout_session.dart';
-import '../services/health_store.dart';
 import '../services/local_store.dart';
 import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
@@ -12,6 +10,7 @@ import '../widgets/weekly_workout_feedback.dart';
 
 class WorkoutCompletionScreen extends StatefulWidget {
   final String workoutName;
+  final String? profileId;
   final String? profileName;
   final Duration activeTime;
   final int completedSteps;
@@ -21,7 +20,6 @@ class WorkoutCompletionScreen extends StatefulWidget {
   final String? progressContext;
   final VoidCallback? onViewProgress;
   final VoidCallback? onDone;
-  final bool persistSession;
 
   const WorkoutCompletionScreen({
     super.key,
@@ -30,12 +28,12 @@ class WorkoutCompletionScreen extends StatefulWidget {
     required this.completedSteps,
     required this.totalSteps,
     required this.progress,
+    this.profileId,
     this.profileName,
     this.estimatedCalories,
     this.progressContext,
     this.onViewProgress,
     this.onDone,
-    this.persistSession = true,
   });
 
   @override
@@ -44,66 +42,23 @@ class WorkoutCompletionScreen extends StatefulWidget {
 
 class _WorkoutCompletionScreenState extends State<WorkoutCompletionScreen> {
   WeeklyWorkoutSummary? _weeklySummary;
-  String? _resolvedProfileName;
 
   @override
   void initState() {
     super.initState();
-    _resolvedProfileName = widget.profileName;
-    if (widget.persistSession) {
-      unawaited(_persistSessionAndLoadFeedback());
-    }
+    unawaited(_loadFeedback());
   }
 
-  Future<void> _persistSessionAndLoadFeedback() async {
+  Future<void> _loadFeedback() async {
     try {
-      final store = LocalStore();
-      final history = WorkoutSessionHistory(store);
-
-      String? profileId;
-      var profileName = widget.profileName;
-      try {
-        final profile = await HealthStore().activeLocalProfile();
-        profileId = profile.id;
-        profileName ??= profile.name;
-      } catch (_) {
-        // Workout history must still work if profile storage is unavailable.
-      }
-
-      var workoutId = 'snapshot:${widget.workoutName}';
-      try {
-        final workouts = await store.loadWorkouts();
-        for (final workout in workouts) {
-          if (workout.name == widget.workoutName) {
-            workoutId = workout.id;
-            break;
-          }
-        }
-      } catch (_) {
-        // The name snapshot is enough for weekly activity accounting.
-      }
-
-      await history.record(
-        workoutId: workoutId,
-        workoutName: widget.workoutName,
-        profileId: profileId,
-        profileName: profileName,
-        activeDuration: widget.activeTime,
-        completedSteps: widget.completedSteps,
-        totalSteps: widget.totalSteps,
-        status: WorkoutSessionStatus.completed,
-      );
-
-      final summary = await history.weeklySummary(profileId: profileId);
-      if (!mounted) return;
-      setState(() {
-        _weeklySummary = summary;
-        _resolvedProfileName = profileName;
-      });
+      final history = WorkoutSessionHistory(LocalStore());
+      final summary = await history.weeklySummary(profileId: widget.profileId);
+      if (!mounted || summary.completedCount == 0) return;
+      setState(() => _weeklySummary = summary);
     } catch (error) {
-      // Session persistence is useful feedback, but it must never make a
-      // successfully completed workout look like a failure.
-      debugPrint('Could not persist workout session: $error');
+      // Completion feedback is optional presentation. A history read failure
+      // must never make a successfully completed workout look like a failure.
+      debugPrint('Could not load workout feedback: $error');
     }
   }
 
@@ -183,11 +138,11 @@ class _WorkoutCompletionScreenState extends State<WorkoutCompletionScreen> {
                               fontWeight: FontWeight.w700,
                             ),
                       ),
-                      if (_resolvedProfileName != null &&
-                          _resolvedProfileName!.trim().isNotEmpty) ...[
+                      if (widget.profileName != null &&
+                          widget.profileName!.trim().isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
-                          _resolvedProfileName!,
+                          widget.profileName!,
                           textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: scheme.onSurfaceVariant,
