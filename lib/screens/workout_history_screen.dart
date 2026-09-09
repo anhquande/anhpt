@@ -32,6 +32,7 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   WorkoutHistoryStatusFilter _status = WorkoutHistoryStatusFilter.all;
   WorkoutHistoryPeriodFilter _period = WorkoutHistoryPeriodFilter.allTime;
   String? _workoutId;
+  final ScrollController _scrollController = ScrollController();
 
   WorkoutHistoryFilter get _filter => WorkoutHistoryFilter(
         status: _status,
@@ -45,6 +46,12 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
       _period = WorkoutHistoryPeriodFilter.allTime;
       _workoutId = null;
     });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -108,6 +115,8 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 760),
                 child: ListView(
+                  controller: _scrollController,
+                  key: const PageStorageKey('workout-history-list'),
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                   children: [
                     if (widget.profileName != null &&
