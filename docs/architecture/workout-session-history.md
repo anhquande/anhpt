@@ -4,7 +4,7 @@
 
 AnhPT needs a real session history before it can give factual progress feedback. `Workout.lastUsedAt` is not workout history: it stores only the most recent use of a workout and cannot answer how many sessions were completed in a week, month, or year.
 
-Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home. Issue #77 adds Workout History, #79 and #83 add monthly/yearly context, #86 adds Session Details, #88 adds Repeat workout, and #95 adds lightweight History filters as the list grows.
+Issue #68 introduced a small local session history as the source of truth for weekly activity feedback. Issue #75 exposes the same source of truth on Home. Issue #77 adds Workout History, #79 and #83 add monthly/yearly context, #86 adds Session Details, #88 adds Repeat workout, #95 adds lightweight History filters as the list grows, and #97 makes the workout player lifecycle the owner of terminal session persistence.
 
 ## Stored session
 
@@ -20,6 +20,20 @@ Each `WorkoutSession` stores a snapshot of:
 
 The v1 persistence key is `anhpt.workoutSessions.v1` in `SharedPreferences`. Filtering never writes to this store.
 
+## Player lifecycle persistence
+
+`WorkoutPlayerScreen` owns terminal session persistence because it is the surface that knows the exact running workout, profile context and terminal state.
+
+- a normal terminal `completed` state records one completed session;
+- an explicit early end records one `incomplete` session;
+- the installed `workoutId` is used directly instead of resolving a workout again from its display name;
+- the player start timestamp and terminal timestamp are stored separately from active workout duration;
+- the recorder is exactly-once, so repeated terminal listener notifications cannot duplicate a session;
+- terminal persistence is awaited before completion navigation or `shutdown_or_exit` device actions;
+- persistence failure is logged but does not turn a completed workout into a failed-workout UX.
+
+`WorkoutCompletionScreen` is presentation-only. It may read the already-persisted history to show weekly feedback, but it does not create or mutate sessions.
+
 ## Progress calculations
 
 Weekly, monthly and yearly summaries count only completed sessions and use local calendar boundaries. Profile filtering is applied before totals are presented. Monthly/yearly comparisons are informational only; AnhPT does not infer targets, streaks, success/failure, or motivational pressure.
@@ -30,7 +44,7 @@ All UI surfaces consume the same persisted history; none keeps a separate sessio
 
 ### Workout Completed
 
-After persistence, a lightweight `This week` card shows updated count and active minutes.
+After player persistence, a lightweight `This week` card reads the updated count and active minutes. Opening this screen does not write another session.
 
 ### Home
 
@@ -61,6 +75,6 @@ When the historical `workoutId` still resolves to an installed workout, `Repeat 
 
 ## Future extensions
 
-Possible later extensions include free-text history search, custom date ranges, calorie/Health metrics backed by real stored inputs, explicit incomplete-session recording earlier in the player lifecycle, history edit/delete rules, and richer charts if user feedback justifies them.
+Possible later extensions include free-text history search, custom date ranges, calorie/Health metrics backed by real stored inputs, history edit/delete rules, and richer charts if user feedback justifies them.
 
 If history grows beyond the scale appropriate for `SharedPreferences`, persistence can migrate to a local database while keeping `WorkoutSession` as the domain model.
