@@ -339,10 +339,13 @@ class _HistoryFilters extends StatelessWidget {
           const SizedBox(height: 14),
           LayoutBuilder(
             builder: (context, constraints) {
-              final compact = constraints.maxWidth < 560;
+              final fieldWidth = constraints.maxWidth >= 680
+                  ? (constraints.maxWidth - 24) / 3
+                  : constraints.maxWidth;
               final fields = [
                 DropdownButtonFormField<WorkoutHistoryPeriodFilter>(
                   key: const Key('workout-history-period-filter'),
+                  isExpanded: true,
                   initialValue: period,
                   decoration: const InputDecoration(
                     labelText: 'Period',
@@ -351,19 +354,19 @@ class _HistoryFilters extends StatelessWidget {
                   items: const [
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.allTime,
-                      child: Text('All time'),
+                      child: Text('All time', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.thisWeek,
-                      child: Text('This week'),
+                      child: Text('This week', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.thisMonth,
-                      child: Text('This month'),
+                      child: Text('This month', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistoryPeriodFilter.thisYear,
-                      child: Text('This year'),
+                      child: Text('This year', overflow: TextOverflow.ellipsis),
                     ),
                   ],
                   onChanged: (value) {
@@ -372,6 +375,7 @@ class _HistoryFilters extends StatelessWidget {
                 ),
                 DropdownButtonFormField<String?>(
                   key: const Key('workout-history-workout-filter'),
+                  isExpanded: true,
                   initialValue: workoutId,
                   decoration: const InputDecoration(
                     labelText: 'Workout',
@@ -380,7 +384,7 @@ class _HistoryFilters extends StatelessWidget {
                   items: [
                     const DropdownMenuItem<String?>(
                       value: null,
-                      child: Text('All workouts'),
+                      child: Text('All workouts', overflow: TextOverflow.ellipsis),
                     ),
                     for (final workout in workouts)
                       DropdownMenuItem<String?>(
@@ -395,6 +399,7 @@ class _HistoryFilters extends StatelessWidget {
                 ),
                 DropdownButtonFormField<WorkoutHistorySort>(
                   key: const Key('workout-history-sort'),
+                  isExpanded: true,
                   initialValue: sort,
                   decoration: const InputDecoration(
                     labelText: 'Sort',
@@ -403,19 +408,19 @@ class _HistoryFilters extends StatelessWidget {
                   items: const [
                     DropdownMenuItem(
                       value: WorkoutHistorySort.newestFirst,
-                      child: Text('Newest first'),
+                      child: Text('Newest first', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistorySort.oldestFirst,
-                      child: Text('Oldest first'),
+                      child: Text('Oldest first', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistorySort.longestDuration,
-                      child: Text('Longest duration'),
+                      child: Text('Longest duration', overflow: TextOverflow.ellipsis),
                     ),
                     DropdownMenuItem(
                       value: WorkoutHistorySort.shortestDuration,
-                      child: Text('Shortest duration'),
+                      child: Text('Shortest duration', overflow: TextOverflow.ellipsis),
                     ),
                   ],
                   onChanged: (value) {
@@ -424,23 +429,12 @@ class _HistoryFilters extends StatelessWidget {
                 ),
               ];
 
-              if (compact) {
-                return Column(
-                  children: [
-                    for (var index = 0; index < fields.length; index++) ...[
-                      fields[index],
-                      if (index < fields.length - 1) const SizedBox(height: 12),
-                    ],
-                  ],
-                );
-              }
-
-              return Row(
+              return Wrap(
+                spacing: 12,
+                runSpacing: 12,
                 children: [
-                  for (var index = 0; index < fields.length; index++) ...[
-                    Expanded(child: fields[index]),
-                    if (index < fields.length - 1) const SizedBox(width: 12),
-                  ],
+                  for (final field in fields)
+                    SizedBox(width: fieldWidth, child: field),
                 ],
               );
             },
