@@ -4,15 +4,19 @@ class WeeklyWorkoutSummary {
   final DateTime weekStart;
   final int completedWorkouts;
   final Duration activeDuration;
+  final int totalCalories;
   final int previousCompletedWorkouts;
   final Duration previousActiveDuration;
+  final int previousTotalCalories;
 
   const WeeklyWorkoutSummary({
     required this.weekStart,
     required this.completedWorkouts,
     required this.activeDuration,
+    this.totalCalories = 0,
     required this.previousCompletedWorkouts,
     required this.previousActiveDuration,
+    this.previousTotalCalories = 0,
   });
 
   bool get hasActivity => completedWorkouts > 0;
@@ -23,15 +27,19 @@ class MonthlyWorkoutSummary {
   final DateTime monthStart;
   final int completedWorkouts;
   final Duration activeDuration;
+  final int totalCalories;
   final int previousCompletedWorkouts;
   final Duration previousActiveDuration;
+  final int previousTotalCalories;
 
   const MonthlyWorkoutSummary({
     required this.monthStart,
     required this.completedWorkouts,
     required this.activeDuration,
+    this.totalCalories = 0,
     required this.previousCompletedWorkouts,
     required this.previousActiveDuration,
+    this.previousTotalCalories = 0,
   });
 
   bool get hasActivity => completedWorkouts > 0;
@@ -87,8 +95,10 @@ class WorkoutSessionAnalytics {
 
     var completedWorkouts = 0;
     var activeDuration = Duration.zero;
+    var totalCalories = 0;
     var previousCompletedWorkouts = 0;
     var previousActiveDuration = Duration.zero;
+    var previousTotalCalories = 0;
 
     for (final session in sessions) {
       if (!session.completed) continue;
@@ -97,10 +107,12 @@ class WorkoutSessionAnalytics {
       if (!endedAt.isBefore(weekStart) && endedAt.isBefore(nextWeekStart)) {
         completedWorkouts++;
         activeDuration += session.activeDuration;
+        totalCalories += session.estimatedCalories ?? 0;
       } else if (!endedAt.isBefore(previousWeekStart) &&
           endedAt.isBefore(weekStart)) {
         previousCompletedWorkouts++;
         previousActiveDuration += session.activeDuration;
+        previousTotalCalories += session.estimatedCalories ?? 0;
       }
     }
 
@@ -108,8 +120,10 @@ class WorkoutSessionAnalytics {
       weekStart: weekStart,
       completedWorkouts: completedWorkouts,
       activeDuration: activeDuration,
+      totalCalories: totalCalories,
       previousCompletedWorkouts: previousCompletedWorkouts,
       previousActiveDuration: previousActiveDuration,
+      previousTotalCalories: previousTotalCalories,
     );
   }
 
@@ -125,8 +139,10 @@ class WorkoutSessionAnalytics {
 
     var completedWorkouts = 0;
     var activeDuration = Duration.zero;
+    var totalCalories = 0;
     var previousCompletedWorkouts = 0;
     var previousActiveDuration = Duration.zero;
+    var previousTotalCalories = 0;
 
     for (final session in sessions) {
       if (!session.completed) continue;
@@ -135,10 +151,12 @@ class WorkoutSessionAnalytics {
       if (!endedAt.isBefore(monthStart) && endedAt.isBefore(nextMonthStart)) {
         completedWorkouts++;
         activeDuration += session.activeDuration;
+        totalCalories += session.estimatedCalories ?? 0;
       } else if (!endedAt.isBefore(previousMonthStart) &&
           endedAt.isBefore(monthStart)) {
         previousCompletedWorkouts++;
         previousActiveDuration += session.activeDuration;
+        previousTotalCalories += session.estimatedCalories ?? 0;
       }
     }
 
@@ -146,8 +164,10 @@ class WorkoutSessionAnalytics {
       monthStart: monthStart,
       completedWorkouts: completedWorkouts,
       activeDuration: activeDuration,
+      totalCalories: totalCalories,
       previousCompletedWorkouts: previousCompletedWorkouts,
       previousActiveDuration: previousActiveDuration,
+      previousTotalCalories: previousTotalCalories,
     );
   }
 
