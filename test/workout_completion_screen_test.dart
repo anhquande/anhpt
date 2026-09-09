@@ -1,5 +1,7 @@
+import 'package:anhpt/models/workout_session.dart';
 import 'package:anhpt/screens/workout_completion_screen.dart';
 import 'package:anhpt/services/local_store.dart';
+import 'package:anhpt/services/workout_session_history.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -21,7 +23,6 @@ void main() {
           completedSteps: 6,
           totalSteps: 6,
           progress: 1,
-          persistSession: false,
         ),
       ),
     );
@@ -53,7 +54,6 @@ void main() {
           estimatedCalories: 85,
           progressContext: 'You trained 3 times this week.',
           onViewProgress: () => viewedProgress = true,
-          persistSession: false,
         ),
       ),
     );
@@ -80,7 +80,6 @@ void main() {
           totalSteps: 3,
           progress: 1,
           onDone: () => done = true,
-          persistSession: false,
         ),
       ),
     );
@@ -90,14 +89,27 @@ void main() {
     expect(done, isTrue);
   });
 
-  testWidgets('completed workout persists and appears in weekly feedback',
+  testWidgets('completion reads weekly feedback without recording another session',
       (tester) async {
     SharedPreferences.setMockInitialValues({});
+    final store = LocalStore();
+    await WorkoutSessionHistory(store).record(
+      workoutId: 'weekly-demo',
+      workoutName: 'Weekly Demo',
+      profileId: 'me',
+      profileName: 'Me',
+      activeDuration: const Duration(minutes: 7),
+      completedSteps: 4,
+      totalSteps: 4,
+      status: WorkoutSessionStatus.completed,
+    );
 
     await tester.pumpWidget(
       const MaterialApp(
         home: WorkoutCompletionScreen(
           workoutName: 'Weekly Demo',
+          profileId: 'me',
+          profileName: 'Me',
           activeTime: Duration(minutes: 7),
           completedSteps: 4,
           totalSteps: 4,
@@ -110,10 +122,8 @@ void main() {
     expect(find.text('This week'), findsOneWidget);
     expect(find.text('1 workout • 7 min'), findsOneWidget);
 
-    final sessions = await LocalStore().loadWorkoutSessions();
+    final sessions = await store.loadWorkoutSessions();
     expect(sessions, hasLength(1));
-    expect(sessions.single.workoutName, 'Weekly Demo');
-    expect(sessions.single.completed, isTrue);
-    expect(sessions.single.activeDuration, const Duration(minutes: 7));
+    expect(sessions.single.workoutId, 'weekly-demo');
   });
 }

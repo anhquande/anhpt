@@ -26,16 +26,18 @@ class WorkoutSessionHistory {
     required int completedSteps,
     required int totalSteps,
     required WorkoutSessionStatus status,
+    DateTime? startedAt,
     DateTime? endedAt,
   }) async {
     final end = endedAt ?? DateTime.now();
+    final start = startedAt ?? end.subtract(activeDuration);
     final session = WorkoutSession(
       id: 'session_${end.microsecondsSinceEpoch}',
       workoutId: workoutId,
       workoutName: workoutName,
       profileId: profileId,
       profileName: profileName,
-      startedAt: end.subtract(activeDuration),
+      startedAt: start,
       endedAt: end,
       activeDuration: activeDuration,
       completedSteps: completedSteps.clamp(0, totalSteps).toInt(),

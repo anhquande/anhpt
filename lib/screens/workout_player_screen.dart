@@ -11,10 +11,13 @@ import '../app/workout_camera_preference.dart';
 import '../core/session_engine.dart';
 import '../models/background_music.dart';
 import '../models/workout.dart';
+import '../models/workout_session.dart';
 import '../services/audio_feedback_service.dart';
 import '../services/background_music_service.dart';
 import '../services/device_action_service.dart';
 import '../services/voice_guide_controller.dart';
+import '../services/workout_session_history.dart';
+import '../services/workout_session_recorder.dart';
 import '../widgets/common.dart';
 import '../widgets/demonstration_media.dart';
 import '../widgets/workout_camera_comparison.dart';
@@ -86,6 +89,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   late final AudioFeedbackService audio;
   late final BackgroundMusicService music;
   late final VoiceGuideController voiceGuide;
+  late final WorkoutSessionRecorder sessionRecorder;
   final DeviceActionService deviceActions = DeviceActionService();
   Timer? _screenOffTimer;
   Timer? _centerFeedbackTimer;
@@ -125,6 +129,14 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     super.initState();
     final workout = widget.controller.byId(widget.workoutId)!;
     engine = SessionEngine(workout);
+    sessionRecorder = WorkoutSessionRecorder(
+      history: WorkoutSessionHistory(widget.controller.store),
+      workoutId: workout.id,
+      workoutName: workout.name,
+      profileId: widget.profileId,
+      profileName: widget.profileName,
+      startedAt: DateTime.now(),
+    );
     music = BackgroundMusicService();
     audio = AudioFeedbackService(onCoachAudioChanged: music.setCoachActive);
     voiceGuide = VoiceGuideController(
@@ -363,7 +375,36 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     }
   }
 
+  int _terminalCompletedSteps() {
+    final totalSteps = engine.totalEffectiveSteps;
+    if (engine.status == SessionStatus.completed) return totalSteps;
+    final completedCurrent = engine.timerFinished ? 1 : 0;
+    return (engine.stepIndex + completedCurrent).clamp(0, totalSteps).toInt();
+  }
+
+  Future<void> _recordTerminalSession() async {
+    final status = engine.status;
+    if (status != SessionStatus.completed && status != SessionStatus.incomplete) {
+      return;
+    }
+    try {
+      await sessionRecorder.recordTerminal(
+        status: status == SessionStatus.completed
+            ? WorkoutSessionStatus.completed
+            : WorkoutSessionStatus.incomplete,
+        activeDuration: engine.activeElapsed,
+        completedSteps: _terminalCompletedSteps(),
+        totalSteps: engine.totalEffectiveSteps,
+        endedAt: DateTime.now(),
+      );
+    } catch (error) {
+      debugPrint('Could not persist terminal workout session: $error');
+    }
+  }
+
   Future<void> _summary() async {
+    await _recordTerminalSession();
+
     final complete = engine.status == SessionStatus.completed;
     if (complete && engine.workout.completionAction == 'shutdown_or_exit') {
       final action =
@@ -375,12 +416,13 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     }
 
     if (complete) {
-      final totalSteps = engine.workout.expand().length;
+      final totalSteps = engine.totalEffectiveSteps;
       if (!mounted) return;
       await Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
           builder: (_) => WorkoutCompletionScreen(
             workoutName: engine.workout.name,
+            profileId: widget.profileId,
             profileName: widget.profileName,
             activeTime: engine.activeElapsed,
             completedSteps: totalSteps,
@@ -392,6 +434,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       return;
     }
 
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
