@@ -3,13 +3,14 @@ import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../models/workout_session.dart';
 import '../services/local_store.dart';
+import '../services/workout_history_filter.dart';
 import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
 import '../widgets/monthly_workout_progress.dart';
 import '../widgets/yearly_workout_progress.dart';
 import 'workout_session_detail_screen.dart';
 
-class WorkoutHistoryScreen extends StatelessWidget {
+class WorkoutHistoryScreen extends StatefulWidget {
   final LocalStore store;
   final String profileId;
   final String? profileName;
@@ -24,6 +25,29 @@ class WorkoutHistoryScreen extends StatelessWidget {
   });
 
   @override
+  State<WorkoutHistoryScreen> createState() => _WorkoutHistoryScreenState();
+}
+
+class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
+  WorkoutHistoryStatusFilter _status = WorkoutHistoryStatusFilter.all;
+  WorkoutHistoryPeriodFilter _period = WorkoutHistoryPeriodFilter.allTime;
+  String? _workoutId;
+
+  WorkoutHistoryFilter get _filter => WorkoutHistoryFilter(
+        status: _status,
+        period: _period,
+        workoutId: _workoutId,
+      );
+
+  void _clearFilters() {
+    setState(() {
+      _status = WorkoutHistoryStatusFilter.all;
+      _period = WorkoutHistoryPeriodFilter.allTime;
+      _workoutId = null;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -35,7 +59,7 @@ class WorkoutHistoryScreen extends StatelessWidget {
       body: ValueListenableBuilder<int>(
         valueListenable: WorkoutSessionHistory.revision,
         builder: (context, _, __) => FutureBuilder<List<WorkoutSession>>(
-          future: WorkoutSessionHistory(store).load(),
+          future: WorkoutSessionHistory(widget.store).load(),
           builder: (context, snapshot) {
             if (snapshot.connectionState != ConnectionState.done) {
               return const Center(child: CircularProgressIndicator());
@@ -49,7 +73,7 @@ class WorkoutHistoryScreen extends StatelessWidget {
             }
 
             final sessions = (snapshot.data ?? const <WorkoutSession>[])
-                .where((session) => session.profileId == profileId)
+                .where((session) => session.profileId == widget.profileId)
                 .toList()
               ..sort((a, b) => b.endedAt.compareTo(a.endedAt));
 
@@ -57,32 +81,41 @@ class WorkoutHistoryScreen extends StatelessWidget {
               return _HistoryMessage(
                 icon: Icons.history_toggle_off,
                 title: 'No workout history yet',
-                message: profileName == null || profileName!.trim().isEmpty
+                message: widget.profileName == null ||
+                        widget.profileName!.trim().isEmpty
                     ? 'Workout sessions for this profile will appear here.'
-                    : 'Workout sessions for ${profileName!.trim()} will appear here.',
+                    : 'Workout sessions for ${widget.profileName!.trim()} will appear here.',
               );
             }
 
             final monthlySummary = WorkoutSessionAnalytics.monthlySummary(
               sessions,
-              profileId: profileId,
+              profileId: widget.profileId,
             );
             final yearlySummary = WorkoutSessionAnalytics.yearlySummary(
               sessions,
-              profileId: profileId,
+              profileId: widget.profileId,
             );
-            final groups = _groupByDay(sessions);
+            final workouts = _workoutChoices(sessions);
+            if (_workoutId != null &&
+                !workouts.any((entry) => entry.$1 == _workoutId)) {
+              _workoutId = null;
+            }
+            final filteredSessions = _filter.apply(sessions);
+            final groups = _groupByDay(filteredSessions);
+
             return Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 760),
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
                   children: [
-                    if (profileName != null && profileName!.trim().isNotEmpty)
+                    if (widget.profileName != null &&
+                        widget.profileName!.trim().isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 16),
                         child: Text(
-                          profileName!.trim(),
+                          widget.profileName!.trim(),
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Theme.of(context)
                                     .colorScheme
@@ -94,18 +127,35 @@ class WorkoutHistoryScreen extends StatelessWidget {
                     const SizedBox(height: 16),
                     YearlyWorkoutProgressCard(summary: yearlySummary),
                     const SizedBox(height: 20),
-                    for (final entry in groups.entries) ...[
-                      _DayHeading(day: entry.key),
-                      const SizedBox(height: 8),
-                      for (final session in entry.value) ...[
-                        _HistorySessionTile(
-                          session: session,
-                          controller: controller,
-                        ),
+                    _HistoryFilters(
+                      status: _status,
+                      period: _period,
+                      workoutId: _workoutId,
+                      workouts: workouts,
+                      resultCount: filteredSessions.length,
+                      showClear: !_filter.isDefault,
+                      onStatusChanged: (value) => setState(() => _status = value),
+                      onPeriodChanged: (value) => setState(() => _period = value),
+                      onWorkoutChanged: (value) =>
+                          setState(() => _workoutId = value),
+                      onClear: _clearFilters,
+                    ),
+                    const SizedBox(height: 20),
+                    if (filteredSessions.isEmpty)
+                      const _FilteredEmptyState()
+                    else
+                      for (final entry in groups.entries) ...[
+                        _DayHeading(day: entry.key),
                         const SizedBox(height: 8),
+                        for (final session in entry.value) ...[
+                          _HistorySessionTile(
+                            session: session,
+                            controller: widget.controller,
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        const SizedBox(height: 12),
                       ],
-                      const SizedBox(height: 12),
-                    ],
                   ],
                 ),
               ),
@@ -114,6 +164,16 @@ class WorkoutHistoryScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static List<(String, String)> _workoutChoices(List<WorkoutSession> sessions) {
+    final names = <String, String>{};
+    for (final session in sessions) {
+      names.putIfAbsent(session.workoutId, () => session.workoutName);
+    }
+    final entries = names.entries.map((entry) => (entry.key, entry.value)).toList();
+    entries.sort((a, b) => a.$2.toLowerCase().compareTo(b.$2.toLowerCase()));
+    return entries;
   }
 
   static Map<DateTime, List<WorkoutSession>> _groupByDay(
@@ -125,6 +185,208 @@ class WorkoutHistoryScreen extends StatelessWidget {
       groups.putIfAbsent(day, () => <WorkoutSession>[]).add(session);
     }
     return groups;
+  }
+}
+
+class _HistoryFilters extends StatelessWidget {
+  final WorkoutHistoryStatusFilter status;
+  final WorkoutHistoryPeriodFilter period;
+  final String? workoutId;
+  final List<(String, String)> workouts;
+  final int resultCount;
+  final bool showClear;
+  final ValueChanged<WorkoutHistoryStatusFilter> onStatusChanged;
+  final ValueChanged<WorkoutHistoryPeriodFilter> onPeriodChanged;
+  final ValueChanged<String?> onWorkoutChanged;
+  final VoidCallback onClear;
+
+  const _HistoryFilters({
+    required this.status,
+    required this.period,
+    required this.workoutId,
+    required this.workouts,
+    required this.resultCount,
+    required this.showClear,
+    required this.onStatusChanged,
+    required this.onPeriodChanged,
+    required this.onWorkoutChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      key: const Key('workout-history-filters'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatusChip(
+                label: 'All',
+                value: WorkoutHistoryStatusFilter.all,
+                selected: status == WorkoutHistoryStatusFilter.all,
+                onSelected: onStatusChanged,
+              ),
+              _StatusChip(
+                label: 'Completed',
+                value: WorkoutHistoryStatusFilter.completed,
+                selected: status == WorkoutHistoryStatusFilter.completed,
+                onSelected: onStatusChanged,
+              ),
+              _StatusChip(
+                label: 'Incomplete',
+                value: WorkoutHistoryStatusFilter.incomplete,
+                selected: status == WorkoutHistoryStatusFilter.incomplete,
+                onSelected: onStatusChanged,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<WorkoutHistoryPeriodFilter>(
+                  key: const Key('workout-history-period-filter'),
+                  initialValue: period,
+                  decoration: const InputDecoration(
+                    labelText: 'Period',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: WorkoutHistoryPeriodFilter.allTime,
+                      child: Text('All time'),
+                    ),
+                    DropdownMenuItem(
+                      value: WorkoutHistoryPeriodFilter.thisWeek,
+                      child: Text('This week'),
+                    ),
+                    DropdownMenuItem(
+                      value: WorkoutHistoryPeriodFilter.thisMonth,
+                      child: Text('This month'),
+                    ),
+                    DropdownMenuItem(
+                      value: WorkoutHistoryPeriodFilter.thisYear,
+                      child: Text('This year'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) onPeriodChanged(value);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String?>(
+                  key: const Key('workout-history-workout-filter'),
+                  initialValue: workoutId,
+                  decoration: const InputDecoration(
+                    labelText: 'Workout',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('All workouts'),
+                    ),
+                    for (final workout in workouts)
+                      DropdownMenuItem<String?>(
+                        value: workout.$1,
+                        child: Text(
+                          workout.$2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: onWorkoutChanged,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Text(
+                '$resultCount ${resultCount == 1 ? 'session' : 'sessions'}',
+                key: const Key('workout-history-result-count'),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              if (showClear)
+                TextButton.icon(
+                  key: const Key('workout-history-clear-filters'),
+                  onPressed: onClear,
+                  icon: const Icon(Icons.filter_alt_off_outlined),
+                  label: const Text('Clear filters'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final String label;
+  final WorkoutHistoryStatusFilter value;
+  final bool selected;
+  final ValueChanged<WorkoutHistoryStatusFilter> onSelected;
+
+  const _StatusChip({
+    required this.label,
+    required this.value,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      key: ValueKey('workout-history-status-${value.name}'),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) => onSelected(value),
+    );
+  }
+}
+
+class _FilteredEmptyState extends StatelessWidget {
+  const _FilteredEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 36),
+      child: Column(
+        children: [
+          Icon(
+            Icons.filter_alt_off_outlined,
+            size: 38,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No sessions match these filters.',
+            key: Key('workout-history-filter-empty'),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
   }
 }
 
