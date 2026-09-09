@@ -48,33 +48,31 @@ void main() {
     final listFinder = find.byKey(
       const PageStorageKey<String>('workout-history-list'),
     );
+    final completedFilter = find.byKey(
+      const ValueKey('workout-history-status-completed'),
+    );
     expect(listFinder, findsOneWidget);
 
-    await tester.scrollUntilVisible(
-      find.byKey(const ValueKey('workout-history-status-completed')),
-      220,
-      scrollable: find.descendant(
-        of: listFinder,
-        matching: find.byType(Scrollable),
-      ),
-    );
+    // Scroll the actual history ListView instead of asking scrollUntilVisible
+    // to infer a Scrollable. The filter controls contain other scrollable
+    // widgets (dropdown internals), so a generic Scrollable finder is
+    // ambiguous in widget tests even though the production page has one
+    // primary vertical history list.
+    await tester.drag(listFinder, const Offset(0, -650));
     await tester.pumpAndSettle();
+
+    expect(completedFilter.hitTestable(), findsOneWidget);
 
     final beforeController = tester.widget<ListView>(listFinder).controller!;
     final before = beforeController.offset;
     expect(before, greaterThan(0));
 
-    await tester.tap(
-      find.byKey(const ValueKey('workout-history-status-completed')),
-    );
+    await tester.tap(completedFilter);
     await tester.pumpAndSettle();
 
     final afterController = tester.widget<ListView>(listFinder).controller!;
     final after = afterController.offset;
     expect(after, closeTo(before, 1));
-    expect(
-      find.byKey(const ValueKey('workout-history-status-completed')),
-      findsOneWidget,
-    );
+    expect(completedFilter, findsOneWidget);
   });
 }
