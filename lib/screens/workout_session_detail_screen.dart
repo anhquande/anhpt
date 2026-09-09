@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_controller.dart';
 import '../models/workout_session.dart';
+import 'workout_player_screen.dart';
 
 class WorkoutSessionDetailScreen extends StatelessWidget {
   final WorkoutSession session;
+  final AppController? controller;
 
   const WorkoutSessionDetailScreen({
     super.key,
     required this.session,
+    this.controller,
   });
 
   @override
@@ -26,6 +30,7 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
     final endedAt = localizations.formatTimeOfDay(
       TimeOfDay.fromDateTime(session.endedAt),
     );
+    final canRepeat = controller?.byId(session.workoutId) != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -158,6 +163,24 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
                     ),
                 ],
               ),
+              if (canRepeat) ...[
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  key: const Key('session-detail-repeat-workout'),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => WorkoutPlayerScreen(
+                        controller: controller!,
+                        workoutId: session.workoutId,
+                        profileId: session.profileId,
+                        profileName: session.profileName,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.replay),
+                  label: const Text('Repeat workout'),
+                ),
+              ],
             ],
           ),
         ),
