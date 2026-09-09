@@ -174,11 +174,10 @@ void main() {
       ),
     );
 
+    final repeat = find.byKey(const Key('session-detail-repeat-workout'));
+    await tester.scrollUntilVisible(repeat, 250);
     expect(find.text('Repeat workout'), findsOneWidget);
-    expect(
-      find.byKey(const Key('session-detail-repeat-workout')),
-      findsOneWidget,
-    );
+    expect(repeat, findsOneWidget);
   });
 
   testWidgets('removed workout does not expose a broken repeat action',
@@ -218,7 +217,9 @@ void main() {
     );
 
     expect(observer.pushes, 1);
-    await tester.tap(find.text('Repeat workout'));
+    final repeat = find.byKey(const Key('session-detail-repeat-workout'));
+    await tester.scrollUntilVisible(repeat, 250);
+    await tester.tap(repeat);
 
     expect(observer.pushes, 2);
   });
