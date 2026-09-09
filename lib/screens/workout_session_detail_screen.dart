@@ -96,6 +96,114 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
     }
   }
 
+  Future<void> _editMetrics() async {
+    var caloriesText = _session.estimatedCalories?.toString() ?? '';
+    var effort = _session.effort;
+    String? validationError;
+
+    final result = await showDialog<_MetricsEditResult>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Workout metrics'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const Key('session-detail-calories-editor'),
+                initialValue: caloriesText,
+                keyboardType: TextInputType.number,
+                onChanged: (value) {
+                  caloriesText = value;
+                  if (validationError != null) {
+                    setDialogState(() => validationError = null);
+                  }
+                },
+                decoration: InputDecoration(
+                  labelText: 'Calories',
+                  suffixText: 'kcal',
+                  errorText: validationError,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<WorkoutSessionEffort?>(
+                key: const Key('session-detail-effort-editor'),
+                initialValue: effort,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Effort',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('Not set')),
+                  DropdownMenuItem(
+                    value: WorkoutSessionEffort.easy,
+                    child: Text('Easy'),
+                  ),
+                  DropdownMenuItem(
+                    value: WorkoutSessionEffort.moderate,
+                    child: Text('Moderate'),
+                  ),
+                  DropdownMenuItem(
+                    value: WorkoutSessionEffort.hard,
+                    child: Text('Hard'),
+                  ),
+                ],
+                onChanged: (value) => effort = value,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const Key('session-detail-save-metrics'),
+              onPressed: () {
+                final trimmed = caloriesText.trim();
+                final parsed = trimmed.isEmpty ? null : int.tryParse(trimmed);
+                if (trimmed.isNotEmpty && (parsed == null || parsed < 0)) {
+                  setDialogState(
+                    () => validationError = 'Enter a non-negative whole number.',
+                  );
+                  return;
+                }
+                Navigator.of(dialogContext).pop(
+                  _MetricsEditResult(parsed, effort),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      final updated = await WorkoutSessionHistory(LocalStore()).updateMetrics(
+        sessionId: _session.id,
+        estimatedCalories: result.estimatedCalories,
+        effort: result.effort,
+      );
+      if (!mounted) return;
+      if (updated == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This session could not be found.')),
+        );
+        return;
+      }
+      setState(() => _session = updated);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save workout metrics.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final session = _session;
@@ -247,10 +355,9 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
                 ],
               ),
               const SizedBox(height: 20),
-              _NoteCard(
-                note: session.note,
-                onEdit: _editNote,
-              ),
+              _MetricsCard(session: session, onEdit: _editMetrics),
+              const SizedBox(height: 20),
+              _NoteCard(note: session.note, onEdit: _editNote),
               if (canRepeat) ...[
                 const SizedBox(height: 20),
                 FilledButton.icon(
@@ -289,10 +396,111 @@ class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen>
   }
 }
 
+class _MetricsEditResult {
+  final int? estimatedCalories;
+  final WorkoutSessionEffort? effort;
+
+  const _MetricsEditResult(this.estimatedCalories, this.effort);
+}
+
 class _NoteEditResult {
   final String note;
 
   const _NoteEditResult(this.note);
+}
+
+class _MetricsCard extends StatelessWidget {
+  final WorkoutSession session;
+  final VoidCallback onEdit;
+
+  const _MetricsCard({required this.session, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final calories = session.estimatedCalories;
+    final effort = session.effort;
+    final hasMetrics = calories != null || effort != null;
+    return Container(
+      key: const Key('session-detail-metrics'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.monitor_heart_outlined, size: 21),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Workout metrics',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ),
+              IconButton(
+                key: const Key('session-detail-edit-metrics'),
+                tooltip: hasMetrics ? 'Edit metrics' : 'Add metrics',
+                onPressed: onEdit,
+                icon: Icon(hasMetrics ? Icons.edit_outlined : Icons.add),
+              ),
+            ],
+          ),
+          if (!hasMetrics)
+            Text(
+              'Add calories and how hard this workout felt.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+            )
+          else ...[
+            if (calories != null)
+              _MetricLine(
+                key: const Key('session-detail-calories'),
+                label: 'Calories',
+                value: '$calories kcal',
+              ),
+            if (effort != null)
+              _MetricLine(
+                key: const Key('session-detail-effort'),
+                label: 'Effort',
+                value: switch (effort) {
+                  WorkoutSessionEffort.easy => 'Easy',
+                  WorkoutSessionEffort.moderate => 'Moderate',
+                  WorkoutSessionEffort.hard => 'Hard',
+                },
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MetricLine extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MetricLine({super.key, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          Text(value, style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
 }
 
 class _NoteCard extends StatelessWidget {
