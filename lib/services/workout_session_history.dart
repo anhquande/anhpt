@@ -51,6 +51,23 @@ class WorkoutSessionHistory {
     return session;
   }
 
+  Future<WorkoutSession?> updateNote({
+    required String sessionId,
+    required String? note,
+  }) async {
+    final sessions = await load();
+    final index = sessions.indexWhere((session) => session.id == sessionId);
+    if (index < 0) return null;
+
+    final updated = sessions[index].copyWithNote(note);
+    if (updated.note == sessions[index].note) return updated;
+
+    sessions[index] = updated;
+    await store.saveWorkoutSessions(sessions);
+    revision.value++;
+    return updated;
+  }
+
   Future<WeeklyWorkoutSummary> weeklySummary({
     DateTime? now,
     String? profileId,

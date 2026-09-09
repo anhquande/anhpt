@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../app/app_controller.dart';
 import '../models/workout_session.dart';
+import '../services/local_store.dart';
+import '../services/workout_session_history.dart';
 import 'workout_player_screen.dart';
 
-class WorkoutSessionDetailScreen extends StatelessWidget {
+class WorkoutSessionDetailScreen extends StatefulWidget {
   final WorkoutSession session;
   final AppController? controller;
 
@@ -15,7 +17,88 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
   });
 
   @override
+  State<WorkoutSessionDetailScreen> createState() =>
+      _WorkoutSessionDetailScreenState();
+}
+
+class _WorkoutSessionDetailScreenState extends State<WorkoutSessionDetailScreen> {
+  late WorkoutSession _session;
+
+  @override
+  void initState() {
+    super.initState();
+    _session = widget.session;
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkoutSessionDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.id != widget.session.id) {
+      _session = widget.session;
+    }
+  }
+
+  Future<void> _editNote() async {
+    var draftNote = _session.note ?? '';
+    final result = await showDialog<_NoteEditResult>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Session note'),
+        content: TextFormField(
+          key: const Key('session-detail-note-editor'),
+          initialValue: draftNote,
+          onChanged: (value) => draftNote = value,
+          autofocus: true,
+          minLines: 3,
+          maxLines: 6,
+          maxLength: 500,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'How did this workout feel?',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const Key('session-detail-save-note'),
+            onPressed: () => Navigator.of(context).pop(
+              _NoteEditResult(draftNote),
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (result == null || !mounted) return;
+
+    try {
+      final updated = await WorkoutSessionHistory(LocalStore()).updateNote(
+        sessionId: _session.id,
+        note: result.note,
+      );
+      if (!mounted) return;
+      if (updated == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This session could not be found.')),
+        );
+        return;
+      }
+      setState(() => _session = updated);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save the session note.')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final session = _session;
     final localizations = MaterialLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final incomplete = session.status == WorkoutSessionStatus.incomplete;
@@ -30,7 +113,7 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
     final endedAt = localizations.formatTimeOfDay(
       TimeOfDay.fromDateTime(session.endedAt),
     );
-    final canRepeat = controller?.byId(session.workoutId) != null;
+    final canRepeat = widget.controller?.byId(session.workoutId) != null;
 
     return Scaffold(
       appBar: AppBar(
@@ -163,6 +246,11 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
                     ),
                 ],
               ),
+              const SizedBox(height: 20),
+              _NoteCard(
+                note: session.note,
+                onEdit: _editNote,
+              ),
               if (canRepeat) ...[
                 const SizedBox(height: 20),
                 FilledButton.icon(
@@ -170,7 +258,7 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
                   onPressed: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => WorkoutPlayerScreen(
-                        controller: controller!,
+                        controller: widget.controller!,
                         workoutId: session.workoutId,
                         profileId: session.profileId,
                         profileName: session.profileName,
@@ -196,8 +284,69 @@ class WorkoutSessionDetailScreen extends StatelessWidget {
       if (duration.inMinutes == 0) return '<1 min';
       return '${duration.inMinutes} min';
     }
-    if (minutes == 0) return '${hours}h';
-    return '${hours}h ${minutes} min';
+    if (minutes == 0) return '$hours' 'h';
+    return '$hours' 'h $minutes min';
+  }
+}
+
+class _NoteEditResult {
+  final String note;
+
+  const _NoteEditResult(this.note);
+}
+
+class _NoteCard extends StatelessWidget {
+  final String? note;
+  final VoidCallback onEdit;
+
+  const _NoteCard({required this.note, required this.onEdit});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final hasNote = note != null && note!.trim().isNotEmpty;
+    return Container(
+      key: const Key('session-detail-notes'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.notes_outlined, size: 21),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Notes',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+              ),
+              IconButton(
+                key: const Key('session-detail-edit-note'),
+                tooltip: hasNote ? 'Edit note' : 'Add note',
+                onPressed: onEdit,
+                icon: Icon(hasNote ? Icons.edit_outlined : Icons.add),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasNote ? note!.trim() : 'Add a note about how this workout felt.',
+            key: const Key('session-detail-note'),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: hasNote ? null : scheme.onSurfaceVariant,
+                ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
