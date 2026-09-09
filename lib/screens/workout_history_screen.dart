@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../app/app_controller.dart';
 import '../models/workout_session.dart';
 import '../services/local_store.dart';
 import '../services/workout_session_analytics.dart';
@@ -12,12 +13,14 @@ class WorkoutHistoryScreen extends StatelessWidget {
   final LocalStore store;
   final String profileId;
   final String? profileName;
+  final AppController? controller;
 
   const WorkoutHistoryScreen({
     super.key,
     required this.store,
     required this.profileId,
     this.profileName,
+    this.controller,
   });
 
   @override
@@ -95,7 +98,10 @@ class WorkoutHistoryScreen extends StatelessWidget {
                       _DayHeading(day: entry.key),
                       const SizedBox(height: 8),
                       for (final session in entry.value) ...[
-                        _HistorySessionTile(session: session),
+                        _HistorySessionTile(
+                          session: session,
+                          controller: controller,
+                        ),
                         const SizedBox(height: 8),
                       ],
                       const SizedBox(height: 12),
@@ -150,8 +156,9 @@ class _DayHeading extends StatelessWidget {
 
 class _HistorySessionTile extends StatelessWidget {
   final WorkoutSession session;
+  final AppController? controller;
 
-  const _HistorySessionTile({required this.session});
+  const _HistorySessionTile({required this.session, this.controller});
 
   @override
   Widget build(BuildContext context) {
@@ -172,7 +179,10 @@ class _HistorySessionTile extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => WorkoutSessionDetailScreen(session: session),
+            builder: (_) => WorkoutSessionDetailScreen(
+              session: session,
+              controller: controller,
+            ),
           ),
         ),
         child: Ink(
