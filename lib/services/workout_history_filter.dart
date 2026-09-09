@@ -2,7 +2,7 @@ import '../models/workout_session.dart';
 
 enum WorkoutHistoryStatusFilter { all, completed, incomplete }
 
-enum WorkoutHistoryPeriodFilter { allTime, thisWeek, thisMonth, thisYear }
+enum WorkoutHistoryPeriodFilter { allTime, thisWeek, thisMonth, thisYear, customRange }
 
 enum WorkoutHistorySort {
   newestFirst,
@@ -17,6 +17,8 @@ class WorkoutHistoryFilter {
   final String? workoutId;
   final String searchQuery;
   final WorkoutHistorySort sort;
+  final DateTime? customStartDate;
+  final DateTime? customEndDate;
 
   const WorkoutHistoryFilter({
     this.status = WorkoutHistoryStatusFilter.all,
@@ -24,6 +26,8 @@ class WorkoutHistoryFilter {
     this.workoutId,
     this.searchQuery = '',
     this.sort = WorkoutHistorySort.newestFirst,
+    this.customStartDate,
+    this.customEndDate,
   });
 
   bool get isDefault =>
@@ -115,6 +119,19 @@ class WorkoutHistoryFilter {
           DateTime(now.year),
           DateTime(now.year + 1),
         ),
+      WorkoutHistoryPeriodFilter.customRange => _customBounds(),
     };
+  }
+
+  (DateTime, DateTime)? _customBounds() {
+    final start = customStartDate;
+    final end = customEndDate;
+    if (start == null || end == null) return null;
+
+    final startDay = DateTime(start.year, start.month, start.day);
+    final endExclusive = DateTime(end.year, end.month, end.day).add(
+      const Duration(days: 1),
+    );
+    return (startDay, endExclusive);
   }
 }
