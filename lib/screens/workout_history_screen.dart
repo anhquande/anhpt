@@ -34,11 +34,66 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
   String? _workoutId;
   final ScrollController _scrollController = ScrollController();
 
+  List<WorkoutSession> _sessions = const [];
+  bool _loading = true;
+  bool _loadFailed = false;
+
   WorkoutHistoryFilter get _filter => WorkoutHistoryFilter(
         status: _status,
         period: _period,
         workoutId: _workoutId,
       );
+
+  @override
+  void initState() {
+    super.initState();
+    WorkoutSessionHistory.revision.addListener(_onHistoryRevisionChanged);
+    _loadHistory();
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkoutHistoryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.store != widget.store || oldWidget.profileId != widget.profileId) {
+      _workoutId = null;
+      _loadHistory();
+    }
+  }
+
+  void _onHistoryRevisionChanged() => _loadHistory(showLoading: false);
+
+  Future<void> _loadHistory({bool showLoading = true}) async {
+    if (showLoading && mounted) {
+      setState(() {
+        _loading = true;
+        _loadFailed = false;
+      });
+    }
+
+    try {
+      final loaded = await WorkoutSessionHistory(widget.store).load();
+      final sessions = loaded
+          .where((session) => session.profileId == widget.profileId)
+          .toList()
+        ..sort((a, b) => b.endedAt.compareTo(a.endedAt));
+      if (!mounted) return;
+      setState(() {
+        _sessions = sessions;
+        _loading = false;
+        _loadFailed = false;
+        if (_workoutId != null &&
+            !sessions.any((session) => session.workoutId == _workoutId)) {
+          _workoutId = null;
+        }
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _loadFailed = true;
+      });
+    }
+  }
 
   void _clearFilters() {
     setState(() {
@@ -50,6 +105,7 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
 
   @override
   void dispose() {
+    WorkoutSessionHistory.revision.removeListener(_onHistoryRevisionChanged);
     _scrollController.dispose();
     super.dispose();
   }
@@ -63,113 +119,95 @@ class _WorkoutHistoryScreenState extends State<WorkoutHistoryScreen> {
           style: TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
-      body: ValueListenableBuilder<int>(
-        valueListenable: WorkoutSessionHistory.revision,
-        builder: (context, _, __) => FutureBuilder<List<WorkoutSession>>(
-          future: WorkoutSessionHistory(widget.store).load(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState != ConnectionState.done) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            if (snapshot.hasError) {
-              return const _HistoryMessage(
-                icon: Icons.error_outline,
-                title: 'Could not load workout history',
-                message: 'Your workout data was not changed.',
-              );
-            }
+      body: _buildBody(context),
+    );
+  }
 
-            final sessions = (snapshot.data ?? const <WorkoutSession>[])
-                .where((session) => session.profileId == widget.profileId)
-                .toList()
-              ..sort((a, b) => b.endedAt.compareTo(a.endedAt));
+  Widget _buildBody(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_loadFailed) {
+      return const _HistoryMessage(
+        icon: Icons.error_outline,
+        title: 'Could not load workout history',
+        message: 'Your workout data was not changed.',
+      );
+    }
+    if (_sessions.isEmpty) {
+      return _HistoryMessage(
+        icon: Icons.history_toggle_off,
+        title: 'No workout history yet',
+        message: widget.profileName == null || widget.profileName!.trim().isEmpty
+            ? 'Workout sessions for this profile will appear here.'
+            : 'Workout sessions for ${widget.profileName!.trim()} will appear here.',
+      );
+    }
 
-            if (sessions.isEmpty) {
-              return _HistoryMessage(
-                icon: Icons.history_toggle_off,
-                title: 'No workout history yet',
-                message: widget.profileName == null ||
-                        widget.profileName!.trim().isEmpty
-                    ? 'Workout sessions for this profile will appear here.'
-                    : 'Workout sessions for ${widget.profileName!.trim()} will appear here.',
-              );
-            }
+    final monthlySummary = WorkoutSessionAnalytics.monthlySummary(
+      _sessions,
+      profileId: widget.profileId,
+    );
+    final yearlySummary = WorkoutSessionAnalytics.yearlySummary(
+      _sessions,
+      profileId: widget.profileId,
+    );
+    final workouts = _workoutChoices(_sessions);
+    final filteredSessions = _filter.apply(_sessions);
+    final groups = _groupByDay(filteredSessions);
 
-            final monthlySummary = WorkoutSessionAnalytics.monthlySummary(
-              sessions,
-              profileId: widget.profileId,
-            );
-            final yearlySummary = WorkoutSessionAnalytics.yearlySummary(
-              sessions,
-              profileId: widget.profileId,
-            );
-            final workouts = _workoutChoices(sessions);
-            if (_workoutId != null &&
-                !workouts.any((entry) => entry.$1 == _workoutId)) {
-              _workoutId = null;
-            }
-            final filteredSessions = _filter.apply(sessions);
-            final groups = _groupByDay(filteredSessions);
-
-            return Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 760),
-                child: ListView(
-                  controller: _scrollController,
-                  key: const PageStorageKey('workout-history-list'),
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
-                  children: [
-                    if (widget.profileName != null &&
-                        widget.profileName!.trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          widget.profileName!.trim(),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant,
-                              ),
-                        ),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760),
+        child: ListView(
+          controller: _scrollController,
+          key: const PageStorageKey('workout-history-list'),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
+          children: [
+            if (widget.profileName != null &&
+                widget.profileName!.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(
+                  widget.profileName!.trim(),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
-                    MonthlyWorkoutProgressCard(summary: monthlySummary),
-                    const SizedBox(height: 16),
-                    YearlyWorkoutProgressCard(summary: yearlySummary),
-                    const SizedBox(height: 20),
-                    _HistoryFilters(
-                      status: _status,
-                      period: _period,
-                      workoutId: _workoutId,
-                      workouts: workouts,
-                      resultCount: filteredSessions.length,
-                      showClear: !_filter.isDefault,
-                      onStatusChanged: (value) => setState(() => _status = value),
-                      onPeriodChanged: (value) => setState(() => _period = value),
-                      onWorkoutChanged: (value) =>
-                          setState(() => _workoutId = value),
-                      onClear: _clearFilters,
-                    ),
-                    const SizedBox(height: 20),
-                    if (filteredSessions.isEmpty)
-                      const _FilteredEmptyState()
-                    else
-                      for (final entry in groups.entries) ...[
-                        _DayHeading(day: entry.key),
-                        const SizedBox(height: 8),
-                        for (final session in entry.value) ...[
-                          _HistorySessionTile(
-                            session: session,
-                            controller: widget.controller,
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        const SizedBox(height: 12),
-                      ],
-                  ],
                 ),
               ),
-            );
-          },
+            MonthlyWorkoutProgressCard(summary: monthlySummary),
+            const SizedBox(height: 16),
+            YearlyWorkoutProgressCard(summary: yearlySummary),
+            const SizedBox(height: 20),
+            _HistoryFilters(
+              status: _status,
+              period: _period,
+              workoutId: _workoutId,
+              workouts: workouts,
+              resultCount: filteredSessions.length,
+              showClear: !_filter.isDefault,
+              onStatusChanged: (value) => setState(() => _status = value),
+              onPeriodChanged: (value) => setState(() => _period = value),
+              onWorkoutChanged: (value) => setState(() => _workoutId = value),
+              onClear: _clearFilters,
+            ),
+            const SizedBox(height: 20),
+            if (filteredSessions.isEmpty)
+              const _FilteredEmptyState()
+            else
+              for (final entry in groups.entries) ...[
+                _DayHeading(day: entry.key),
+                const SizedBox(height: 8),
+                for (final session in entry.value) ...[
+                  _HistorySessionTile(
+                    session: session,
+                    controller: widget.controller,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                const SizedBox(height: 12),
+              ],
+          ],
         ),
       ),
     );
