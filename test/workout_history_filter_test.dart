@@ -6,17 +6,18 @@ WorkoutSession session({
   required String id,
   required String workoutId,
   required DateTime endedAt,
+  Duration activeDuration = const Duration(minutes: 10),
   WorkoutSessionStatus status = WorkoutSessionStatus.completed,
 }) {
   return WorkoutSession(
     id: id,
     workoutId: workoutId,
-    workoutName: workoutId == 'mobility' ? 'Mobility' : 'Plank',
+    workoutName: workoutId == 'mobility' ? 'Morning Mobility' : 'High Plank',
     profileId: 'me',
     profileName: 'Me',
-    startedAt: endedAt.subtract(const Duration(minutes: 10)),
+    startedAt: endedAt.subtract(activeDuration),
     endedAt: endedAt,
-    activeDuration: const Duration(minutes: 10),
+    activeDuration: activeDuration,
     completedSteps: status == WorkoutSessionStatus.completed ? 4 : 2,
     totalSteps: 4,
     status: status,
@@ -30,27 +31,32 @@ void main() {
       id: 'today-completed',
       workoutId: 'mobility',
       endedAt: DateTime(2026, 9, 9, 8),
+      activeDuration: const Duration(minutes: 12),
     ),
     session(
       id: 'week-incomplete',
       workoutId: 'plank',
       endedAt: DateTime(2026, 9, 8, 18),
+      activeDuration: const Duration(minutes: 5),
       status: WorkoutSessionStatus.incomplete,
     ),
     session(
       id: 'month-completed',
       workoutId: 'plank',
       endedAt: DateTime(2026, 9, 2, 9),
+      activeDuration: const Duration(minutes: 20),
     ),
     session(
       id: 'year-completed',
       workoutId: 'mobility',
       endedAt: DateTime(2026, 4, 10, 9),
+      activeDuration: const Duration(minutes: 8),
     ),
     session(
       id: 'old-completed',
       workoutId: 'mobility',
       endedAt: DateTime(2025, 12, 31, 23, 59),
+      activeDuration: const Duration(minutes: 15),
     ),
   ];
 
@@ -77,23 +83,15 @@ void main() {
       period: WorkoutHistoryPeriodFilter.thisYear,
     ).apply(sessions, now: now);
 
-    expect(
-      week.map((item) => item.id),
-      ['today-completed', 'week-incomplete'],
-    );
-    expect(
-      month.map((item) => item.id),
-      ['today-completed', 'week-incomplete', 'month-completed'],
-    );
-    expect(
-      year.map((item) => item.id),
-      [
-        'today-completed',
-        'week-incomplete',
-        'month-completed',
-        'year-completed',
-      ],
-    );
+    expect(week.map((item) => item.id), ['today-completed', 'week-incomplete']);
+    expect(month.map((item) => item.id),
+        ['today-completed', 'week-incomplete', 'month-completed']);
+    expect(year.map((item) => item.id), [
+      'today-completed',
+      'week-incomplete',
+      'month-completed',
+      'year-completed',
+    ]);
   });
 
   test('workout filter uses persisted workout id', () {
@@ -102,20 +100,81 @@ void main() {
       now: now,
     );
 
-    expect(result.map((item) => item.id), [
-      'week-incomplete',
-      'month-completed',
-    ]);
+    expect(result.map((item) => item.id), ['week-incomplete', 'month-completed']);
   });
 
-  test('status period and workout filters combine', () {
+  test('search matches workout name case-insensitively', () {
+    final mobility = const WorkoutHistoryFilter(
+      searchQuery: 'MOBILITY',
+    ).apply(sessions, now: now);
+    final partial = const WorkoutHistoryFilter(
+      searchQuery: 'plAn',
+    ).apply(sessions, now: now);
+
+    expect(mobility.map((item) => item.workoutId).toSet(), {'mobility'});
+    expect(partial.map((item) => item.workoutId).toSet(), {'plank'});
+  });
+
+  test('search combines with status period and workout filters', () {
     final result = const WorkoutHistoryFilter(
       status: WorkoutHistoryStatusFilter.completed,
       period: WorkoutHistoryPeriodFilter.thisMonth,
       workoutId: 'plank',
+      searchQuery: 'high',
     ).apply(sessions, now: now);
 
     expect(result.map((item) => item.id), ['month-completed']);
+  });
+
+  test('all sort modes are deterministic', () {
+    expect(
+      const WorkoutHistoryFilter(sort: WorkoutHistorySort.newestFirst)
+          .apply(sessions, now: now)
+          .map((item) => item.id),
+      [
+        'today-completed',
+        'week-incomplete',
+        'month-completed',
+        'year-completed',
+        'old-completed',
+      ],
+    );
+    expect(
+      const WorkoutHistoryFilter(sort: WorkoutHistorySort.oldestFirst)
+          .apply(sessions, now: now)
+          .map((item) => item.id),
+      [
+        'old-completed',
+        'year-completed',
+        'month-completed',
+        'week-incomplete',
+        'today-completed',
+      ],
+    );
+    expect(
+      const WorkoutHistoryFilter(sort: WorkoutHistorySort.longestDuration)
+          .apply(sessions, now: now)
+          .map((item) => item.id),
+      [
+        'month-completed',
+        'old-completed',
+        'today-completed',
+        'year-completed',
+        'week-incomplete',
+      ],
+    );
+    expect(
+      const WorkoutHistoryFilter(sort: WorkoutHistorySort.shortestDuration)
+          .apply(sessions, now: now)
+          .map((item) => item.id),
+      [
+        'week-incomplete',
+        'year-completed',
+        'today-completed',
+        'old-completed',
+        'month-completed',
+      ],
+    );
   });
 
   test('all-time default keeps all sessions newest first', () {
@@ -125,5 +184,13 @@ void main() {
     expect(result.first.id, 'today-completed');
     expect(result.last.id, 'old-completed');
     expect(const WorkoutHistoryFilter().isDefault, isTrue);
+    expect(
+      const WorkoutHistoryFilter(searchQuery: 'mobility').isDefault,
+      isFalse,
+    );
+    expect(
+      const WorkoutHistoryFilter(sort: WorkoutHistorySort.oldestFirst).isDefault,
+      isFalse,
+    );
   });
 }
