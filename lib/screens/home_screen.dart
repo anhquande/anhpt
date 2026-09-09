@@ -543,6 +543,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       HomeWeeklyWorkoutFeedback(
                         store: controller.store,
                         profileId: _activeProfile!.id,
+                        controller: controller,
                       ),
                       const SizedBox(height: 14),
                     ],
