@@ -107,7 +107,17 @@ void main() {
 
     expect(find.text('Today'), findsOneWidget);
     expect(find.text('Yesterday'), findsOneWidget);
-    expect(find.text('Incomplete'), findsOneWidget);
+    final incompleteSession = find.byKey(
+      const ValueKey('workout-history-session-newer'),
+    );
+    expect(incompleteSession, findsOneWidget);
+    expect(
+      find.descendant(
+        of: incompleteSession,
+        matching: find.text('Incomplete'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('7 min'), findsOneWidget);
     expect(find.textContaining('2/4 steps'), findsOneWidget);
 
