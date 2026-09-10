@@ -312,6 +312,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
                   results: widget.posePipeline?.results,
                   errors: widget.posePipeline?.errors,
                   capabilities: widget.posePipeline?.estimator.capabilities,
+                  trackingRequirements: PoseTrackingRequirements.upperBody(),
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
