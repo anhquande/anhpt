@@ -1,0 +1,135 @@
+import 'dart:async';
+
+import 'package:anhpt/core/pose/pose.dart';
+import 'package:anhpt/pose_rendering/pose_rendering.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+final _capabilities = PoseEstimatorCapabilities(
+  supportedJoints: BodyJoint.values.toSet(),
+);
+
+BodyPose _fullBodyPose(DateTime timestamp) => BodyPose(
+      joints: {
+        for (final joint in PoseTrackingRequirements.fullBody().requiredJoints)
+          joint: const PosePoint(x: 0.5, y: 0.5, confidence: 0.9),
+      },
+      timestamp: timestamp,
+      confidence: 0.9,
+    );
+
+PosePipelineResult _result(DateTime timestamp, List<BodyPose> poses) =>
+    PosePipelineResult(
+      frame: PoseFrameMetadata(
+        width: 640,
+        height: 480,
+        rotationDegrees: 0,
+        format: PoseFrameFormat.nv21,
+        timestamp: timestamp,
+        isMirrored: false,
+        cameraFacing: PoseCameraFacing.back,
+      ),
+      poses: poses,
+      inferenceDuration: const Duration(milliseconds: 10),
+      capabilities: _capabilities,
+    );
+
+Widget _app({
+  required Stream<PosePipelineResult> results,
+  Stream<PosePipelineError>? errors,
+  PoseTrackingConfig? config,
+}) =>
+    MaterialApp(
+      home: SizedBox(
+        width: 320,
+        height: 480,
+        child: RealtimePoseView(
+          camera: const SizedBox(key: ValueKey('fake-camera')),
+          results: results,
+          errors: errors,
+          capabilities: _capabilities,
+          trackingConfig: config,
+          mode: PoseViewMode.cameraWithSkeleton,
+          renderer: SkeletonPoseRenderer(),
+        ),
+      ),
+    );
+
+void main() {
+  final t0 = DateTime.utc(2026, 9, 10, 12);
+
+  testWidgets('shows non-blocking no-person and ready guidance', (tester) async {
+    final results = StreamController<PosePipelineResult>();
+    addTearDown(results.close);
+
+    await tester.pumpWidget(
+      _app(
+        results: results.stream,
+        config: PoseTrackingConfig(
+          readyHoldDuration: Duration.zero,
+          trackingStartDuration: const Duration(seconds: 1),
+        ),
+      ),
+    );
+
+    results.add(_result(t0, const []));
+    await tester.pump();
+    expect(find.text('Move into camera view'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pose-tracking-status')), findsOneWidget);
+
+    results.add(_result(t0.add(const Duration(milliseconds: 10)), [
+      _fullBodyPose(t0.add(const Duration(milliseconds: 10))),
+    ]));
+    await tester.pump();
+    expect(find.text('Ready'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsOneWidget);
+  });
+
+  testWidgets('inference errors use tracking hysteresis', (tester) async {
+    final results = StreamController<PosePipelineResult>();
+    final errors = StreamController<PosePipelineError>();
+    addTearDown(results.close);
+    addTearDown(errors.close);
+
+    await tester.pumpWidget(
+      _app(
+        results: results.stream,
+        errors: errors.stream,
+        config: PoseTrackingConfig(
+          readyHoldDuration: Duration.zero,
+          trackingStartDuration: Duration.zero,
+          lostTrackingDelay: const Duration(milliseconds: 250),
+          noPersonDelay: const Duration(seconds: 1),
+        ),
+      ),
+    );
+
+    results.add(_result(t0, [_fullBodyPose(t0)]));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('pose-tracking-status')), findsNothing);
+
+    errors.add(
+      PosePipelineError(
+        stage: PosePipelineErrorStage.inference,
+        error: StateError('temporary'),
+        stackTrace: StackTrace.empty,
+        frameTimestamp: t0.add(const Duration(milliseconds: 100)),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Tracking lost'), findsNothing);
+    expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsOneWidget);
+
+    errors.add(
+      PosePipelineError(
+        stage: PosePipelineErrorStage.inference,
+        error: StateError('still failing'),
+        stackTrace: StackTrace.empty,
+        frameTimestamp: t0.add(const Duration(milliseconds: 350)),
+      ),
+    );
+    await tester.pump();
+    expect(find.text('Tracking lost'), findsOneWidget);
+    expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsNothing);
+  });
+}
