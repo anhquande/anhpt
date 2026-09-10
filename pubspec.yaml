@@ -2,7 +2,7 @@ name: anhpt
 description: AnhPT - Your Voice-Guided Personal Trainer
 publish_to: "none"
 
-version: 0.30.0+45
+version: 0.31.0+46
 
 environment:
   sdk: ">=3.12.0 <4.0.0"
@@ -30,6 +30,12 @@ dependencies:
   camera_android_camerax: 0.7.4+6
   camera_windows: 0.2.6+1
   google_mlkit_pose_detection: ^0.16.1
+  # Windows pose support uses Media Foundation-backed UVC frame capture and
+  # ONNX Runtime CPU inference. The existing camera_windows dependency remains
+  # for the mobile/legacy camera path, while Windows workout pose capture is
+  # routed through flutter_ffi_uvc so raw RGBA frames are available.
+  flutter_ffi_uvc: ^1.0.0
+  flutter_onnxruntime: ^1.8.5
   win32: ^5.15.0
   package_info_plus: ^8.3.1
   screen_brightness: ^2.1.11
