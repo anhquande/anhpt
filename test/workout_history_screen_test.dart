@@ -173,7 +173,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byIcon(Icons.chevron_right), findsOneWidget);
-    await tester.tap(find.text('This week'));
+    await tester.tap(find.text('1 workout • 10 min'));
     await tester.pumpAndSettle();
 
     expect(find.text('Workout history'), findsOneWidget);
