@@ -17,6 +17,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Future<void> _useTallHomeSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(900, 1400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   const pathProviderChannel = MethodChannel('plugins.flutter.io/path_provider');
@@ -248,6 +253,7 @@ ${List.generate(18, (index) => '  - name: Step ${index + 1}\n    duration: 10s')
   testWidgets('Home is compact and searches local workouts without accents', (
     tester,
   ) async {
+    await _useTallHomeSurface(tester);
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore())
       ..workouts = [
@@ -294,7 +300,7 @@ steps:
 
     expect(find.text('Workouts'), findsOneWidget);
     expect(find.text('Browse workouts'), findsNothing);
-    expect(find.byType(WorkoutCard), findsWidgets);
+    expect(find.byType(WorkoutCard), findsNWidgets(2));
     expect(find.text('Import package'), findsNothing);
     expect(find.text('Import YAML'), findsNothing);
     expect(find.byTooltip('Workout actions'), findsOneWidget);
@@ -353,6 +359,7 @@ steps:
   });
 
   testWidgets('Home no longer exposes Browse Workouts', (tester) async {
+    await _useTallHomeSurface(tester);
     SharedPreferences.setMockInitialValues({});
     final controller = AppController(LocalStore());
 

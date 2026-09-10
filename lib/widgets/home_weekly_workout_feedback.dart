@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../app/app_controller.dart';
 import '../screens/workout_history_screen.dart';
 import '../services/local_store.dart';
+import '../services/weekly_workout_goal.dart';
 import '../services/workout_consistency_analytics.dart';
 import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
 import 'weekly_workout_feedback.dart';
+import 'weekly_workout_goal_card.dart';
 import 'workout_consistency_card.dart';
 
 class HomeWeeklyWorkoutFeedback extends StatelessWidget {
@@ -21,8 +23,9 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
     this.controller,
   });
 
-  Future<(WeeklyWorkoutSummary, WorkoutConsistencySummary)> _load() async {
+  Future<(WeeklyWorkoutSummary, WorkoutConsistencySummary, int)> _load() async {
     final sessions = await WorkoutSessionHistory(store).load();
+    final goal = await const WeeklyWorkoutGoalStore().load(profileId);
     return (
       WorkoutSessionAnalytics.weeklySummary(
         sessions,
@@ -32,46 +35,102 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
         sessions,
         profileId: profileId,
       ),
+      goal,
     );
+  }
+
+  Future<void> _editGoal(BuildContext context, int currentGoal) async {
+    final selected = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        var value = currentGoal;
+        return StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: const Text('Weekly workout goal'),
+            content: DropdownButtonFormField<int>(
+              key: const Key('weekly-workout-goal-picker'),
+              initialValue: value,
+              decoration: const InputDecoration(
+                labelText: 'Workout days per week',
+                border: OutlineInputBorder(),
+              ),
+              items: [
+                for (var day = 1; day <= 7; day++)
+                  DropdownMenuItem(
+                    value: day,
+                    child: Text('$day ${day == 1 ? 'day' : 'days'}'),
+                  ),
+              ],
+              onChanged: (next) {
+                if (next != null) setState(() => value = next);
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                key: const Key('weekly-workout-goal-save'),
+                onPressed: () => Navigator.pop(context, value),
+                child: const Text('Save'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (selected == null || selected == currentGoal) return;
+    await const WeeklyWorkoutGoalStore().save(profileId, selected);
   }
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<int>(
       valueListenable: WorkoutSessionHistory.revision,
-      builder: (context, _, __) =>
-          FutureBuilder<(WeeklyWorkoutSummary, WorkoutConsistencySummary)>(
-        future: _load(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done ||
-              snapshot.hasError ||
-              !snapshot.hasData) {
-            // Home already has refresh feedback for catalog loading. Avoid a
-            // second progress indicator for this tiny local-data read.
-            return const SizedBox.shrink();
-          }
-          final (weekly, consistency) = snapshot.data!;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              WeeklyWorkoutFeedbackCard(
-                summary: weekly,
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WorkoutHistoryScreen(
-                      store: store,
-                      profileId: profileId,
-                      controller: controller,
+      builder: (context, _, __) => ValueListenableBuilder<int>(
+        valueListenable: WeeklyWorkoutGoalStore.revision,
+        builder: (context, _, __) => FutureBuilder<(
+          WeeklyWorkoutSummary,
+          WorkoutConsistencySummary,
+          int
+        )>(
+          future: _load(),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState != ConnectionState.done ||
+                snapshot.hasError ||
+                !snapshot.hasData) {
+              return const SizedBox.shrink();
+            }
+            final (weekly, consistency, goal) = snapshot.data!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                WeeklyWorkoutFeedbackCard(
+                  summary: weekly,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => WorkoutHistoryScreen(
+                        store: store,
+                        profileId: profileId,
+                        controller: controller,
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              WorkoutConsistencyCard(summary: consistency),
-            ],
-          );
-        },
+                const SizedBox(height: 12),
+                WeeklyWorkoutGoalCard(
+                  completedDays: consistency.workoutDaysThisWeek,
+                  goalDays: goal,
+                  onEdit: () => _editGoal(context, goal),
+                ),
+                const SizedBox(height: 12),
+                WorkoutConsistencyCard(summary: consistency),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

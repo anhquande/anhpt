@@ -11,6 +11,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+Future<void> _useTallHomeSurface(WidgetTester tester) async {
+  await tester.binding.setSurfaceSize(const Size(900, 1400));
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+}
+
 void main() {
   final previewYaml = Uint8List.fromList(
     utf8.encode('''
@@ -56,6 +61,7 @@ steps:
   testWidgets('Dashboard reports catalog listing count then hides it', (
     tester,
   ) async {
+    await _useTallHomeSurface(tester);
     SharedPreferences.setMockInitialValues({});
     final controller = _SyncController(entry: entry, service: previewService);
 
@@ -78,6 +84,7 @@ steps:
   testWidgets('Dashboard reports catalog errors then hides them', (
     tester,
   ) async {
+    await _useTallHomeSurface(tester);
     SharedPreferences.setMockInitialValues({});
     final controller = _SyncController(
       entry: entry,
@@ -100,6 +107,7 @@ steps:
   testWidgets('catalog details preview YAML but install only on Download', (
     tester,
   ) async {
+    await _useTallHomeSurface(tester);
     SharedPreferences.setMockInitialValues({});
     final controller = _SyncController(entry: entry, service: previewService);
 
@@ -108,8 +116,6 @@ steps:
     );
     await tester.pump();
     await tester.pump();
-    await tester.ensureVisible(find.text('Morning Flow'));
-    await tester.pumpAndSettle();
     await tester.tap(find.text('Morning Flow'));
     await tester.pumpAndSettle();
 
