@@ -9,7 +9,6 @@ import 'pose_painter.dart';
 import 'pose_renderer.dart';
 import 'pose_view_mode.dart';
 import 'pose_view_transform.dart';
-import 'primary_pose_selector.dart';
 
 /// Presentation widget that consumes PR4 pipeline results and paints one pose.
 ///
@@ -24,16 +23,22 @@ class RealtimePoseView extends StatefulWidget {
     required this.results,
     required this.mode,
     required this.renderer,
-    this.primaryPoseSelector,
+    this.errors,
+    this.capabilities,
+    this.trackingRequirements,
+    this.trackingConfig,
     this.previewFit = BoxFit.fill,
     this.debugConfig = const PoseRenderDebugConfig(),
   });
 
   final Widget camera;
   final Stream<PosePipelineResult>? results;
+  final Stream<PosePipelineError>? errors;
+  final PoseEstimatorCapabilities? capabilities;
+  final PoseTrackingRequirements? trackingRequirements;
+  final PoseTrackingConfig? trackingConfig;
   final PoseViewMode mode;
   final PoseRenderer renderer;
-  final PrimaryPoseSelector? primaryPoseSelector;
   final BoxFit previewFit;
   final PoseRenderDebugConfig debugConfig;
 
@@ -42,40 +47,112 @@ class RealtimePoseView extends StatefulWidget {
 }
 
 class _RealtimePoseViewState extends State<RealtimePoseView> {
+  static final PoseEstimatorCapabilities _fallbackCapabilities =
+      PoseEstimatorCapabilities(supportedJoints: BodyJoint.values.toSet());
+
   StreamSubscription<PosePipelineResult>? _subscription;
+  StreamSubscription<PosePipelineError>? _errorSubscription;
+  late PoseTrackingEvaluator _trackingEvaluator;
+  PoseTrackingEvaluation? _trackingEvaluation;
   BodyPose? _pose;
   PoseFrameMetadata? _frame;
+
+  PoseEstimatorCapabilities get _capabilities =>
+      widget.capabilities ?? _fallbackCapabilities;
 
   @override
   void initState() {
     super.initState();
-    _subscribe(widget.results);
+    _resetTrackingEvaluator();
+    _subscribe();
   }
 
   @override
   void didUpdateWidget(covariant RealtimePoseView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!identical(oldWidget.results, widget.results)) {
-      _subscribe(widget.results);
+    final trackingInputsChanged =
+        !identical(oldWidget.capabilities, widget.capabilities) ||
+            !identical(
+              oldWidget.trackingRequirements,
+              widget.trackingRequirements,
+            ) ||
+            !identical(oldWidget.trackingConfig, widget.trackingConfig);
+    final streamsChanged = !identical(oldWidget.results, widget.results) ||
+        !identical(oldWidget.errors, widget.errors);
+
+    if (trackingInputsChanged) {
+      _resetTrackingEvaluator();
+      _trackingEvaluation = null;
+      _pose = null;
+      _frame = null;
+    }
+    if (streamsChanged) {
+      _subscribe();
     }
   }
 
-  void _subscribe(Stream<PosePipelineResult>? results) {
+  void _resetTrackingEvaluator() {
+    _trackingEvaluator = PoseTrackingEvaluator(
+      requirements: widget.trackingRequirements,
+      config: widget.trackingConfig,
+    );
+  }
+
+  void _subscribe() {
     unawaited(_subscription?.cancel());
+    unawaited(_errorSubscription?.cancel());
     _subscription = null;
+    _errorSubscription = null;
+    _trackingEvaluator.reset();
+    _trackingEvaluation = null;
     _pose = null;
     _frame = null;
+
+    final results = widget.results;
     if (results != null) {
       _subscription = results.listen(_onResult);
+    }
+    final errors = widget.errors;
+    if (errors != null) {
+      _errorSubscription = errors.listen(_onError);
     }
   }
 
   void _onResult(PosePipelineResult result) {
     if (!mounted) return;
-    final selector = widget.primaryPoseSelector ?? selectPrimaryPose;
+    final evaluation = _trackingEvaluator.evaluate(
+      poses: result.poses,
+      capabilities: _capabilities,
+      timestamp: result.frame.timestamp,
+    );
     setState(() {
-      _pose = selector(result.poses);
+      _trackingEvaluation = evaluation;
       _frame = result.frame;
+      final nextPose = evaluation.primaryPose;
+      if (nextPose != null) {
+        _pose = nextPose;
+      } else if (evaluation.state == PoseTrackingState.noPerson ||
+          evaluation.state == PoseTrackingState.lostTracking) {
+        _pose = null;
+      }
+      // During a brief invalid observation that is still inside hysteresis,
+      // keep the previous pose only in this presentation layer. Canonical
+      // BodyPose data is never mutated or synthesized.
+    });
+  }
+
+  void _onError(PosePipelineError error) {
+    if (!mounted || error.stage != PosePipelineErrorStage.inference) return;
+    final evaluation = _trackingEvaluator.evaluateInferenceError(
+      capabilities: _capabilities,
+      timestamp: error.frameTimestamp ?? DateTime.now(),
+    );
+    setState(() {
+      _trackingEvaluation = evaluation;
+      if (evaluation.state == PoseTrackingState.noPerson ||
+          evaluation.state == PoseTrackingState.lostTracking) {
+        _pose = null;
+      }
     });
   }
 
@@ -119,6 +196,21 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     );
   }
 
+  String? _trackingMessage(PoseTrackingEvaluation? evaluation) {
+    if (evaluation == null) return null;
+    if (evaluation.hasCapabilityMismatch) {
+      return 'Pose model does not support all required joints';
+    }
+    return switch (evaluation.state) {
+      PoseTrackingState.noPerson => 'Move into camera view',
+      PoseTrackingState.partialBody => 'Make sure your full body is visible',
+      PoseTrackingState.initializing => 'Hold still',
+      PoseTrackingState.ready => 'Ready',
+      PoseTrackingState.tracking => null,
+      PoseTrackingState.lostTracking => 'Tracking lost',
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -136,6 +228,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         final geometry = _previewGeometry(viewportSize);
         final viewTransform = _viewTransform(geometry);
         final pose = _pose;
+        final trackingMessage = _trackingMessage(_trackingEvaluation);
 
         return Stack(
           fit: StackFit.expand,
@@ -177,6 +270,37 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
                   size: 48,
                 ),
               ),
+            if (trackingMessage != null)
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 12,
+                child: IgnorePointer(
+                  child: Center(
+                    child: DecoratedBox(
+                      key: const ValueKey('pose-tracking-status'),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .surface
+                            .withValues(alpha: .82),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        child: Text(
+                          trackingMessage,
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.labelMedium,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         );
       },
@@ -186,7 +310,9 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   @override
   void dispose() {
     unawaited(_subscription?.cancel());
+    unawaited(_errorSubscription?.cancel());
     _subscription = null;
+    _errorSubscription = null;
     super.dispose();
   }
 }
