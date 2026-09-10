@@ -63,11 +63,18 @@ class PosePipelineResult {
     required this.frame,
     required List<BodyPose> poses,
     required this.inferenceDuration,
+    this.capabilities,
   }) : poses = UnmodifiableListView<BodyPose>(List<BodyPose>.from(poses));
 
   final PoseFrameMetadata frame;
   final List<BodyPose> poses;
   final Duration inferenceDuration;
+
+  /// Capabilities of the estimator that produced [poses].
+  ///
+  /// Optional for compatibility with synthetic/test results constructed by
+  /// presentation consumers. Production pipeline results always populate it.
+  final PoseEstimatorCapabilities? capabilities;
 }
 
 enum PosePipelineErrorStage { initialization, inference, disposal }
@@ -289,6 +296,7 @@ class PosePipeline {
               frame: PoseFrameMetadata.fromFrame(frame),
               poses: poses,
               inferenceDuration: stopwatch.elapsed,
+              capabilities: estimator.capabilities,
             ),
           );
         }

@@ -419,6 +419,8 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
                 child: RealtimePoseView(
                   camera: cameraView,
                   results: widget.posePipeline?.results,
+                  errors: widget.posePipeline?.errors,
+                  capabilities: widget.posePipeline?.estimator.capabilities,
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
