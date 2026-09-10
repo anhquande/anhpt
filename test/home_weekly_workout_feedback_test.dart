@@ -32,7 +32,7 @@ WorkoutSession _session({
 void main() {
   testWidgets('Home weekly feedback is scoped to the active profile',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 900));
+    await tester.binding.setSurfaceSize(const Size(800, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
@@ -71,7 +71,7 @@ void main() {
 
   testWidgets('Home feedback refreshes when a completed session is recorded',
       (tester) async {
-    await tester.binding.setSurfaceSize(const Size(800, 900));
+    await tester.binding.setSurfaceSize(const Size(800, 1000));
     addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
