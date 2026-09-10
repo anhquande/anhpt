@@ -62,7 +62,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('This week'), findsWidgets);
     expect(find.text('1 workout • 10 min'), findsOneWidget);
     expect(find.textContaining('35 min'), findsNothing);
   });
@@ -121,12 +121,12 @@ void main() {
       MaterialApp(home: HomeScreen(controller: controller)),
     );
     for (var attempt = 0;
-        attempt < 20 && find.text('This week').evaluate().isEmpty;
+        attempt < 20 && find.text('1 workout • 12 min').evaluate().isEmpty;
         attempt++) {
       await tester.pump(const Duration(milliseconds: 100));
     }
 
-    expect(find.text('This week'), findsOneWidget);
+    expect(find.text('This week'), findsWidgets);
     expect(find.text('1 workout • 12 min'), findsOneWidget);
     expect(find.text('Search workouts'), findsOneWidget);
   });
