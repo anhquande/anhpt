@@ -52,6 +52,26 @@ class PoseTrackingRequirements {
         },
       );
 
+  /// Relaxed tracking profile for laptop/desktop cameras that commonly show
+  /// only the user's upper body.
+  ///
+  /// Aggregate pose confidence is intentionally ignored here because engines
+  /// such as MoveNet include off-frame lower-body landmarks in that aggregate.
+  /// Required upper-body joints still need to satisfy the normal per-joint
+  /// confidence threshold, so this remains quality-gated rather than blindly
+  /// accepting any partial pose.
+  factory PoseTrackingRequirements.upperBody() => PoseTrackingRequirements(
+        requiredJoints: const {
+          BodyJoint.leftShoulder,
+          BodyJoint.rightShoulder,
+          BodyJoint.leftElbow,
+          BodyJoint.rightElbow,
+          BodyJoint.leftWrist,
+          BodyJoint.rightWrist,
+        },
+        minPoseConfidence: 0,
+      );
+
   final Set<BodyJoint> requiredJoints;
   final double? minJointConfidence;
   final double? minPoseConfidence;
