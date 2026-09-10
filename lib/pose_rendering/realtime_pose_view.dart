@@ -32,7 +32,8 @@ class RealtimePoseView extends StatefulWidget {
     this.smoother,
     this.previewFit = BoxFit.fill,
     this.debugConfig = const PoseRenderDebugConfig(),
-  });
+    this.trackingStatusDebounce = const Duration(milliseconds: 600),
+  }) : assert(!trackingStatusDebounce.isNegative);
 
   final Widget camera;
   final Stream<PosePipelineResult>? results;
@@ -52,6 +53,13 @@ class RealtimePoseView extends StatefulWidget {
   final BoxFit previewFit;
   final PoseRenderDebugConfig debugConfig;
 
+  /// Presentation-only stabilization for pose guidance.
+  ///
+  /// Tracking state and skeleton rendering still update on every pose result.
+  /// Only the user-facing status badge waits for a state/message to remain
+  /// stable, preventing confidence noise from flashing guidance every frame.
+  final Duration trackingStatusDebounce;
+
   @override
   State<RealtimePoseView> createState() => _RealtimePoseViewState();
 }
@@ -62,11 +70,14 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
 
   StreamSubscription<PosePipelineResult>? _subscription;
   StreamSubscription<PosePipelineError>? _errorSubscription;
+  Timer? _trackingStatusTimer;
   late PoseTrackingEvaluator _trackingEvaluator;
   late PoseSmoother _poseSmoother;
   PoseTrackingEvaluation? _trackingEvaluation;
   BodyPose? _smoothedPose;
   PoseFrameMetadata? _frame;
+  String? _displayedTrackingMessage;
+  String? _pendingTrackingMessage;
 
   PoseEstimatorCapabilities get _capabilities =>
       widget.capabilities ?? _fallbackCapabilities;
@@ -89,6 +100,8 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
               widget.trackingRequirements,
             ) ||
             !identical(oldWidget.trackingConfig, widget.trackingConfig);
+    final statusPresentationChanged =
+        oldWidget.trackingStatusDebounce != widget.trackingStatusDebounce;
     final smootherChanged = !identical(oldWidget.smoother, widget.smoother);
     final streamsChanged = !identical(oldWidget.results, widget.results) ||
         !identical(oldWidget.errors, widget.errors);
@@ -96,9 +109,13 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     if (trackingInputsChanged) {
       _resetTrackingEvaluator();
       _trackingEvaluation = null;
+      _resetTrackingStatus();
       _resetPoseSmoother();
       _smoothedPose = null;
       _frame = null;
+    } else if (statusPresentationChanged) {
+      _resetTrackingStatus();
+      _queueTrackingMessage(_trackingEvaluation);
     } else if (smootherChanged) {
       _resetPoseSmoother();
       _smoothedPose = null;
@@ -120,6 +137,13 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _poseSmoother.reset();
   }
 
+  void _resetTrackingStatus() {
+    _trackingStatusTimer?.cancel();
+    _trackingStatusTimer = null;
+    _pendingTrackingMessage = null;
+    _displayedTrackingMessage = null;
+  }
+
   void _subscribe() {
     unawaited(_subscription?.cancel());
     unawaited(_errorSubscription?.cancel());
@@ -127,6 +151,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _errorSubscription = null;
     _trackingEvaluator.reset();
     _poseSmoother.reset();
+    _resetTrackingStatus();
     _trackingEvaluation = null;
     _smoothedPose = null;
     _frame = null;
@@ -174,6 +199,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       // Raw BodyPose observations remain available in the pipeline result and
       // in trackingEvaluation.primaryPose; they are never mutated or replaced.
     });
+    _queueTrackingMessage(evaluation);
   }
 
   void _onError(PosePipelineError error) {
@@ -191,6 +217,40 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         _smoothedPose = null;
       }
     });
+    _queueTrackingMessage(evaluation);
+  }
+
+  void _queueTrackingMessage(PoseTrackingEvaluation? evaluation) {
+    final desired = _trackingMessage(evaluation);
+    if (desired == _displayedTrackingMessage) {
+      _trackingStatusTimer?.cancel();
+      _trackingStatusTimer = null;
+      _pendingTrackingMessage = null;
+      return;
+    }
+    if (desired == _pendingTrackingMessage) return;
+
+    _trackingStatusTimer?.cancel();
+    _trackingStatusTimer = null;
+    _pendingTrackingMessage = desired;
+
+    if (widget.trackingStatusDebounce == Duration.zero) {
+      _commitTrackingMessage(desired);
+      return;
+    }
+
+    _trackingStatusTimer = Timer(widget.trackingStatusDebounce, () {
+      if (!mounted || _pendingTrackingMessage != desired) return;
+      _commitTrackingMessage(desired);
+    });
+  }
+
+  void _commitTrackingMessage(String? message) {
+    _trackingStatusTimer?.cancel();
+    _trackingStatusTimer = null;
+    _pendingTrackingMessage = null;
+    if (!mounted || _displayedTrackingMessage == message) return;
+    setState(() => _displayedTrackingMessage = message);
   }
 
   bool _mirrorForVisiblePreview(PoseFrameMetadata frame) =>
@@ -265,7 +325,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         final geometry = _previewGeometry(viewportSize);
         final viewTransform = _viewTransform(geometry);
         final pose = _smoothedPose;
-        final trackingMessage = _trackingMessage(_trackingEvaluation);
+        final trackingMessage = _displayedTrackingMessage;
 
         return Stack(
           fit: StackFit.expand,
@@ -352,6 +412,8 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     unawaited(_errorSubscription?.cancel());
     _subscription = null;
     _errorSubscription = null;
+    _trackingStatusTimer?.cancel();
+    _trackingStatusTimer = null;
     _poseSmoother.reset();
     super.dispose();
   }
