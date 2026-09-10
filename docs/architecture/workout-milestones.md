@@ -24,4 +24,4 @@ Unlocked milestones are shown as compact badges. The next milestone is selected 
 
 Home shows an `Achievements` card only after the profile has workout activity. The card shows unlocked count, unlocked badges in a horizontal list, and progress toward the next milestone. It refreshes through the existing `WorkoutSessionHistory.revision` mechanism.
 
-Release-ready source version: 0.29.0.
+Release-ready source version: 0.29.0. A `feat:` PR therefore publishes the next minor release through the existing release workflow.
