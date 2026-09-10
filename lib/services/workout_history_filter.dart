@@ -47,9 +47,10 @@ class WorkoutHistoryFilter {
     final result = sessions.where((session) {
       if (!_matchesStatus(session)) return false;
       if (workoutId != null && session.workoutId != workoutId) return false;
-      if (query.isNotEmpty &&
-          !session.workoutName.toLowerCase().contains(query)) {
-        return false;
+      if (query.isNotEmpty) {
+        final matchesWorkout = session.workoutName.toLowerCase().contains(query);
+        final matchesNote = session.note?.toLowerCase().contains(query) ?? false;
+        if (!matchesWorkout && !matchesNote) return false;
       }
       if (bounds != null &&
           (session.endedAt.isBefore(bounds.$1) ||
