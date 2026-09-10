@@ -5,16 +5,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/workout_camera_preference.dart';
+import '../camera/pose_camera_frame_adapter.dart';
+import '../core/pose/pose.dart';
 
 class WorkoutCameraPreview extends StatefulWidget {
   final bool enabled;
   final WorkoutCameraFacing facing;
+  final PosePipeline? posePipeline;
   final ValueChanged<String?>? onErrorChanged;
 
   const WorkoutCameraPreview({
     super.key,
     required this.enabled,
     this.facing = WorkoutCameraFacing.front,
+    this.posePipeline,
     this.onErrorChanged,
   });
 
@@ -28,6 +32,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   static const _cameraInitializationTimeout = Duration(seconds: 10);
   static const _cameraDisposeTimeout = Duration(seconds: 2);
   static const _retryDelay = Duration(milliseconds: 300);
+  static const _poseErrorLogInterval = Duration(seconds: 5);
 
   CameraController? _controller;
   List<CameraDescription> _cameras = const [];
@@ -35,6 +40,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   bool _loading = false;
   String? _error;
   int _generation = 0;
+  DateTime? _lastPoseErrorLogAt;
 
   bool get _platformSupported {
     if (kIsWeb) return false;
@@ -165,6 +171,9 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       camera,
       ResolutionPreset.medium,
       enableAudio: false,
+      imageFormatGroup: PoseCameraFrameAdapter.preferredImageFormatGroup(
+        defaultTargetPlatform,
+      ),
     );
     try {
       await controller.initialize().timeout(_cameraInitializationTimeout);
@@ -177,9 +186,92 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
       return;
     }
     setState(() => _controller = controller);
+    unawaited(
+      _startPoseProcessing(
+        controller,
+        camera,
+        generation: generation,
+      ),
+    );
+  }
+
+  Future<void> _startPoseProcessing(
+    CameraController controller,
+    CameraDescription camera, {
+    required int generation,
+  }) async {
+    final pipeline = widget.posePipeline;
+    if (pipeline == null || !controller.supportsImageStreaming()) return;
+
+    await pipeline.start();
+    if (!mounted ||
+        generation != _generation ||
+        !widget.enabled ||
+        _controller != controller ||
+        !pipeline.isRunning) {
+      await pipeline.stop();
+      return;
+    }
+
+    try {
+      await controller.startImageStream((image) {
+        if (!mounted ||
+            generation != _generation ||
+            !widget.enabled ||
+            _controller != controller ||
+            !pipeline.isRunning) {
+          return;
+        }
+        try {
+          final frame = PoseCameraFrameAdapter.fromCameraImage(
+            image: image,
+            camera: camera,
+            deviceOrientation: controller.value.deviceOrientation,
+            platform: defaultTargetPlatform,
+            // The camera plugin does not expose a cross-platform hardware
+            // capture timestamp, so callback delivery time is the canonical
+            // capture timestamp for this adapter.
+            timestamp: DateTime.now(),
+          );
+          pipeline.submit(frame);
+        } catch (error) {
+          _logPoseError('Could not adapt camera frame for pose processing: $error');
+        }
+      });
+    } catch (error) {
+      _logPoseError('Pose image streaming is unavailable: $error');
+      await pipeline.stop();
+    }
+  }
+
+  Future<void> _stopPoseProcessing(CameraController? controller) async {
+    if (controller != null &&
+        controller.value.isInitialized &&
+        controller.supportsImageStreaming() &&
+        controller.value.isStreamingImages) {
+      try {
+        await controller.stopImageStream().timeout(_cameraDisposeTimeout);
+      } on TimeoutException {
+        _logPoseError('Stopping the pose image stream timed out.');
+      } catch (error) {
+        _logPoseError('Stopping the pose image stream failed: $error');
+      }
+    }
+    await widget.posePipeline?.stop();
+  }
+
+  void _logPoseError(String message) {
+    final now = DateTime.now();
+    final previous = _lastPoseErrorLogAt;
+    if (previous != null && now.difference(previous) < _poseErrorLogInterval) {
+      return;
+    }
+    _lastPoseErrorLogAt = now;
+    debugPrint(message);
   }
 
   Future<void> _disposeSafely(CameraController? controller) async {
+    await _stopPoseProcessing(controller);
     if (controller == null) return;
     try {
       await controller.dispose().timeout(_cameraDisposeTimeout);
