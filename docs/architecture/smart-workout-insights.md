@@ -25,3 +25,7 @@ The recovery message is a general training suggestion, not a medical recommendat
 Home shows a compact `Insights` card between Weekly Goal and Consistency when insights are available. The existing `WorkoutSessionHistory.revision` and `WeeklyWorkoutGoalStore.revision` signals refresh the card automatically.
 
 No WorkoutSession schema, persistence, History search/filter/sort, or CSV export behavior is changed.
+
+## Release
+
+This feature is released as a minor version because it adds new user-visible functionality without changing persisted workout-session data.
