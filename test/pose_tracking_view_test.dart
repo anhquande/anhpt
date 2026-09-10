@@ -59,7 +59,7 @@ void main() {
   final t0 = DateTime.utc(2026, 9, 10, 12);
 
   testWidgets('shows non-blocking no-person and ready guidance', (tester) async {
-    final results = StreamController<PosePipelineResult>();
+    final results = StreamController<PosePipelineResult>.broadcast(sync: true);
     addTearDown(results.close);
 
     await tester.pumpWidget(
@@ -86,8 +86,8 @@ void main() {
   });
 
   testWidgets('inference errors use tracking hysteresis', (tester) async {
-    final results = StreamController<PosePipelineResult>();
-    final errors = StreamController<PosePipelineError>();
+    final results = StreamController<PosePipelineResult>.broadcast(sync: true);
+    final errors = StreamController<PosePipelineError>.broadcast(sync: true);
     addTearDown(results.close);
     addTearDown(errors.close);
 
