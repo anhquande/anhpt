@@ -57,8 +57,14 @@ void main() {
 
     final recorder = PictureRecorder();
     final canvas = Canvas(recorder);
+    final transform = _identityTransform(const Size(200, 200));
     expect(
-      () => renderer.render(canvas: canvas, size: const Size(200, 200), pose: pose),
+      () => renderer.render(
+        canvas: canvas,
+        size: const Size(200, 200),
+        pose: pose,
+        transformPoint: transform.transformPoint,
+      ),
       returnsNormally,
     );
     recorder.endRecording();
@@ -92,14 +98,6 @@ void main() {
         const PoseBone(BodyJoint.leftShoulder, BodyJoint.leftElbow),
       ),
       isFalse,
-    );
-  });
-
-  test('normalized coordinates convert to canvas coordinates', () {
-    const point = PosePoint(x: .5, y: .25, confidence: 1);
-    expect(
-      normalizedPosePointToOffset(point, const Size(1000, 800)),
-      const Offset(500, 200),
     );
   });
 
@@ -202,6 +200,17 @@ PosePipelineResult _result(BodyPose pose) => PosePipelineResult(
       inferenceDuration: const Duration(milliseconds: 8),
     );
 
+PoseViewTransform _identityTransform(Size size) => PoseViewTransform(
+      sourceSize: size,
+      rotationDegrees: 0,
+      previewGeometry: CameraPreviewGeometry(
+        previewSourceSize: size,
+        viewportSize: size,
+        fit: BoxFit.fill,
+        mirrored: false,
+      ),
+    );
+
 Future<void> _pumpPainter(
   WidgetTester tester,
   BodyPose pose,
@@ -214,7 +223,11 @@ Future<void> _pumpPainter(
             width: 120,
             height: 120,
             child: CustomPaint(
-              painter: PosePainter(pose: pose, renderer: renderer),
+              painter: PosePainter(
+                pose: pose,
+                renderer: renderer,
+                viewTransform: _identityTransform(const Size(120, 120)),
+              ),
             ),
           ),
         ),
@@ -230,6 +243,7 @@ class _RecordingPoseRenderer implements PoseRenderer {
     required Canvas canvas,
     required Size size,
     required BodyPose pose,
+    required PosePointProjector transformPoint,
   }) {
     paintCount++;
     lastPose = pose;
