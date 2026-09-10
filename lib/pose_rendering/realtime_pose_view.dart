@@ -311,7 +311,9 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
               Positioned(
                 left: 12,
                 right: 12,
-                bottom: 12,
+                // Keep camera/tracking guidance away from workout instructions,
+                // which occupy the lower part of the workout presentation.
+                top: 56,
                 child: IgnorePointer(
                   child: Center(
                     child: DecoratedBox(
