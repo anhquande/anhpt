@@ -124,6 +124,13 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
         return;
       }
 
+      // Retain native handles before estimator initialization so the catch path
+      // can always release the texture/device if first-run model setup fails.
+      _devices = devices;
+      _selectedDevice = selected;
+      _textureId = textureId;
+      _mode = mode;
+
       final pipeline = widget.posePipeline;
       if (pipeline != null) {
         await pipeline.start();
@@ -137,12 +144,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
 
       _lastFrameSequence = -1;
       _startFramePump();
-      setState(() {
-        _devices = devices;
-        _selectedDevice = selected;
-        _textureId = textureId;
-        _mode = mode;
-      });
+      setState(() {});
     } catch (error) {
       if (mounted && generation == _generation) {
         _setError('Windows camera/pose could not start: $error');
@@ -238,6 +240,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       setState(() {
         _devices = const [];
         _selectedDevice = null;
+        _loading = false;
       });
     }
   }
