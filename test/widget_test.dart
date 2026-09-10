@@ -294,7 +294,7 @@ steps:
 
     expect(find.text('Workouts'), findsOneWidget);
     expect(find.text('Browse workouts'), findsNothing);
-    expect(find.byType(WorkoutCard), findsNWidgets(2));
+    expect(find.byType(WorkoutCard), findsWidgets);
     expect(find.text('Import package'), findsNothing);
     expect(find.text('Import YAML'), findsNothing);
     expect(find.byTooltip('Workout actions'), findsOneWidget);

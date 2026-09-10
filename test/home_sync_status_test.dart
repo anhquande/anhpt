@@ -108,6 +108,8 @@ steps:
     );
     await tester.pump();
     await tester.pump();
+    await tester.ensureVisible(find.text('Morning Flow'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Morning Flow'));
     await tester.pumpAndSettle();
 
