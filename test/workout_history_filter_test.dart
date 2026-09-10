@@ -8,6 +8,7 @@ WorkoutSession session({
   required DateTime endedAt,
   Duration activeDuration = const Duration(minutes: 10),
   WorkoutSessionStatus status = WorkoutSessionStatus.completed,
+  String? note,
 }) {
   return WorkoutSession(
     id: id,
@@ -21,6 +22,7 @@ WorkoutSession session({
     completedSteps: status == WorkoutSessionStatus.completed ? 4 : 2,
     totalSteps: 4,
     status: status,
+    note: note,
   );
 }
 
@@ -165,6 +167,69 @@ void main() {
 
     expect(mobility.map((item) => item.workoutId).toSet(), {'mobility'});
     expect(partial.map((item) => item.workoutId).toSet(), {'plank'});
+  });
+
+  test('search matches session notes case-insensitively and partially', () {
+    final values = [
+      session(
+        id: 'note-match',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 9, 8),
+        note: 'Left shoulder felt MUCH better today',
+      ),
+      session(
+        id: 'no-note',
+        workoutId: 'plank',
+        endedAt: DateTime(2026, 9, 8, 18),
+      ),
+    ];
+
+    final result = const WorkoutHistoryFilter(
+      searchQuery: 'much BETTER',
+    ).apply(values, now: now);
+
+    expect(result.map((item) => item.id), ['note-match']);
+  });
+
+  test('search matches workout name or note and composes with filters', () {
+    final values = [
+      session(
+        id: 'name-match',
+        workoutId: 'plank',
+        endedAt: DateTime(2026, 9, 7, 8),
+      ),
+      session(
+        id: 'note-match',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 6, 8),
+        note: 'Practiced plank alignment carefully',
+      ),
+      session(
+        id: 'incomplete-note-match',
+        workoutId: 'mobility',
+        endedAt: DateTime(2026, 9, 5, 8),
+        status: WorkoutSessionStatus.incomplete,
+        note: 'Plank felt difficult',
+      ),
+    ];
+
+    final allMatches = const WorkoutHistoryFilter(
+      searchQuery: 'plank',
+    ).apply(values, now: now);
+    final completedMatches = const WorkoutHistoryFilter(
+      status: WorkoutHistoryStatusFilter.completed,
+      searchQuery: 'plank',
+    ).apply(values, now: now);
+
+    expect(allMatches.map((item) => item.id), [
+      'name-match',
+      'note-match',
+      'incomplete-note-match',
+    ]);
+    expect(completedMatches.map((item) => item.id), [
+      'name-match',
+      'note-match',
+    ]);
   });
 
   test('search combines with status period and workout filters', () {
