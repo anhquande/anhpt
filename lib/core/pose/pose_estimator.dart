@@ -1,6 +1,7 @@
 import 'dart:collection';
 
 import 'body_pose.dart';
+import 'pose_frame.dart';
 
 /// Static capabilities advertised by a concrete pose-estimation adapter.
 ///
@@ -27,18 +28,24 @@ class PoseEstimatorCapabilities {
   bool supportsJoint(BodyJoint joint) => supportedJoints.contains(joint);
 }
 
-/// Engine-agnostic lifecycle contract for pose estimation.
+/// Engine-agnostic lifecycle and inference contract for pose estimation.
 ///
-/// The frame/input contract is deliberately added in the next integration
-/// step, once the shared pose-frame abstraction exists. Keeping it out of this
-/// first layer prevents camera or engine-specific frame types from leaking into
-/// the core API.
+/// Implementations receive only [PoseFrame], never camera-plugin frame types.
+/// A frame's borrowed byte buffers must not be retained after [estimate]
+/// completes.
 abstract interface class PoseEstimator {
   PoseEstimatorCapabilities get capabilities;
 
   bool get isInitialized;
 
   Future<void> initialize();
+
+  /// Estimates zero or more body poses from [frame].
+  ///
+  /// An empty list means that no pose was detected. Implementations supporting
+  /// more than one pose may return multiple results up to the advertised
+  /// [PoseEstimatorCapabilities.maxPoseCount].
+  Future<List<BodyPose>> estimate(PoseFrame frame);
 
   Future<void> dispose();
 }

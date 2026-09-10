@@ -18,6 +18,9 @@ class _FakePoseEstimator implements PoseEstimator {
   }
 
   @override
+  Future<List<BodyPose>> estimate(PoseFrame frame) async => const [];
+
+  @override
   Future<void> dispose() async {
     _isInitialized = false;
   }
