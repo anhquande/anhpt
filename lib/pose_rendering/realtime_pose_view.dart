@@ -228,7 +228,9 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       _pendingTrackingMessage = null;
       return;
     }
-    if (desired == _pendingTrackingMessage) return;
+    if (_trackingStatusTimer != null && desired == _pendingTrackingMessage) {
+      return;
+    }
 
     _trackingStatusTimer?.cancel();
     _trackingStatusTimer = null;
