@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../app/workout_camera_preference.dart';
+import '../core/pose/pose.dart';
 import '../models/workout_video_settings.dart';
+import '../pose_estimators/default_pose_estimator.dart';
 import 'workout_camera_preview.dart';
 
 class WorkoutCameraComparison extends StatefulWidget {
@@ -9,6 +13,7 @@ class WorkoutCameraComparison extends StatefulWidget {
   final bool demonstrationEnabled;
   final WorkoutCameraLayout layout;
   final WorkoutCameraFacing? cameraFacing;
+  final PosePipeline? posePipeline;
   final Widget? demonstration;
   final ValueChanged<String?>? onCameraErrorChanged;
 
@@ -18,6 +23,7 @@ class WorkoutCameraComparison extends StatefulWidget {
     this.demonstrationEnabled = true,
     required this.layout,
     this.cameraFacing,
+    this.posePipeline,
     this.demonstration,
     this.onCameraErrorChanged,
   });
@@ -29,6 +35,11 @@ class WorkoutCameraComparison extends StatefulWidget {
 
 class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   final GlobalKey _cameraKey = GlobalKey(debugLabel: 'workout-camera-preview');
+  PosePipeline? _ownedPosePipeline;
+
+  PosePipeline get _posePipeline => widget.posePipeline ??
+      (_ownedPosePipeline ??=
+          PosePipeline(estimator: createDefaultPoseEstimator()));
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +53,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
       key: _cameraKey,
       enabled: true,
       facing: widget.cameraFacing ?? configuredFacing,
+      posePipeline: _posePipeline,
       onErrorChanged: widget.onCameraErrorChanged,
     );
 
@@ -159,4 +171,14 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
           child: child,
         ),
       );
+
+  @override
+  void dispose() {
+    final ownedPipeline = _ownedPosePipeline;
+    _ownedPosePipeline = null;
+    if (ownedPipeline != null) {
+      unawaited(ownedPipeline.dispose());
+    }
+    super.dispose();
+  }
 }

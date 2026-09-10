@@ -14,11 +14,15 @@ enum PoseFrameFormat {
   unknown,
 }
 
+/// Camera-facing metadata normalized independently from camera plugins.
+enum PoseCameraFacing { front, back, external, unknown }
+
 /// One memory plane belonging to a [PoseFrame].
 ///
 /// [bytes] is treated as read-only borrowed memory. Producers may reuse the
 /// underlying buffer after pose estimation for the frame has completed, so
-/// consumers must not mutate it or retain it beyond the estimation call.
+/// consumers must not mutate it or retain it beyond the estimation call unless
+/// the producing adapter explicitly guarantees that its bytes are owned.
 class PoseFramePlane {
   const PoseFramePlane({
     required this.bytes,
@@ -46,6 +50,7 @@ class PoseFrame {
     required List<PoseFramePlane> planes,
     required this.timestamp,
     this.isMirrored = false,
+    this.cameraFacing = PoseCameraFacing.unknown,
   })  : assert(width > 0),
         assert(height > 0),
         assert(
@@ -71,8 +76,14 @@ class PoseFrame {
   /// Capture timestamp supplied by the frame producer.
   final DateTime timestamp;
 
-  /// Whether the image content is horizontally mirrored.
+  /// Whether the image content itself is horizontally mirrored.
+  ///
+  /// This is distinct from a front-camera preview that is mirrored only for
+  /// presentation. Renderers can use [cameraFacing] later without changing
+  /// canonical pose coordinates.
   final bool isMirrored;
+
+  final PoseCameraFacing cameraFacing;
 
   bool get isPortraitAfterRotation =>
       rotationDegrees == 90 || rotationDegrees == 270
