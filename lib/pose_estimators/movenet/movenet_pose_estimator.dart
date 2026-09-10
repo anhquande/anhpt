@@ -256,18 +256,22 @@ class MoveNetPoseEstimator implements PoseEstimator {
     final scaleX = inputSize / frame.width;
     final scaleY = inputSize / frame.height;
     final scale = scaleX < scaleY ? scaleX : scaleY;
-    final scaledWidth = (frame.width * scale).round().clamp(1, inputSize);
-    final scaledHeight = (frame.height * scale).round().clamp(1, inputSize);
+    final scaledWidth =
+        (frame.width * scale).round().clamp(1, inputSize).toInt();
+    final scaledHeight =
+        (frame.height * scale).round().clamp(1, inputSize).toInt();
     final offsetX = (inputSize - scaledWidth) ~/ 2;
     final offsetY = (inputSize - scaledHeight) ~/ 2;
 
     final input = Int32List(inputSize * inputSize * 3);
     for (var y = 0; y < scaledHeight; y++) {
       final sourceY = ((y * frame.height) ~/ scaledHeight)
-          .clamp(0, frame.height - 1);
+          .clamp(0, frame.height - 1)
+          .toInt();
       for (var x = 0; x < scaledWidth; x++) {
         final sourceX = ((x * frame.width) ~/ scaledWidth)
-            .clamp(0, frame.width - 1);
+            .clamp(0, frame.width - 1)
+            .toInt();
         final sourceOffset =
             sourceY * bytesPerRow + sourceX * bytesPerPixel;
         final inputOffset =
