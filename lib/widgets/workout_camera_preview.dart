@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../app/workout_camera_preference.dart';
 import '../camera/pose_camera_frame_adapter.dart';
 import '../core/pose/pose.dart';
+import '../pose_rendering/pose_rendering.dart';
 
 class WorkoutCameraPreview extends StatefulWidget {
   final bool enabled;
@@ -34,6 +35,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   static const _retryDelay = Duration(milliseconds: 300);
   static const _poseErrorLogInterval = Duration(seconds: 5);
 
+  final SkeletonPoseRenderer _poseRenderer = SkeletonPoseRenderer();
   CameraController? _controller;
   List<CameraDescription> _cameras = const [];
   CameraDescription? _selectedCamera;
@@ -41,6 +43,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   String? _error;
   int _generation = 0;
   DateTime? _lastPoseErrorLogAt;
+  PoseViewMode _poseViewMode = PoseViewMode.camera;
 
   bool get _platformSupported {
     if (kIsWeb) return false;
@@ -352,6 +355,12 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     return safeRatio;
   }
 
+  IconData _poseViewIcon(PoseViewMode mode) => switch (mode) {
+        PoseViewMode.camera => Icons.videocam_outlined,
+        PoseViewMode.skeleton => Icons.accessibility_new_rounded,
+        PoseViewMode.cameraWithSkeleton => Icons.layers_outlined,
+      };
+
   @override
   Widget build(BuildContext context) {
     if (!_platformSupported) {
@@ -406,7 +415,46 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
           child: Center(
             child: AspectRatio(
               aspectRatio: previewAspectRatio,
-              child: ClipRect(child: cameraView),
+              child: ClipRect(
+                child: RealtimePoseView(
+                  camera: cameraView,
+                  results: widget.posePipeline?.results,
+                  mode: _poseViewMode,
+                  renderer: _poseRenderer,
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: 8,
+          left: 8,
+          child: Material(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: .82),
+            borderRadius: BorderRadius.circular(24),
+            child: PopupMenuButton<PoseViewMode>(
+              tooltip: 'Pose view',
+              initialValue: _poseViewMode,
+              icon: Icon(_poseViewIcon(_poseViewMode)),
+              onSelected: (mode) => setState(() => _poseViewMode = mode),
+              itemBuilder: (_) => [
+                for (final mode in PoseViewMode.values)
+                  PopupMenuItem(
+                    value: mode,
+                    child: Row(
+                      children: [
+                        Icon(_poseViewIcon(mode)),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(mode.label)),
+                        if (mode == _poseViewMode)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 10),
+                            child: Icon(Icons.check_rounded),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
