@@ -5,12 +5,14 @@ import '../screens/workout_history_screen.dart';
 import '../services/local_store.dart';
 import '../services/weekly_workout_goal.dart';
 import '../services/workout_consistency_analytics.dart';
+import '../services/workout_milestone_analytics.dart';
 import '../services/workout_personal_bests_analytics.dart';
 import '../services/workout_session_analytics.dart';
 import '../services/workout_session_history.dart';
 import 'weekly_workout_feedback.dart';
 import 'weekly_workout_goal_card.dart';
 import 'workout_consistency_card.dart';
+import 'workout_milestones_card.dart';
 import 'workout_personal_bests_card.dart';
 
 class HomeWeeklyWorkoutFeedback extends StatelessWidget {
@@ -29,6 +31,7 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
     WeeklyWorkoutSummary,
     WorkoutConsistencySummary,
     WorkoutPersonalBestsSummary,
+    WorkoutMilestoneSummary,
     int
   )> _load() async {
     final sessions = await WorkoutSessionHistory(store).load();
@@ -43,6 +46,10 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
         profileId: profileId,
       ),
       WorkoutPersonalBestsAnalytics.summarize(
+        sessions,
+        profileId: profileId,
+      ),
+      WorkoutMilestoneAnalytics.summarize(
         sessions,
         profileId: profileId,
       ),
@@ -105,6 +112,7 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
           WeeklyWorkoutSummary,
           WorkoutConsistencySummary,
           WorkoutPersonalBestsSummary,
+          WorkoutMilestoneSummary,
           int
         )>(
           future: _load(),
@@ -114,7 +122,8 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
                 !snapshot.hasData) {
               return const SizedBox.shrink();
             }
-            final (weekly, consistency, personalBests, goal) = snapshot.data!;
+            final (weekly, consistency, personalBests, milestones, goal) =
+                snapshot.data!;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -142,6 +151,10 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
                 if (personalBests.hasRecords) ...[
                   const SizedBox(height: 12),
                   WorkoutPersonalBestsCard(summary: personalBests),
+                ],
+                if (milestones.hasActivity) ...[
+                  const SizedBox(height: 12),
+                  WorkoutMilestonesCard(summary: milestones),
                 ],
               ],
             );
