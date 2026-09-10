@@ -78,3 +78,34 @@ jobs:
 
       - name: Test
         run: flutter test
+
+  windows-build:
+    name: Windows Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        shell: powershell
+        run: flutter config --enable-windows-desktop
+
+      - name: Prepare Windows project
+        shell: powershell
+        run: |
+          if (-not (Test-Path "windows\CMakeLists.txt")) {
+            flutter create --platforms=windows --project-name anhpt .
+          }
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Windows debug app
+        run: flutter build windows --debug
