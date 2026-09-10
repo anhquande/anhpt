@@ -5,6 +5,7 @@ import '../screens/workout_history_screen.dart';
 import '../services/local_store.dart';
 import '../services/weekly_workout_goal.dart';
 import '../services/workout_consistency_analytics.dart';
+import '../services/workout_insights_analytics.dart';
 import '../services/workout_milestone_analytics.dart';
 import '../services/workout_personal_bests_analytics.dart';
 import '../services/workout_session_analytics.dart';
@@ -12,6 +13,7 @@ import '../services/workout_session_history.dart';
 import 'weekly_workout_feedback.dart';
 import 'weekly_workout_goal_card.dart';
 import 'workout_consistency_card.dart';
+import 'workout_insights_card.dart';
 import 'workout_milestones_card.dart';
 import 'workout_personal_bests_card.dart';
 
@@ -32,6 +34,7 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
     WorkoutConsistencySummary,
     WorkoutPersonalBestsSummary,
     WorkoutMilestoneSummary,
+    List<WorkoutInsight>,
     int
   )> _load() async {
     final sessions = await WorkoutSessionHistory(store).load();
@@ -52,6 +55,11 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
       WorkoutMilestoneAnalytics.summarize(
         sessions,
         profileId: profileId,
+      ),
+      WorkoutInsightsAnalytics.summarize(
+        sessions,
+        profileId: profileId,
+        weeklyGoalDays: goal,
       ),
       goal,
     );
@@ -113,6 +121,7 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
           WorkoutConsistencySummary,
           WorkoutPersonalBestsSummary,
           WorkoutMilestoneSummary,
+          List<WorkoutInsight>,
           int
         )>(
           future: _load(),
@@ -122,8 +131,14 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
                 !snapshot.hasData) {
               return const SizedBox.shrink();
             }
-            final (weekly, consistency, personalBests, milestones, goal) =
-                snapshot.data!;
+            final (
+              weekly,
+              consistency,
+              personalBests,
+              milestones,
+              insights,
+              goal,
+            ) = snapshot.data!;
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
@@ -146,6 +161,10 @@ class HomeWeeklyWorkoutFeedback extends StatelessWidget {
                   goalDays: goal,
                   onEdit: () => _editGoal(context, goal),
                 ),
+                if (insights.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  WorkoutInsightsCard(insights: insights),
+                ],
                 const SizedBox(height: 12),
                 WorkoutConsistencyCard(summary: consistency),
                 if (personalBests.hasRecords) ...[
