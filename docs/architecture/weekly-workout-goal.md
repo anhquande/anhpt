@@ -13,3 +13,5 @@ Progress uses the active profile's distinct completed workout days for the curre
 ## UI
 
 Home shows a Weekly goal card alongside the existing weekly feedback and consistency insights. The goal can be edited directly from the card. Saving increments `WeeklyWorkoutGoalStore.revision`, which refreshes the card without mutating workout history.
+
+The goal preference stays independent from workout-session persistence so profile goal changes never rewrite historical sessions.
