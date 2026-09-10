@@ -16,8 +16,10 @@ class PosePipelineConfig {
   final double targetFps;
 
   Duration get minimumFrameInterval => Duration(
-        microseconds:
-            (Duration.microsecondsPerSecond / targetFps).round().clamp(1, 1 << 31),
+        microseconds: (Duration.microsecondsPerSecond / targetFps)
+            .round()
+            .clamp(1, 1 << 31)
+            .toInt(),
       );
 }
 
@@ -126,6 +128,7 @@ class PosePipeline {
   bool _disposed = false;
   bool _processing = false;
   int _generation = 0;
+  Future<void>? _startFuture;
   Future<void>? _processingFuture;
   PoseFrame? _pendingFrame;
   DateTime? _lastInferenceFrameTimestamp;
@@ -149,14 +152,28 @@ class PosePipeline {
         lastInferenceDuration: _lastInferenceDuration,
       );
 
-  Future<void> start() async {
+  Future<void> start() {
     if (_disposed) {
-      throw StateError('PosePipeline has been disposed.');
+      return Future<void>.error(StateError('PosePipeline has been disposed.'));
     }
-    if (_running) return;
+    if (_running) return Future<void>.value();
+
+    final existingStart = _startFuture;
+    if (existingStart != null) return existingStart;
 
     final generation = ++_generation;
     _resetSessionState();
+    late final Future<void> startFuture;
+    startFuture = _initializeForStart(generation).whenComplete(() {
+      if (identical(_startFuture, startFuture)) {
+        _startFuture = null;
+      }
+    });
+    _startFuture = startFuture;
+    return startFuture;
+  }
+
+  Future<void> _initializeForStart(int generation) async {
     try {
       if (!estimator.isInitialized) {
         await estimator.initialize();
@@ -179,7 +196,8 @@ class PosePipeline {
   }
 
   Future<void> stop() async {
-    if (!_running && !_processing) {
+    final startFuture = _startFuture;
+    if (!_running && !_processing && startFuture == null) {
       _pendingFrame = null;
       return;
     }
@@ -189,6 +207,10 @@ class PosePipeline {
     if (_pendingFrame != null) {
       _droppedFrameCount++;
       _pendingFrame = null;
+    }
+
+    if (startFuture != null) {
+      await startFuture;
     }
 
     final processing = _processingFuture;
@@ -284,7 +306,7 @@ class PosePipeline {
         frame = next;
       }
     } finally {
-      if (generation == _generation || !_running) {
+      if (generation == _generation || !_running || _disposed) {
         _processing = false;
         _processingFuture = null;
       }
@@ -328,8 +350,8 @@ class PosePipeline {
 
   Future<void> dispose() async {
     if (_disposed) return;
-    await stop();
     _disposed = true;
+    await stop();
     ++_generation;
     try {
       if (estimator.isInitialized) {
