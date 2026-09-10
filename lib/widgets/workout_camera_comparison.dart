@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app/workout_camera_preference.dart';
+import '../core/pose/pose.dart';
 import '../models/workout_video_settings.dart';
 import 'workout_camera_preview.dart';
 
@@ -9,6 +10,7 @@ class WorkoutCameraComparison extends StatefulWidget {
   final bool demonstrationEnabled;
   final WorkoutCameraLayout layout;
   final WorkoutCameraFacing? cameraFacing;
+  final PosePipeline? posePipeline;
   final Widget? demonstration;
   final ValueChanged<String?>? onCameraErrorChanged;
 
@@ -18,6 +20,7 @@ class WorkoutCameraComparison extends StatefulWidget {
     this.demonstrationEnabled = true,
     required this.layout,
     this.cameraFacing,
+    this.posePipeline,
     this.demonstration,
     this.onCameraErrorChanged,
   });
@@ -42,6 +45,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
       key: _cameraKey,
       enabled: true,
       facing: widget.cameraFacing ?? configuredFacing,
+      posePipeline: widget.posePipeline,
       onErrorChanged: widget.onCameraErrorChanged,
     );
 
