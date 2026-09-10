@@ -3,4 +3,5 @@ export 'body_pose.dart';
 export 'pose_estimator.dart';
 export 'pose_frame.dart';
 export 'pose_pipeline.dart';
+export 'pose_smoothing.dart';
 export 'pose_tracking.dart';
