@@ -21,4 +21,4 @@ Sessions are evaluated newest first. Equal record values keep the most recent co
 
 Home shows a compact `Personal bests` card below the existing weekly goal and consistency insights when at least one completed workout exists. Missing calorie data hides the calorie row instead of presenting a misleading zero.
 
-The card is refreshed through the existing `WorkoutSessionHistory.revision` listener. Existing Workout History search, filter, sort and CSV export semantics are unchanged.
+The card refreshes automatically through the existing `WorkoutSessionHistory.revision` listener whenever persisted workout history changes. Existing Workout History search, filter, sort and CSV export semantics are unchanged.
