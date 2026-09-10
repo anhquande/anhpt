@@ -93,13 +93,16 @@ class EmaPoseSmoother implements PoseSmoother {
       );
     }
 
-    _previousJoints = joints;
-    _previousTimestamp = pose.timestamp;
-    return BodyPose(
+    final output = BodyPose(
       joints: joints,
       timestamp: pose.timestamp,
       confidence: pose.confidence,
     );
+    // BodyPose already owns an immutable copy of the joint map. Reuse that as
+    // EMA history instead of retaining a second per-frame map.
+    _previousJoints = output.joints;
+    _previousTimestamp = pose.timestamp;
+    return output;
   }
 
   double _effectiveAlpha(Duration delta) {
