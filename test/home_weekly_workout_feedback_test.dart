@@ -32,6 +32,8 @@ WorkoutSession _session({
 void main() {
   testWidgets('Home weekly feedback is scoped to the active profile',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     final now = DateTime.now();
@@ -69,6 +71,8 @@ void main() {
 
   testWidgets('Home feedback refreshes when a completed session is recorded',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     final history = WorkoutSessionHistory(store);
@@ -104,6 +108,8 @@ void main() {
 
   testWidgets('Home mounts weekly feedback for the active local profile',
       (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 1000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
     final activeProfile = await HealthStore().activeLocalProfile();
@@ -128,12 +134,17 @@ void main() {
 
     expect(find.text('This week'), findsWidgets);
     expect(find.text('1 workout • 12 min'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Search workouts'),
+      250,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Search workouts'), findsOneWidget);
   });
 }
 
 class _HomeController extends AppController {
-  _HomeController(LocalStore store) : super(store);
+  _HomeController(super.store);
 
   @override
   Future<void> refreshAllBucketSources() async {}
