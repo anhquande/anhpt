@@ -68,9 +68,6 @@ class SkeletonRenderConfig {
   final Color boneColor;
 }
 
-Offset normalizedPosePointToOffset(PosePoint point, Size size) =>
-    Offset(point.x * size.width, point.y * size.height);
-
 /// Lightweight skeleton renderer for canonical [BodyPose] values.
 class SkeletonPoseRenderer implements PoseRenderer {
   SkeletonPoseRenderer({this.config = const SkeletonRenderConfig()})
@@ -103,14 +100,15 @@ class SkeletonPoseRenderer implements PoseRenderer {
     required Canvas canvas,
     required Size size,
     required BodyPose pose,
+    required PosePointProjector transformPoint,
   }) {
     for (final bone in canonicalSkeletonBones) {
       final start = pose[bone.start];
       final end = pose[bone.end];
       if (!jointIsRenderable(start) || !jointIsRenderable(end)) continue;
       canvas.drawLine(
-        normalizedPosePointToOffset(start!, size),
-        normalizedPosePointToOffset(end!, size),
+        transformPoint(start!),
+        transformPoint(end!),
         _bonePaint,
       );
     }
@@ -118,7 +116,7 @@ class SkeletonPoseRenderer implements PoseRenderer {
     for (final point in pose.joints.values) {
       if (!jointIsRenderable(point)) continue;
       canvas.drawCircle(
-        normalizedPosePointToOffset(point, size),
+        transformPoint(point),
         config.jointRadius,
         _jointPaint,
       );

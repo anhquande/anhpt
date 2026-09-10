@@ -1,3 +1,4 @@
+export 'camera_preview_geometry.dart';
 export 'pose_painter.dart';
 export 'pose_renderer.dart';
 export 'pose_view_mode.dart';
