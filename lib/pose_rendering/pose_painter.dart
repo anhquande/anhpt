@@ -1,6 +1,6 @@
 import 'dart:ui';
 
-import 'package:flutter/painting.dart';
+import 'package:flutter/widgets.dart';
 
 import '../core/pose/body_pose.dart';
 import 'pose_renderer.dart';
