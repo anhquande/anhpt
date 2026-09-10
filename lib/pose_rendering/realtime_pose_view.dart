@@ -33,7 +33,7 @@ class RealtimePoseView extends StatefulWidget {
     this.previewFit = BoxFit.fill,
     this.debugConfig = const PoseRenderDebugConfig(),
     this.trackingStatusDebounce = const Duration(milliseconds: 600),
-  }) : assert(!trackingStatusDebounce.isNegative);
+  });
 
   final Widget camera;
   final Stream<PosePipelineResult>? results;
@@ -85,6 +85,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   @override
   void initState() {
     super.initState();
+    assert(!widget.trackingStatusDebounce.isNegative);
     _resetTrackingEvaluator();
     _resetPoseSmoother();
     _subscribe();
@@ -114,6 +115,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       _smoothedPose = null;
       _frame = null;
     } else if (statusPresentationChanged) {
+      assert(!widget.trackingStatusDebounce.isNegative);
       _resetTrackingStatus();
       _queueTrackingMessage(_trackingEvaluation);
     } else if (smootherChanged) {
