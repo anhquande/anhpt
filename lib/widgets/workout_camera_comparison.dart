@@ -1,11 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../app/workout_camera_preference.dart';
 import '../core/pose/pose.dart';
 import '../models/workout_video_settings.dart';
 import '../pose_estimators/default_pose_estimator.dart';
+import 'windows_pose_camera_preview.dart';
 import 'workout_camera_preview.dart';
 
 class WorkoutCameraComparison extends StatefulWidget {
@@ -49,13 +51,22 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
     final configuredFacing = WorkoutVideoRuntime.current?.camera == 'back'
         ? WorkoutCameraFacing.back
         : WorkoutCameraFacing.front;
-    final camera = WorkoutCameraPreview(
-      key: _cameraKey,
-      enabled: true,
-      facing: widget.cameraFacing ?? configuredFacing,
-      posePipeline: _posePipeline,
-      onErrorChanged: widget.onCameraErrorChanged,
-    );
+    final facing = widget.cameraFacing ?? configuredFacing;
+    final camera = !kIsWeb && defaultTargetPlatform == TargetPlatform.windows
+        ? WindowsPoseCameraPreview(
+            key: _cameraKey,
+            enabled: true,
+            facing: facing,
+            posePipeline: _posePipeline,
+            onErrorChanged: widget.onCameraErrorChanged,
+          )
+        : WorkoutCameraPreview(
+            key: _cameraKey,
+            enabled: true,
+            facing: facing,
+            posePipeline: _posePipeline,
+            onErrorChanged: widget.onCameraErrorChanged,
+          );
 
     if (!widget.demonstrationEnabled) {
       return _frame(camera);

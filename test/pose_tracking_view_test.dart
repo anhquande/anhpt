@@ -18,6 +18,19 @@ BodyPose _fullBodyPose(DateTime timestamp) => BodyPose(
       confidence: 0.9,
     );
 
+BodyPose _partialBodyPose(DateTime timestamp) => BodyPose(
+      joints: const {
+        BodyJoint.leftShoulder:
+            PosePoint(x: 0.4, y: 0.25, confidence: 0.9),
+        BodyJoint.rightShoulder:
+            PosePoint(x: 0.6, y: 0.25, confidence: 0.9),
+        BodyJoint.leftHip: PosePoint(x: 0.45, y: 0.55, confidence: 0.9),
+        BodyJoint.rightHip: PosePoint(x: 0.55, y: 0.55, confidence: 0.9),
+      },
+      timestamp: timestamp,
+      confidence: 0.9,
+    );
+
 PosePipelineResult _result(DateTime timestamp, List<BodyPose> poses) =>
     PosePipelineResult(
       frame: PoseFrameMetadata(
@@ -38,6 +51,7 @@ Widget _app({
   required Stream<PosePipelineResult> results,
   Stream<PosePipelineError>? errors,
   PoseTrackingConfig? config,
+  Duration statusDebounce = const Duration(milliseconds: 600),
 }) =>
     MaterialApp(
       home: SizedBox(
@@ -49,6 +63,7 @@ Widget _app({
           errors: errors,
           capabilities: _capabilities,
           trackingConfig: config,
+          trackingStatusDebounce: statusDebounce,
           mode: PoseViewMode.cameraWithSkeleton,
           renderer: SkeletonPoseRenderer(),
         ),
@@ -58,7 +73,8 @@ Widget _app({
 void main() {
   final t0 = DateTime.utc(2026, 9, 10, 12);
 
-  testWidgets('shows non-blocking no-person and ready guidance', (tester) async {
+  testWidgets('shows stable no-person and ready guidance after debounce',
+      (tester) async {
     final results = StreamController<PosePipelineResult>.broadcast(sync: true);
     addTearDown(results.close);
 
@@ -74,6 +90,9 @@ void main() {
 
     results.add(_result(t0, const []));
     await tester.pump();
+    expect(find.text('Move into camera view'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 600));
     expect(find.text('Move into camera view'), findsOneWidget);
     expect(find.byKey(const ValueKey('pose-tracking-status')), findsOneWidget);
 
@@ -81,8 +100,69 @@ void main() {
       _fullBodyPose(t0.add(const Duration(milliseconds: 10))),
     ]));
     await tester.pump();
-    expect(find.text('Ready'), findsOneWidget);
+    expect(find.text('Move into camera view'), findsOneWidget);
+    expect(find.text('Ready'), findsNothing);
     expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Move into camera view'), findsNothing);
+    expect(find.text('Ready'), findsOneWidget);
+  });
+
+  testWidgets('brief pose-state chatter does not flash status messages',
+      (tester) async {
+    final results = StreamController<PosePipelineResult>.broadcast(sync: true);
+    addTearDown(results.close);
+
+    await tester.pumpWidget(
+      _app(
+        results: results.stream,
+        config: PoseTrackingConfig(
+          readyHoldDuration: Duration.zero,
+          trackingStartDuration: Duration.zero,
+          lostTrackingDelay: Duration.zero,
+          noPersonDelay: const Duration(seconds: 1),
+          recoveryDuration: Duration.zero,
+        ),
+      ),
+    );
+
+    results.add(_result(t0, [_partialBodyPose(t0)]));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.byKey(const ValueKey('pose-tracking-status')), findsNothing);
+
+    results.add(_result(t0.add(const Duration(milliseconds: 300)), [
+      _fullBodyPose(t0.add(const Duration(milliseconds: 300))),
+    ]));
+    await tester.pump(const Duration(milliseconds: 700));
+    expect(find.byKey(const ValueKey('pose-tracking-status')), findsNothing);
+
+    results.add(_result(t0.add(const Duration(seconds: 1)), [
+      _partialBodyPose(t0.add(const Duration(seconds: 1))),
+    ]));
+    await tester.pump(const Duration(milliseconds: 599));
+    expect(find.text('Make sure your full body is visible'), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 1));
+    expect(find.text('Make sure your full body is visible'), findsOneWidget);
+
+    results.add(_result(t0.add(const Duration(milliseconds: 1600)), [
+      _fullBodyPose(t0.add(const Duration(milliseconds: 1600))),
+    ]));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Make sure your full body is visible'), findsOneWidget);
+
+    results.add(_result(t0.add(const Duration(milliseconds: 1900)), [
+      _partialBodyPose(t0.add(const Duration(milliseconds: 1900))),
+    ]));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.text('Make sure your full body is visible'), findsOneWidget);
+
+    results.add(_result(t0.add(const Duration(milliseconds: 2300)), [
+      _fullBodyPose(t0.add(const Duration(milliseconds: 2300))),
+    ]));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byKey(const ValueKey('pose-tracking-status')), findsNothing);
   });
 
   testWidgets('inference errors use tracking hysteresis', (tester) async {
@@ -129,7 +209,10 @@ void main() {
       ),
     );
     await tester.pump();
-    expect(find.text('Tracking lost'), findsOneWidget);
+    expect(find.text('Tracking lost'), findsNothing);
     expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsNothing);
+
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('Tracking lost'), findsOneWidget);
   });
 }
