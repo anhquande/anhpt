@@ -8,3 +8,4 @@ export 'pose_geometry.dart';
 export 'pose_pipeline.dart';
 export 'pose_smoothing.dart';
 export 'pose_tracking.dart';
+export 'squat_analyzer.dart';
