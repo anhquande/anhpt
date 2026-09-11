@@ -8,12 +8,14 @@ import '../app/workout_camera_preference.dart';
 import '../camera/pose_camera_frame_adapter.dart';
 import '../core/pose/pose.dart';
 import '../pose_rendering/pose_rendering.dart';
+import 'squat_analysis_overlay.dart';
 
 class WorkoutCameraPreview extends StatefulWidget {
   final bool enabled;
   final WorkoutCameraFacing facing;
   final PosePipeline? posePipeline;
   final ValueChanged<String?>? onErrorChanged;
+  final ValueChanged<PoseFeatures>? onPoseFeatures;
 
   const WorkoutCameraPreview({
     super.key,
@@ -21,6 +23,7 @@ class WorkoutCameraPreview extends StatefulWidget {
     this.facing = WorkoutCameraFacing.front,
     this.posePipeline,
     this.onErrorChanged,
+    this.onPoseFeatures,
   });
 
   @override
@@ -36,6 +39,8 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   static const _poseErrorLogInterval = Duration(seconds: 5);
 
   final SkeletonPoseRenderer _poseRenderer = SkeletonPoseRenderer();
+  final ExerciseAnalysisController _squatAnalysisController =
+      ExerciseAnalysisController(analyzer: const SquatExerciseAnalyzer());
   CameraController? _controller;
   List<CameraDescription> _cameras = const [];
   CameraDescription? _selectedCamera;
@@ -44,6 +49,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
   int _generation = 0;
   DateTime? _lastPoseErrorLogAt;
   PoseViewMode _poseViewMode = PoseViewMode.camera;
+  ExerciseAnalysis? _squatAnalysis;
 
   bool get _platformSupported {
     if (kIsWeb) return false;
@@ -273,6 +279,35 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     debugPrint(message);
   }
 
+  void _handlePoseFeatures(PoseFeatures features) {
+    widget.onPoseFeatures?.call(features);
+    final analysis = _squatAnalysisController.analyze(features);
+    if (_sameSquatPresentation(_squatAnalysis, analysis)) {
+      _squatAnalysis = analysis;
+      return;
+    }
+    if (!mounted) {
+      _squatAnalysis = analysis;
+      return;
+    }
+    setState(() => _squatAnalysis = analysis);
+  }
+
+  bool _sameSquatPresentation(ExerciseAnalysis? a, ExerciseAnalysis b) {
+    if (a == null) return false;
+    return a.repetitionCount == b.repetitionCount &&
+        a.state.id == b.state.id &&
+        _feedbackCodes(a) == _feedbackCodes(b);
+  }
+
+  String _feedbackCodes(ExerciseAnalysis analysis) =>
+      analysis.feedback.map((item) => item.code).join('|');
+
+  void _resetSquatAnalysis() {
+    _squatAnalysisController.reset();
+    _squatAnalysis = null;
+  }
+
   Future<void> _disposeSafely(CameraController? controller) async {
     await _stopPoseProcessing(controller);
     if (controller == null) return;
@@ -319,6 +354,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     ++_generation;
     final controller = _controller;
     _controller = null;
+    _resetSquatAnalysis();
     if (mounted) setState(() {});
     await _disposeSafely(controller);
   }
@@ -407,6 +443,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
           )
         : preview;
 
+    final squatAnalysis = _squatAnalysis;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -421,6 +458,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
                   results: widget.posePipeline?.results,
                   errors: widget.posePipeline?.errors,
                   capabilities: widget.posePipeline?.estimator.capabilities,
+                  onPoseFeatures: _handlePoseFeatures,
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
@@ -428,6 +466,15 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
             ),
           ),
         ),
+        if (squatAnalysis != null)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: IgnorePointer(
+              child: Center(child: SquatAnalysisOverlay(analysis: squatAnalysis)),
+            ),
+          ),
         Positioned(
           top: 8,
           left: 8,
@@ -503,6 +550,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
     ++_generation;
     final controller = _controller;
     _controller = null;
+    _resetSquatAnalysis();
     unawaited(_disposeSafely(controller));
     super.dispose();
   }

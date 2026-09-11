@@ -7,6 +7,7 @@ import '../app/workout_camera_preference.dart';
 import '../camera/windows_pose_frame_adapter.dart';
 import '../core/pose/pose.dart';
 import '../pose_rendering/pose_rendering.dart';
+import 'squat_analysis_overlay.dart';
 
 /// Windows camera surface that exposes raw UVC frames to the canonical pose
 /// pipeline while rendering the same native stream through a Flutter Texture.
@@ -17,12 +18,14 @@ class WindowsPoseCameraPreview extends StatefulWidget {
     required this.facing,
     this.posePipeline,
     this.onErrorChanged,
+    this.onPoseFeatures,
   });
 
   final bool enabled;
   final WorkoutCameraFacing facing;
   final PosePipeline? posePipeline;
   final ValueChanged<String?>? onErrorChanged;
+  final ValueChanged<PoseFeatures>? onPoseFeatures;
 
   @override
   State<WindowsPoseCameraPreview> createState() =>
@@ -33,6 +36,8 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     with WidgetsBindingObserver {
   final UvcCamera _camera = UvcCamera();
   final SkeletonPoseRenderer _poseRenderer = SkeletonPoseRenderer();
+  final ExerciseAnalysisController _squatAnalysisController =
+      ExerciseAnalysisController(analyzer: const SquatExerciseAnalyzer());
 
   List<UvcUsbDevice> _devices = const [];
   UvcUsbDevice? _selectedDevice;
@@ -44,6 +49,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   bool _loading = false;
   String? _error;
   PoseViewMode _poseViewMode = PoseViewMode.camera;
+  ExerciseAnalysis? _squatAnalysis;
 
   @override
   void initState() {
@@ -210,6 +216,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     _frameTimer?.cancel();
     _frameTimer = null;
     _lastFrameSequence = -1;
+    _resetSquatAnalysis();
 
     await widget.posePipeline?.stop();
 
@@ -250,6 +257,35 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     _error = value;
     widget.onErrorChanged?.call(value);
     if (mounted) setState(() {});
+  }
+
+  void _handlePoseFeatures(PoseFeatures features) {
+    widget.onPoseFeatures?.call(features);
+    final analysis = _squatAnalysisController.analyze(features);
+    if (_sameSquatPresentation(_squatAnalysis, analysis)) {
+      _squatAnalysis = analysis;
+      return;
+    }
+    if (!mounted) {
+      _squatAnalysis = analysis;
+      return;
+    }
+    setState(() => _squatAnalysis = analysis);
+  }
+
+  bool _sameSquatPresentation(ExerciseAnalysis? a, ExerciseAnalysis b) {
+    if (a == null) return false;
+    return a.repetitionCount == b.repetitionCount &&
+        a.state.id == b.state.id &&
+        _feedbackCodes(a) == _feedbackCodes(b);
+  }
+
+  String _feedbackCodes(ExerciseAnalysis analysis) =>
+      analysis.feedback.map((item) => item.code).join('|');
+
+  void _resetSquatAnalysis() {
+    _squatAnalysisController.reset();
+    _squatAnalysis = null;
   }
 
   IconData _poseViewIcon(PoseViewMode mode) => switch (mode) {
@@ -298,6 +334,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
           )
         : preview;
 
+    final squatAnalysis = _squatAnalysis;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -315,6 +352,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
                   trackingRequirements: PoseTrackingRequirements.upperBody(),
                   trackingStatusDebounce:
                       RealtimePoseView.defaultTrackingStatusDebounce,
+                  onPoseFeatures: _handlePoseFeatures,
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
@@ -322,6 +360,15 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
             ),
           ),
         ),
+        if (squatAnalysis != null)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: IgnorePointer(
+              child: Center(child: SquatAnalysisOverlay(analysis: squatAnalysis)),
+            ),
+          ),
         Positioned(
           top: 8,
           left: 8,
@@ -385,6 +432,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     ++_generation;
     _frameTimer?.cancel();
     _frameTimer = null;
+    _resetSquatAnalysis();
     unawaited(_disposeCamera());
     super.dispose();
   }
