@@ -32,8 +32,11 @@ class RealtimePoseView extends StatefulWidget {
     this.smoother,
     this.previewFit = BoxFit.fill,
     this.debugConfig = const PoseRenderDebugConfig(),
-    this.trackingStatusDebounce = const Duration(milliseconds: 600),
+    this.trackingStatusDebounce = Duration.zero,
   });
+
+  /// User-facing default delay for stabilizing pose guidance messages.
+  static const defaultTrackingStatusDebounce = Duration(milliseconds: 600);
 
   final Widget camera;
   final Stream<PosePipelineResult>? results;
@@ -58,6 +61,10 @@ class RealtimePoseView extends StatefulWidget {
   /// Tracking state and skeleton rendering still update on every pose result.
   /// Only the user-facing status badge waits for a state/message to remain
   /// stable, preventing confidence noise from flashing guidance every frame.
+  ///
+  /// Defaults to zero so low-level tests and embedded diagnostic surfaces can
+  /// observe tracking state synchronously. User-facing live camera surfaces
+  /// should pass [defaultTrackingStatusDebounce].
   final Duration trackingStatusDebounce;
 
   @override
@@ -177,6 +184,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       capabilities: _capabilities,
       timestamp: result.frame.timestamp,
     );
+    final previousTrackingState = _trackingEvaluation?.state;
 
     setState(() {
       _trackingEvaluation = evaluation;
@@ -187,10 +195,12 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         // orientation/crop/mirror/view-space transform.
         _smoothedPose = _poseSmoother.update(rawPose);
       } else if (evaluation.state == PoseTrackingState.noPerson) {
-        // A real no-person state ends the smoothing timeline so a future person
-        // cannot inherit stale joint history.
+        // noPerson is the hard reset boundary. A short lostTracking interval
+        // only hides the skeleton; it must not clear smoother history.
         _smoothedPose = null;
-        _poseSmoother.reset();
+        if (previousTrackingState != PoseTrackingState.noPerson) {
+          _poseSmoother.reset();
+        }
       } else if (evaluation.state == PoseTrackingState.lostTracking) {
         // Stop drawing when tracking is lost, but retain the EMA history during
         // the short PR7 recovery window. noPerson performs the hard reset.
@@ -210,11 +220,15 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       capabilities: _capabilities,
       timestamp: error.frameTimestamp ?? DateTime.now(),
     );
+    final previousTrackingState = _trackingEvaluation?.state;
+
     setState(() {
       _trackingEvaluation = evaluation;
       if (evaluation.state == PoseTrackingState.noPerson) {
         _smoothedPose = null;
-        _poseSmoother.reset();
+        if (previousTrackingState != PoseTrackingState.noPerson) {
+          _poseSmoother.reset();
+        }
       } else if (evaluation.state == PoseTrackingState.lostTracking) {
         _smoothedPose = null;
       }
@@ -308,7 +322,9 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       PoseTrackingState.initializing => 'Hold still',
       PoseTrackingState.ready => 'Ready',
       PoseTrackingState.tracking => null,
-      PoseTrackingState.lostTracking => 'Tracking lost',
+      PoseTrackingState.lostTracking => evaluation.primaryPose == null
+          ? 'Tracking lost'
+          : 'Make sure your full body is visible',
     };
   }
 
