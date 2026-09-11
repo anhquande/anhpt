@@ -17,12 +17,14 @@ class WindowsPoseCameraPreview extends StatefulWidget {
     required this.facing,
     this.posePipeline,
     this.onErrorChanged,
+    this.onPoseFeatures,
   });
 
   final bool enabled;
   final WorkoutCameraFacing facing;
   final PosePipeline? posePipeline;
   final ValueChanged<String?>? onErrorChanged;
+  final ValueChanged<PoseFeatures>? onPoseFeatures;
 
   @override
   State<WindowsPoseCameraPreview> createState() =>
@@ -315,6 +317,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
                   trackingRequirements: PoseTrackingRequirements.upperBody(),
                   trackingStatusDebounce:
                       RealtimePoseView.defaultTrackingStatusDebounce,
+                  onPoseFeatures: widget.onPoseFeatures,
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
