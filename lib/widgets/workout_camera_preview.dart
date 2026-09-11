@@ -14,6 +14,7 @@ class WorkoutCameraPreview extends StatefulWidget {
   final WorkoutCameraFacing facing;
   final PosePipeline? posePipeline;
   final ValueChanged<String?>? onErrorChanged;
+  final ValueChanged<PoseFeatures>? onPoseFeatures;
 
   const WorkoutCameraPreview({
     super.key,
@@ -21,6 +22,7 @@ class WorkoutCameraPreview extends StatefulWidget {
     this.facing = WorkoutCameraFacing.front,
     this.posePipeline,
     this.onErrorChanged,
+    this.onPoseFeatures,
   });
 
   @override
@@ -421,6 +423,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
                   results: widget.posePipeline?.results,
                   errors: widget.posePipeline?.errors,
                   capabilities: widget.posePipeline?.estimator.capabilities,
+                  onPoseFeatures: widget.onPoseFeatures,
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
