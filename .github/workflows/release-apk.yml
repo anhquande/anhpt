@@ -100,8 +100,10 @@ jobs:
           set -euo pipefail
           if [[ ! -f android/gradlew ]]; then
             cp android/app/src/main/AndroidManifest.xml /tmp/AnhPT-AndroidManifest.xml || true
+            cp android/app/proguard-rules.pro /tmp/AnhPT-proguard-rules.pro || true
             flutter create --platforms=android --project-name anhpt .
             cp /tmp/AnhPT-AndroidManifest.xml android/app/src/main/AndroidManifest.xml || true
+            cp /tmp/AnhPT-proguard-rules.pro android/app/proguard-rules.pro || true
           fi
       - name: Build release APK
         run: flutter build apk --release --build-name=${{ needs.metadata.outputs.version }} --build-number=${{ needs.metadata.outputs.build_number }}
