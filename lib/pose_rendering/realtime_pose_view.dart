@@ -30,6 +30,8 @@ class RealtimePoseView extends StatefulWidget {
     this.trackingRequirements,
     this.trackingConfig,
     this.smoother,
+    this.featureExtractor = const CanonicalPoseFeatureExtractor(),
+    this.onPoseFeatures,
     this.previewFit = BoxFit.fill,
     this.debugConfig = const PoseRenderDebugConfig(),
     this.trackingStatusDebounce = Duration.zero,
@@ -50,6 +52,16 @@ class RealtimePoseView extends StatefulWidget {
   /// When omitted, [EmaPoseSmoother] with the centralized default
   /// [PoseSmoothingConfig] is used.
   final PoseSmoother? smoother;
+
+  /// Stateless extractor that derives canonical geometry after smoothing.
+  ///
+  /// The extractor sees only canonical normalized [BodyPose] coordinates before
+  /// PR6 orientation/crop/mirror/view-space transforms. Future analyzers can
+  /// consume [onPoseFeatures] without coupling to the renderer or camera UI.
+  final PoseFeatureExtractor featureExtractor;
+
+  /// Optional feature stream for future exercise analyzers and diagnostics.
+  final ValueChanged<PoseFeatures>? onPoseFeatures;
 
   final PoseViewMode mode;
   final PoseRenderer renderer;
@@ -82,6 +94,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   late PoseSmoother _poseSmoother;
   PoseTrackingEvaluation? _trackingEvaluation;
   BodyPose? _smoothedPose;
+  BodyPose? _previousFeaturePose;
   PoseFrameMetadata? _frame;
   String? _displayedTrackingMessage;
   String? _pendingTrackingMessage;
@@ -120,6 +133,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       _resetTrackingStatus();
       _resetPoseSmoother();
       _smoothedPose = null;
+      _previousFeaturePose = null;
       _frame = null;
     } else if (statusPresentationChanged) {
       assert(!widget.trackingStatusDebounce.isNegative);
@@ -128,6 +142,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     } else if (smootherChanged) {
       _resetPoseSmoother();
       _smoothedPose = null;
+      _previousFeaturePose = null;
     }
     if (streamsChanged) {
       _subscribe();
@@ -163,6 +178,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _resetTrackingStatus();
     _trackingEvaluation = null;
     _smoothedPose = null;
+    _previousFeaturePose = null;
     _frame = null;
 
     final results = widget.results;
@@ -185,6 +201,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       timestamp: result.frame.timestamp,
     );
     final previousTrackingState = _trackingEvaluation?.state;
+    PoseFeatures? extractedFeatures;
 
     setState(() {
       _trackingEvaluation = evaluation;
@@ -193,11 +210,19 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       if (rawPose != null) {
         // Smoothing happens in canonical normalized coordinates before PR6's
         // orientation/crop/mirror/view-space transform.
-        _smoothedPose = _poseSmoother.update(rawPose);
+        final previousFeaturePose = _previousFeaturePose;
+        final smoothedPose = _poseSmoother.update(rawPose);
+        _smoothedPose = smoothedPose;
+        _previousFeaturePose = smoothedPose;
+        extractedFeatures = widget.featureExtractor.extract(
+          smoothedPose,
+          previousPose: previousFeaturePose,
+        );
       } else if (evaluation.state == PoseTrackingState.noPerson) {
         // noPerson is the hard reset boundary. A short lostTracking interval
         // only hides the skeleton; it must not clear smoother history.
         _smoothedPose = null;
+        _previousFeaturePose = null;
         if (previousTrackingState != PoseTrackingState.noPerson) {
           _poseSmoother.reset();
         }
@@ -211,6 +236,10 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       // Raw BodyPose observations remain available in the pipeline result and
       // in trackingEvaluation.primaryPose; they are never mutated or replaced.
     });
+    final features = extractedFeatures;
+    if (features != null) {
+      widget.onPoseFeatures?.call(features);
+    }
     _queueTrackingMessage(evaluation);
   }
 
@@ -226,6 +255,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       _trackingEvaluation = evaluation;
       if (evaluation.state == PoseTrackingState.noPerson) {
         _smoothedPose = null;
+        _previousFeaturePose = null;
         if (previousTrackingState != PoseTrackingState.noPerson) {
           _poseSmoother.reset();
         }
@@ -434,6 +464,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _errorSubscription = null;
     _trackingStatusTimer?.cancel();
     _trackingStatusTimer = null;
+    _previousFeaturePose = null;
     _poseSmoother.reset();
     super.dispose();
   }
