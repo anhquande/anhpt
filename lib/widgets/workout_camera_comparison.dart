@@ -18,6 +18,7 @@ class WorkoutCameraComparison extends StatefulWidget {
   final PosePipeline? posePipeline;
   final Widget? demonstration;
   final ValueChanged<String?>? onCameraErrorChanged;
+  final ValueChanged<PoseFeatures>? onPoseFeatures;
 
   const WorkoutCameraComparison({
     super.key,
@@ -28,6 +29,7 @@ class WorkoutCameraComparison extends StatefulWidget {
     this.posePipeline,
     this.demonstration,
     this.onCameraErrorChanged,
+    this.onPoseFeatures,
   });
 
   @override
@@ -59,6 +61,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
             facing: facing,
             posePipeline: _posePipeline,
             onErrorChanged: widget.onCameraErrorChanged,
+            onPoseFeatures: widget.onPoseFeatures,
           )
         : WorkoutCameraPreview(
             key: _cameraKey,
@@ -66,6 +69,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
             facing: facing,
             posePipeline: _posePipeline,
             onErrorChanged: widget.onCameraErrorChanged,
+            onPoseFeatures: widget.onPoseFeatures,
           );
 
     if (!widget.demonstrationEnabled) {
