@@ -6,6 +6,8 @@ import 'package:anhpt/services/workout_serializer.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  tearDown(WorkoutVideoRuntime.reset);
+
   const yaml = '''
 version: 2
 name: Camera workout
@@ -98,5 +100,64 @@ steps:
     expect(WorkoutVideoRuntime.current?.autoEnable, isTrue);
     expect(WorkoutVideoRuntime.current?.layout, 'camera_picture_in_picture');
     expect(WorkoutVideoRuntime.current?.camera, 'back');
+  });
+
+  test('session exposes active exercise id only for the active step', () {
+    final workout = WorkoutParser.parse(
+      '''
+version: 2
+name: Exercise routed workout
+start_countdown: 0s
+video:
+  auto_enable: true
+exercises:
+  - id: squat
+    name: Squat
+steps:
+  - name: Squat
+    duration: 30s
+    exercise_id: squat
+  - name: Rest
+    duration: 30s
+''',
+      id: 'active-exercise',
+      defaultVoiceLanguage: 'en',
+    );
+    final engine = SessionEngine(workout);
+    addTearDown(engine.dispose);
+
+    expect(WorkoutVideoRuntime.activeExerciseId, isNull);
+
+    engine.start();
+    expect(WorkoutVideoRuntime.activeExerciseId, 'squat');
+
+    expect(engine.goToNextStep(), isTrue);
+    expect(WorkoutVideoRuntime.activeExerciseId, isNull);
+  });
+
+  test('disposing the session clears active exercise routing', () {
+    final workout = WorkoutParser.parse(
+      '''
+version: 2
+name: Exercise cleanup workout
+start_countdown: 0s
+exercises:
+  - id: squat
+    name: Squat
+steps:
+  - name: Squat
+    duration: 30s
+    exercise_id: squat
+''',
+      id: 'cleanup',
+      defaultVoiceLanguage: 'en',
+    );
+    final engine = SessionEngine(workout)..start();
+
+    expect(WorkoutVideoRuntime.activeExerciseId, 'squat');
+
+    engine.dispose();
+    expect(WorkoutVideoRuntime.current, isNull);
+    expect(WorkoutVideoRuntime.activeExerciseId, isNull);
   });
 }

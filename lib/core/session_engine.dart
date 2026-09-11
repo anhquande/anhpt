@@ -38,6 +38,7 @@ class SessionEngine extends ChangeNotifier {
             ? SessionStatus.preparing
             : SessionStatus.running {
     WorkoutVideoRuntime.current = WorkoutVideoSettings.fromYaml(workout.rawYaml);
+    WorkoutVideoRuntime.activeExerciseId = null;
     _steps = workout.expand();
     if (_steps.isEmpty) {
       throw StateError('Workout must contain at least one executable step.');
@@ -156,7 +157,16 @@ class SessionEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  void _syncActiveExerciseId() {
+    WorkoutVideoRuntime.activeExerciseId = currentStep.exerciseId;
+  }
+
+  void _clearActiveExerciseId() {
+    WorkoutVideoRuntime.activeExerciseId = null;
+  }
+
   void _startCurrentStepTimer() {
+    _syncActiveExerciseId();
     _announcementComplete = false;
     _timerFinished = false;
     _timerStarted = false;
@@ -263,6 +273,7 @@ class SessionEngine extends ChangeNotifier {
   }
 
   void _completeWorkout() {
+    _clearActiveExerciseId();
     _activeWatch.stop();
     _stepWatch.stop();
     status = SessionStatus.completed;
@@ -300,6 +311,7 @@ class SessionEngine extends ChangeNotifier {
       ..reset();
 
     stepIndex = index;
+    _syncActiveExerciseId();
     _announcementComplete = false;
     _stepElapsedBefore = Duration.zero;
     _timerFinished = currentStep.duration <= Duration.zero;
@@ -357,6 +369,7 @@ class SessionEngine extends ChangeNotifier {
       _stepElapsedBefore += _stepWatch.elapsed;
     }
 
+    _clearActiveExerciseId();
     _activeWatch.stop();
     _stepWatch.stop();
     _prepareWatch.stop();
@@ -372,7 +385,7 @@ class SessionEngine extends ChangeNotifier {
     _prepareWatch.stop();
     _stepWatch.stop();
     _activeWatch.stop();
-    WorkoutVideoRuntime.current = null;
+    WorkoutVideoRuntime.reset();
     super.dispose();
   }
 }

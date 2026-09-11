@@ -35,4 +35,15 @@ class WorkoutVideoSettings {
 
 class WorkoutVideoRuntime {
   static WorkoutVideoSettings? current;
+
+  /// Exercise id of the step that is currently active in the workout session.
+  ///
+  /// Camera surfaces use this to route live pose features to the matching
+  /// analyzer without coupling low-level camera code to the workout screen.
+  static String? activeExerciseId;
+
+  static void reset() {
+    current = null;
+    activeExerciseId = null;
+  }
 }

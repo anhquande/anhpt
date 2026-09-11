@@ -36,6 +36,10 @@ video:
   layout: picture_in_picture
   camera: front
 
+exercises:
+  - id: squat
+    name: Squat
+
 steps:
   - name: Welcome
     id: welcome
@@ -47,6 +51,7 @@ steps:
   - name: Squat
     id: squat
     duration: 30s
+    exercise_id: squat
     guide: >
       Do easy squats at your own pace. Try the grid button now and switch between the available video layouts.
 
@@ -68,6 +73,7 @@ steps:
       - name: Squat Repeat
         id: squat-repeat
         duration: 20s
+        exercise_id: squat
         guide: >
           Finish with easy squats. This repeated step demonstrates repeat handling and workout progress.
 """;
