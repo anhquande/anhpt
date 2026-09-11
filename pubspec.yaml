@@ -38,14 +38,18 @@ dependencies:
   flutter_onnxruntime: ^1.8.5
   win32: ^5.15.0
   package_info_plus: ^8.3.1
+  screen_brightness: ^2.1.11
+  open_filex: ^4.7.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
   assets:
-    - assets/content/motivational_quotes.yaml
-    - assets/content/whats_new.yaml
+    - assets/audio/
+    - assets/content/
+    - assets/workout_artwork/feature/
+    - assets/workout_artwork/thumbnail/
