@@ -197,5 +197,5 @@ jobs:
           "release/${{ needs.metadata.outputs.windows_name }}"
           --repo "${{ github.repository }}"
           --target "${{ github.event.pull_request.merge_commit_sha }}"
-          --title "AnhPT ${{ needs.metadata.outputs.version }}"
+          --title "AnhPT ${{ needs.metadata.outputs.tag }}"
           --generate-notes
