@@ -7,6 +7,7 @@ import '../app/workout_camera_preference.dart';
 import '../core/pose/pose.dart';
 import '../models/workout_video_settings.dart';
 import '../pose_estimators/default_pose_estimator.dart';
+import 'plank_analysis_overlay.dart';
 import 'squat_analysis_overlay.dart';
 import 'windows_pose_camera_preview.dart';
 import 'workout_camera_preview.dart';
@@ -105,8 +106,8 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   }
 
   Widget _analysisCamera(Widget camera) {
-    final analysis = _analysis;
-    if (analysis?.exerciseId != SquatExerciseAnalyzer.id) return camera;
+    final overlay = _analysisOverlay();
+    if (overlay == null) return camera;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -115,12 +116,20 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
           left: 12,
           right: 12,
           bottom: 12,
-          child: IgnorePointer(
-            child: Center(child: SquatAnalysisOverlay(analysis: analysis!)),
-          ),
+          child: IgnorePointer(child: Center(child: overlay)),
         ),
       ],
     );
+  }
+
+  Widget? _analysisOverlay() {
+    final analysis = _analysis;
+    if (analysis == null) return null;
+    return switch (analysis.exerciseId) {
+      SquatExerciseAnalyzer.id => SquatAnalysisOverlay(analysis: analysis),
+      PlankExerciseAnalyzer.id => PlankAnalysisOverlay(analysis: analysis),
+      _ => null,
+    };
   }
 
   void _handlePoseFeatures(PoseFeatures features) {
