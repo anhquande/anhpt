@@ -14,14 +14,25 @@ void main() {
       expect(registry.supportedExerciseIds, contains('squat'));
     });
 
+    test('creates the default plank analyzer by exercise id', () {
+      final registry = ExerciseAnalyzerRegistry();
+
+      final analyzer = registry.create('plank');
+
+      expect(analyzer, isA<PlankExerciseAnalyzer>());
+      expect(analyzer?.exerciseId, PlankExerciseAnalyzer.id);
+      expect(registry.supports('plank'), isTrue);
+      expect(registry.supportedExerciseIds, contains('plank'));
+    });
+
     test('does not create analyzers for blank or unknown ids', () {
       final registry = ExerciseAnalyzerRegistry();
 
       expect(registry.create(null), isNull);
       expect(registry.create(''), isNull);
       expect(registry.create('   '), isNull);
-      expect(registry.create('plank'), isNull);
-      expect(registry.supports('plank'), isFalse);
+      expect(registry.create('push-up'), isNull);
+      expect(registry.supports('push-up'), isFalse);
     });
 
     test('supports injected analyzer factories', () {
@@ -36,6 +47,7 @@ void main() {
       expect(analyzer, isA<NoopExerciseAnalyzer>());
       expect(analyzer?.exerciseId, 'custom');
       expect(registry.supports('squat'), isFalse);
+      expect(registry.supports('plank'), isFalse);
       expect(registry.supportedExerciseIds, ['custom']);
     });
   });
