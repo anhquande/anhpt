@@ -1,4 +1,5 @@
 import 'exercise_analysis.dart';
+import 'plank_analyzer.dart';
 import 'squat_analyzer.dart';
 
 typedef ExerciseAnalyzerFactory = ExerciseAnalyzer Function();
@@ -16,6 +17,7 @@ class ExerciseAnalyzerRegistry {
   static final defaultExerciseAnalyzerFactories =
       <String, ExerciseAnalyzerFactory>{
     SquatExerciseAnalyzer.id: SquatExerciseAnalyzer.new,
+    PlankExerciseAnalyzer.id: PlankExerciseAnalyzer.new,
   };
 
   final Map<String, ExerciseAnalyzerFactory> _factories;

@@ -39,6 +39,8 @@ video:
 exercises:
   - id: squat
     name: Squat
+  - id: plank
+    name: High Plank
 
 steps:
   - name: Welcome
@@ -65,6 +67,7 @@ steps:
   - name: High Plank
     id: high-plank
     duration: 30s
+    exercise_id: plank
     guide: >
       Hold a comfortable high plank. Compare your body line with the demonstration and try another camera layout if you want.
 
