@@ -40,10 +40,11 @@ class WorkoutCameraComparison extends StatefulWidget {
 
 class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   final GlobalKey _cameraKey = GlobalKey(debugLabel: 'workout-camera-preview');
-  final ExerciseAnalysisController _squatAnalysisController =
-      ExerciseAnalysisController(analyzer: const SquatExerciseAnalyzer());
+  final ExerciseAnalyzerRegistry _analyzerRegistry =
+      const ExerciseAnalyzerRegistry();
   PosePipeline? _ownedPosePipeline;
   String? _routedExerciseId;
+  ExerciseAnalysisController? _analysisController;
   ExerciseAnalysis? _analysis;
 
   PosePipeline get _posePipeline => widget.posePipeline ??
@@ -97,14 +98,16 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
     final activeExerciseId = WorkoutVideoRuntime.activeExerciseId;
     if (_routedExerciseId == activeExerciseId) return;
     _routedExerciseId = activeExerciseId;
-    _resetAnalysis(notify: false);
+    final analyzer = _analyzerRegistry.create(activeExerciseId);
+    _analysisController = analyzer == null
+        ? null
+        : ExerciseAnalysisController(analyzer: analyzer);
+    _analysis = null;
   }
 
   Widget _analysisCamera(Widget camera) {
-    final analysis = _routedExerciseId == SquatExerciseAnalyzer.id
-        ? _analysis
-        : null;
-    if (analysis == null) return camera;
+    final analysis = _analysis;
+    if (analysis?.exerciseId != SquatExerciseAnalyzer.id) return camera;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -114,7 +117,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
           right: 12,
           bottom: 12,
           child: IgnorePointer(
-            child: Center(child: SquatAnalysisOverlay(analysis: analysis)),
+            child: Center(child: SquatAnalysisOverlay(analysis: analysis!)),
           ),
         ),
       ],
@@ -123,18 +126,15 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
 
   void _handlePoseFeatures(PoseFeatures features) {
     widget.onPoseFeatures?.call(features);
-    final activeExerciseId = WorkoutVideoRuntime.activeExerciseId;
-    if (activeExerciseId != SquatExerciseAnalyzer.id) {
+    _syncActiveExerciseRoute();
+
+    final controller = _analysisController;
+    if (controller == null) {
       _resetAnalysis();
       return;
     }
 
-    if (_routedExerciseId != activeExerciseId) {
-      _routedExerciseId = activeExerciseId;
-      _resetAnalysis(notify: false);
-    }
-
-    final analysis = _squatAnalysisController.analyze(features);
+    final analysis = controller.analyze(features);
     if (_samePresentation(_analysis, analysis)) {
       _analysis = analysis;
       return;
@@ -158,7 +158,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
       analysis.feedback.map((item) => item.code).join('|');
 
   void _resetAnalysis({bool notify = true}) {
-    _squatAnalysisController.reset();
+    _analysisController?.reset();
     if (_analysis == null) return;
     if (!mounted || !notify) {
       _analysis = null;
