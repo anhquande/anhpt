@@ -9,17 +9,16 @@ typedef ExerciseAnalyzerFactory = ExerciseAnalyzer Function();
 /// constructors. New analyzers should be added here rather than directly in
 /// player or camera widgets.
 class ExerciseAnalyzerRegistry {
-  final Map<String, ExerciseAnalyzerFactory> _factories;
+  ExerciseAnalyzerRegistry({
+    Map<String, ExerciseAnalyzerFactory>? factories,
+  }) : _factories = factories ?? defaultExerciseAnalyzerFactories;
 
-  const ExerciseAnalyzerRegistry({
-    Map<String, ExerciseAnalyzerFactory> factories =
-        defaultExerciseAnalyzerFactories,
-  }) : _factories = factories;
-
-  static const defaultExerciseAnalyzerFactories =
+  static final defaultExerciseAnalyzerFactories =
       <String, ExerciseAnalyzerFactory>{
     SquatExerciseAnalyzer.id: SquatExerciseAnalyzer.new,
   };
+
+  final Map<String, ExerciseAnalyzerFactory> _factories;
 
   ExerciseAnalyzer? create(String? exerciseId) {
     final normalizedId = exerciseId?.trim();
@@ -27,7 +26,12 @@ class ExerciseAnalyzerRegistry {
     return _factories[normalizedId]?.call();
   }
 
-  bool supports(String? exerciseId) => create(exerciseId) != null;
+  bool supports(String? exerciseId) {
+    final normalizedId = exerciseId?.trim();
+    return normalizedId != null &&
+        normalizedId.isNotEmpty &&
+        _factories.containsKey(normalizedId);
+  }
 
   Iterable<String> get supportedExerciseIds => _factories.keys;
 }
