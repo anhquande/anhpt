@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   group('ExerciseAnalyzerRegistry', () {
     test('creates the default squat analyzer by exercise id', () {
-      const registry = ExerciseAnalyzerRegistry();
+      final registry = ExerciseAnalyzerRegistry();
 
       final analyzer = registry.create('squat');
 
@@ -15,7 +15,7 @@ void main() {
     });
 
     test('does not create analyzers for blank or unknown ids', () {
-      const registry = ExerciseAnalyzerRegistry();
+      final registry = ExerciseAnalyzerRegistry();
 
       expect(registry.create(null), isNull);
       expect(registry.create(''), isNull);
