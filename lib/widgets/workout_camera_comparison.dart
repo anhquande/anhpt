@@ -40,8 +40,7 @@ class WorkoutCameraComparison extends StatefulWidget {
 
 class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   final GlobalKey _cameraKey = GlobalKey(debugLabel: 'workout-camera-preview');
-  final ExerciseAnalyzerRegistry _analyzerRegistry =
-      const ExerciseAnalyzerRegistry();
+  final ExerciseAnalyzerRegistry _analyzerRegistry = ExerciseAnalyzerRegistry();
   PosePipeline? _ownedPosePipeline;
   String? _routedExerciseId;
   ExerciseAnalysisController? _analysisController;
