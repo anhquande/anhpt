@@ -1,0 +1,37 @@
+import 'exercise_analysis.dart';
+import 'squat_analyzer.dart';
+
+typedef ExerciseAnalyzerFactory = ExerciseAnalyzer Function();
+
+/// Creates exercise analyzers by canonical exercise id.
+///
+/// The registry keeps UI and camera code independent from concrete analyzer
+/// constructors. New analyzers should be added here rather than directly in
+/// player or camera widgets.
+class ExerciseAnalyzerRegistry {
+  ExerciseAnalyzerRegistry({
+    Map<String, ExerciseAnalyzerFactory>? factories,
+  }) : _factories = factories ?? defaultExerciseAnalyzerFactories;
+
+  static final defaultExerciseAnalyzerFactories =
+      <String, ExerciseAnalyzerFactory>{
+    SquatExerciseAnalyzer.id: SquatExerciseAnalyzer.new,
+  };
+
+  final Map<String, ExerciseAnalyzerFactory> _factories;
+
+  ExerciseAnalyzer? create(String? exerciseId) {
+    final normalizedId = exerciseId?.trim();
+    if (normalizedId == null || normalizedId.isEmpty) return null;
+    return _factories[normalizedId]?.call();
+  }
+
+  bool supports(String? exerciseId) {
+    final normalizedId = exerciseId?.trim();
+    return normalizedId != null &&
+        normalizedId.isNotEmpty &&
+        _factories.containsKey(normalizedId);
+  }
+
+  Iterable<String> get supportedExerciseIds => _factories.keys;
+}
