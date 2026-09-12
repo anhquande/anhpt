@@ -25,16 +25,16 @@ void main() {
     });
 
     test('supports injected analyzer factories', () {
-      const registry = ExerciseAnalyzerRegistry(
+      final registry = ExerciseAnalyzerRegistry(
         factories: {
-          'custom': NoopExerciseAnalyzer.new,
+          'custom': () => const NoopExerciseAnalyzer(exerciseId: 'custom'),
         },
       );
 
       final analyzer = registry.create('custom');
 
       expect(analyzer, isA<NoopExerciseAnalyzer>());
-      expect(analyzer?.exerciseId, 'noop');
+      expect(analyzer?.exerciseId, 'custom');
       expect(registry.supports('squat'), isFalse);
       expect(registry.supportedExerciseIds, ['custom']);
     });
