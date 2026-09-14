@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/pose/pose.dart';
 import 'plank_analysis_overlay.dart';
+import 'push_up_analysis_overlay.dart';
 import 'squat_analysis_overlay.dart';
 
 /// Selects the visual live-analysis overlay for a routed exercise analysis.
@@ -21,13 +22,17 @@ class ExerciseAnalysisOverlay extends StatelessWidget {
     final overlay = switch (analysis.exerciseId) {
       SquatExerciseAnalyzer.id => SquatAnalysisOverlay(analysis: analysis),
       PlankExerciseAnalyzer.id => PlankAnalysisOverlay(analysis: analysis),
+      PushUpExerciseAnalyzer.id => PushUpAnalysisOverlay(analysis: analysis),
       _ => null,
     };
     return overlay ?? const SizedBox.shrink();
   }
 
   static bool supports(ExerciseAnalysis? analysis) => switch (analysis?.exerciseId) {
-        SquatExerciseAnalyzer.id || PlankExerciseAnalyzer.id => true,
+        SquatExerciseAnalyzer.id ||
+        PlankExerciseAnalyzer.id ||
+        PushUpExerciseAnalyzer.id =>
+          true,
         _ => false,
       };
 }
