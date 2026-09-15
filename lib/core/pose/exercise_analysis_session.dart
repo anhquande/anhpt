@@ -17,7 +17,7 @@ class ExerciseAnalysisSession {
   String? _exerciseId;
   ExerciseAnalysisController? _controller;
   ExerciseAnalysis? _analysis;
-  final List<void Function(ExerciseEvent)> _eventListeners = [];
+  final List<void Function(ExerciseEvent)> _eventListeners = <void Function(ExerciseEvent)>[];
 
   String? get exerciseId => _exerciseId;
   ExerciseAnalysis? get analysis => _analysis;
