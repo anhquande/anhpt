@@ -40,10 +40,8 @@ class WorkoutCameraComparison extends StatefulWidget {
 
 class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   final GlobalKey _cameraKey = GlobalKey(debugLabel: 'workout-camera-preview');
-  final ExerciseAnalyzerRegistry _analyzerRegistry = ExerciseAnalyzerRegistry();
+  final ExerciseAnalysisSession _analysisSession = ExerciseAnalysisSession();
   PosePipeline? _ownedPosePipeline;
-  String? _routedExerciseId;
-  ExerciseAnalysisController? _analysisController;
   ExerciseAnalysis? _analysis;
 
   PosePipeline get _posePipeline => widget.posePipeline ??
@@ -94,14 +92,11 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   }
 
   void _syncActiveExerciseRoute() {
-    final activeExerciseId = WorkoutVideoRuntime.activeExerciseId;
-    if (_routedExerciseId == activeExerciseId) return;
-    _routedExerciseId = activeExerciseId;
-    final analyzer = _analyzerRegistry.create(activeExerciseId);
-    _analysisController = analyzer == null
-        ? null
-        : ExerciseAnalysisController(analyzer: analyzer);
-    _analysis = null;
+    final previousExerciseId = _analysisSession.exerciseId;
+    _analysisSession.route(WorkoutVideoRuntime.activeExerciseId);
+    if (previousExerciseId != _analysisSession.exerciseId) {
+      _analysis = null;
+    }
   }
 
   Widget _analysisCamera(Widget camera) {
@@ -127,13 +122,11 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
     widget.onPoseFeatures?.call(features);
     _syncActiveExerciseRoute();
 
-    final controller = _analysisController;
-    if (controller == null) {
+    final analysis = _analysisSession.analyze(features);
+    if (analysis == null) {
       _resetAnalysis();
       return;
     }
-
-    final analysis = controller.analyze(features);
     if (_samePresentation(_analysis, analysis)) {
       _analysis = analysis;
       return;
@@ -157,7 +150,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
       analysis.feedback.map((item) => item.code).join('|');
 
   void _resetAnalysis({bool notify = true}) {
-    _analysisController?.reset();
+    _analysisSession.reset();
     if (_analysis == null) return;
     if (!mounted || !notify) {
       _analysis = null;

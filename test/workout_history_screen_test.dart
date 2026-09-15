@@ -72,7 +72,8 @@ void main() {
     await _useTallHistorySurface(tester);
     SharedPreferences.setMockInitialValues({});
     final store = LocalStore();
-    final now = DateTime.now();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final now = today.add(const Duration(hours: 12));
     await store.saveWorkoutSessions([
       _session(
         id: 'older',
@@ -84,7 +85,7 @@ void main() {
         id: 'yesterday',
         name: 'Yesterday Workout',
         profileId: 'me',
-        endedAt: now.subtract(const Duration(days: 1, hours: 1)),
+        endedAt: today.subtract(const Duration(hours: 1)),
       ),
       _session(
         id: 'newer',
