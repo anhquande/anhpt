@@ -26,6 +26,50 @@ void main() {
       expect(session.analysis, same(second));
     });
 
+    test('forwards analyzer events to registered listeners', () {
+      final event = ExerciseEvent(
+        type: ExerciseEventType.repetitionCompleted,
+        timestamp: DateTime.utc(2026, 1, 1),
+        code: 'rep',
+        repetitionCount: 1,
+      );
+      final analyzer = _RecordingAnalyzer('demo')..events = [event];
+      final session = ExerciseAnalysisSession(
+        registry: ExerciseAnalyzerRegistry(
+          factories: {'demo': () => analyzer},
+        ),
+      );
+      final received = <ExerciseEvent>[];
+      session.addEventListener(received.add);
+
+      session.route('demo');
+      session.analyze(_features(0));
+
+      expect(received, [same(event)]);
+    });
+
+    test('removed listeners no longer receive analyzer events', () {
+      final event = ExerciseEvent(
+        type: ExerciseEventType.stateChanged,
+        timestamp: DateTime.utc(2026, 1, 1),
+      );
+      final analyzer = _RecordingAnalyzer('demo')..events = [event];
+      final session = ExerciseAnalysisSession(
+        registry: ExerciseAnalyzerRegistry(
+          factories: {'demo': () => analyzer},
+        ),
+      );
+      final received = <ExerciseEvent>[];
+      void listener(ExerciseEvent value) => received.add(value);
+      session.addEventListener(listener);
+      session.removeEventListener(listener);
+
+      session.route('demo');
+      session.analyze(_features(0));
+
+      expect(received, isEmpty);
+    });
+
     test('changing route resets previous analyzer and history', () {
       final firstAnalyzer = _RecordingAnalyzer('first');
       final secondAnalyzer = _RecordingAnalyzer('second');
@@ -113,6 +157,7 @@ class _RecordingAnalyzer implements ExerciseAnalyzer {
   final String exerciseId;
 
   int resetCount = 0;
+  List<ExerciseEvent> events = const [];
   final previousFeaturesSeen = <PoseFeatures?>[];
   final previousAnalysisSeen = <ExerciseAnalysis?>[];
 
@@ -129,6 +174,7 @@ class _RecordingAnalyzer implements ExerciseAnalyzer {
       state: const ExerciseState(id: 'sample'),
       timestamp: features.timestamp,
       repetitionCount: previousAnalysis?.repetitionCount ?? 0,
+      events: events,
     );
   }
 
