@@ -1,6 +1,7 @@
 /// Engine-agnostic pose domain API for AnhPT.
 export 'body_pose.dart';
 export 'exercise_analysis.dart';
+export 'exercise_analysis_session.dart';
 export 'exercise_analyzer_registry.dart';
 export 'plank_analyzer.dart';
 export 'pose_estimator.dart';
