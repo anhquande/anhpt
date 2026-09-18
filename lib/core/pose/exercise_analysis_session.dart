@@ -17,10 +17,23 @@ class ExerciseAnalysisSession {
   String? _exerciseId;
   ExerciseAnalysisController? _controller;
   ExerciseAnalysis? _analysis;
+  final List<void Function(ExerciseEvent)> _eventListeners = <void Function(ExerciseEvent)>[];
 
   String? get exerciseId => _exerciseId;
   ExerciseAnalysis? get analysis => _analysis;
   bool get isSupported => _controller != null;
+
+  /// Registers a downstream consumer for high-level analyzer events.
+  ///
+  /// The core session only forwards events. UI, TTS, haptics, persistence, and
+  /// other side effects remain owned by their respective app layers.
+  void addEventListener(void Function(ExerciseEvent) listener) {
+    if (!_eventListeners.contains(listener)) _eventListeners.add(listener);
+  }
+
+  void removeEventListener(void Function(ExerciseEvent) listener) {
+    _eventListeners.remove(listener);
+  }
 
   /// Selects the analyzer for [exerciseId].
   ///
@@ -50,7 +63,17 @@ class ExerciseAnalysisSession {
       _analysis = null;
       return null;
     }
-    return _analysis = controller.analyze(features);
+    final analysis = controller.analyze(features);
+    _analysis = analysis;
+    if (analysis.events.isNotEmpty && _eventListeners.isNotEmpty) {
+      final listeners = List<void Function(ExerciseEvent)>.from(_eventListeners);
+      for (final event in analysis.events) {
+        for (final listener in listeners) {
+          listener(event);
+        }
+      }
+    }
+    return analysis;
   }
 
   /// Clears analyzer history while preserving the active exercise route.
