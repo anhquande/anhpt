@@ -20,6 +20,7 @@ class WorkoutCameraComparison extends StatefulWidget {
   final Widget? demonstration;
   final ValueChanged<String?>? onCameraErrorChanged;
   final ValueChanged<PoseFeatures>? onPoseFeatures;
+  final ValueChanged<ExerciseEvent>? onExerciseEvent;
 
   const WorkoutCameraComparison({
     super.key,
@@ -31,6 +32,7 @@ class WorkoutCameraComparison extends StatefulWidget {
     this.demonstration,
     this.onCameraErrorChanged,
     this.onPoseFeatures,
+    this.onExerciseEvent,
   });
 
   @override
@@ -43,6 +45,16 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
   final ExerciseAnalysisSession _analysisSession = ExerciseAnalysisSession();
   PosePipeline? _ownedPosePipeline;
   ExerciseAnalysis? _analysis;
+
+  @override
+  void initState() {
+    super.initState();
+    _analysisSession.addEventListener(_forwardExerciseEvent);
+  }
+
+  void _forwardExerciseEvent(ExerciseEvent event) {
+    if (mounted && widget.cameraEnabled) widget.onExerciseEvent?.call(event);
+  }
 
   PosePipeline get _posePipeline => widget.posePipeline ??
       (_ownedPosePipeline ??=
@@ -263,6 +275,7 @@ class _WorkoutCameraComparisonState extends State<WorkoutCameraComparison> {
 
   @override
   void dispose() {
+    _analysisSession.removeEventListener(_forwardExerciseEvent);
     _resetAnalysis(notify: false);
     final ownedPipeline = _ownedPosePipeline;
     _ownedPosePipeline = null;
