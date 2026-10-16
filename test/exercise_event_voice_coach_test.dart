@@ -63,7 +63,8 @@ void main() {
       clock: () => now,
     );
     coach.handle(event('squat_repetition_completed', rep: 1));
-    now = now.add(const Duration(seconds: 5));
+    // Still inside the cooldown when the first speech finishes.
+    now = now.add(const Duration(seconds: 2));
     coach.handle(event('squat_repetition_completed', rep: 2));
     blocker.complete();
     await Future<void>.delayed(Duration.zero);
