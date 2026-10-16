@@ -9,12 +9,14 @@ import 'package:flutter/services.dart';
 import '../app/app_controller.dart';
 import '../app/workout_camera_preference.dart';
 import '../core/session_engine.dart';
+import '../core/pose/exercise_analysis.dart';
 import '../models/background_music.dart';
 import '../models/workout.dart';
 import '../models/workout_session.dart';
 import '../services/audio_feedback_service.dart';
 import '../services/background_music_service.dart';
 import '../services/device_action_service.dart';
+import '../services/exercise_event_voice_coach.dart';
 import '../services/voice_guide_controller.dart';
 import '../services/workout_session_history.dart';
 import '../services/workout_session_recorder.dart';
@@ -89,6 +91,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
   late final AudioFeedbackService audio;
   late final BackgroundMusicService music;
   late final VoiceGuideController voiceGuide;
+  late final ExerciseEventVoiceCoach exerciseVoiceCoach;
   late final WorkoutSessionRecorder sessionRecorder;
   final DeviceActionService deviceActions = DeviceActionService();
   Timer? _screenOffTimer;
@@ -152,6 +155,18 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
             executable.step.id:
                 widget.controller.resolveAudioSource(executable.step.recording!),
       },
+    );
+    exerciseVoiceCoach = ExerciseEventVoiceCoach(
+      speak: (phrase) => audio.speak(phrase),
+      isAudioBusy: () => audio.isCoachAudioActive,
+      language: () => workout.voice.language,
+      canSpeak: () => !_disposed &&
+          _cameraEnabled &&
+          audioReady &&
+          !soundMuted &&
+          engine.status == SessionStatus.running &&
+          engine.announcementComplete &&
+          !engine.timerFinished,
     );
     engine.addListener(_changed);
     _scheduleScreenOff();
@@ -287,6 +302,10 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     music.setMuted(muted);
     await voiceGuide.setMuted(muted);
     if (mounted) setState(() {});
+  }
+
+  void _onExerciseEvent(ExerciseEvent event) {
+    exerciseVoiceCoach.handle(event);
   }
 
   void _showCenterFeedback(IconData icon) {
@@ -896,6 +915,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                             layout: _cameraLayout,
                             demonstration: demonstration,
                             onCameraErrorChanged: _cameraErrorChanged,
+                            onExerciseEvent: _onExerciseEvent,
                           ),
                         ),
                         Positioned(
@@ -1021,6 +1041,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
     _centerFeedbackTimer?.cancel();
     engine.removeListener(_changed);
     engine.dispose();
+    exerciseVoiceCoach.dispose();
     voiceGuide.dispose();
     unawaited(deviceActions.restoreDisplay());
     unawaited(audio.dispose());
