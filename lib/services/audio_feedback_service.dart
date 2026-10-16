@@ -31,6 +31,10 @@ class AudioFeedbackService {
 
   double get voiceVolume => _voiceVolume;
 
+  /// Used by camera coaching to avoid interrupting protected workout prompts.
+  bool get isCoachAudioActive =>
+      _activeSpeechOperationId != null || _activeRecordingOperationId != null;
+
   static AudioContext mixingAudioContext() => AudioContextConfig(
         focus: AudioContextConfigFocus.mixWithOthers,
       ).build();
