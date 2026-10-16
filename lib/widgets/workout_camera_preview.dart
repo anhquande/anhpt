@@ -361,6 +361,7 @@ class _WorkoutCameraPreviewState extends State<WorkoutCameraPreview>
         PoseViewMode.camera => Icons.videocam_outlined,
         PoseViewMode.skeleton => Icons.accessibility_new_rounded,
         PoseViewMode.cameraWithSkeleton => Icons.layers_outlined,
+        PoseViewMode.stickman => Icons.account_circle_outlined,
       };
 
   @override
