@@ -101,6 +101,27 @@ void main() {
     );
   });
 
+  test('stickman handles missing and low-confidence joints', () {
+    final renderer = StickmanPoseRenderer();
+    final pose = _pose(confidence: .8, joints: const {
+      BodyJoint.nose: _high,
+      BodyJoint.leftShoulder: PosePoint(x: .2, y: .4, confidence: .1),
+      BodyJoint.rightShoulder: PosePoint(x: .7, y: .4, confidence: .9),
+    });
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    final transform = _identityTransform(const Size(200, 200));
+    expect(() => renderer.render(canvas: canvas, size: const Size(200, 200),
+        pose: pose, transformPoint: transform.transformPoint), returnsNormally);
+    recorder.endRecording();
+  });
+
+  test('stickman mode hides camera and skeleton', () {
+    expect(PoseViewMode.stickman.showsCamera, isFalse);
+    expect(PoseViewMode.stickman.showsSkeleton, isFalse);
+    expect(PoseViewMode.stickman.showsStickman, isTrue);
+  });
+
   test('primary pose selection uses highest aggregate confidence', () {
     final poseA = _pose(confidence: .5, joints: const {});
     final poseB = _pose(confidence: .9, joints: const {});
@@ -171,6 +192,11 @@ void main() {
     await pumpMode(PoseViewMode.cameraWithSkeleton);
     expect(find.byKey(const ValueKey('pose-camera-layer')), findsOneWidget);
     expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsOneWidget);
+
+    await pumpMode(PoseViewMode.stickman);
+    expect(find.byKey(const ValueKey('pose-camera-layer')), findsNothing);
+    expect(find.byKey(const ValueKey('pose-skeleton-layer')), findsNothing);
+    expect(find.byKey(const ValueKey('pose-stickman-layer')), findsOneWidget);
   });
 }
 
