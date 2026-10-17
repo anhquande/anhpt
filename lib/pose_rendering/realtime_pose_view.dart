@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 
 import '../core/pose/pose.dart';
@@ -118,7 +119,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     super.didUpdateWidget(oldWidget);
     final trackingInputsChanged =
         !identical(oldWidget.capabilities, widget.capabilities) ||
-            !identical(
+            !_sameTrackingRequirements(
               oldWidget.trackingRequirements,
               widget.trackingRequirements,
             ) ||
@@ -126,8 +127,10 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     final statusPresentationChanged =
         oldWidget.trackingStatusDebounce != widget.trackingStatusDebounce;
     final smootherChanged = !identical(oldWidget.smoother, widget.smoother);
-    final streamsChanged = !identical(oldWidget.results, widget.results) ||
-        !identical(oldWidget.errors, widget.errors);
+    // Controller.stream may return a fresh wrapper for the same source. As in
+    // StreamBuilder, stream equality identifies an actual subscription change.
+    final streamsChanged = oldWidget.results != widget.results ||
+        oldWidget.errors != widget.errors;
 
     if (trackingInputsChanged) {
       _resetTrackingEvaluator();
@@ -149,6 +152,19 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     if (streamsChanged) {
       _subscribe();
     }
+  }
+
+  // Callers may recreate an equivalent profile on every timer/analysis build.
+  // Identity changes alone must not blank the rendered pose or reset the EMA.
+  bool _sameTrackingRequirements(
+    PoseTrackingRequirements? previous,
+    PoseTrackingRequirements? current,
+  ) {
+    if (identical(previous, current)) return true;
+    if (previous == null || current == null) return false;
+    return previous.minJointConfidence == current.minJointConfidence &&
+        previous.minPoseConfidence == current.minPoseConfidence &&
+        setEquals(previous.requiredJoints, current.requiredJoints);
   }
 
   void _resetTrackingEvaluator() {

@@ -72,3 +72,19 @@ conventions into AnhPT canonical normalized coordinates before creating a
 `PoseRenderDebugConfig` is disabled by default. It can optionally draw viewport
 and preview bounds, center lines, and canonical joint coordinates to isolate
 mapping errors without adding a developer settings screen.
+
+## Tracking profile updates
+
+Parent timer/analysis rebuilds can construct fresh tracking requirement objects
+with unchanged joint sets and confidence thresholds. RealtimePoseView compares
+these values rather than object identity, preserving the displayed pose, EMA
+history, feature history and tracking guidance between inference frames. A real
+change to required joints or either confidence threshold still resets tracking.
+This prevents Windows Stickman 2D from alternating between the avatar and the
+empty-state icon on ordinary Player updates. Confidence filtering and genuine
+tracking loss continue to apply.
+
+Controller stream getters can also return equal but non-identical wrappers.
+Subscription changes use stream equality, matching Flutter StreamBuilder, so
+ordinary parent rebuilds do not resubscribe and clear the displayed pose. A
+new source still cancels the old subscription and clears stale pose data.

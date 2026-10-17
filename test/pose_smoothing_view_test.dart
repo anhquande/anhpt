@@ -41,24 +41,28 @@ PosePipelineResult _result(DateTime timestamp, List<BodyPose> poses) =>
 
 Widget _app({
   required Stream<PosePipelineResult> results,
+  Stream<PosePipelineError>? errors,
   required PoseSmoother smoother,
   required PoseTrackingConfig trackingConfig,
-}) =>
-    MaterialApp(
-      home: SizedBox(
-        width: 320,
-        height: 480,
-        child: RealtimePoseView(
-          camera: const SizedBox(key: ValueKey('fake-camera')),
-          results: results,
-          capabilities: _capabilities,
-          trackingConfig: trackingConfig,
-          smoother: smoother,
-          mode: PoseViewMode.cameraWithSkeleton,
-          renderer: SkeletonPoseRenderer(),
-        ),
-      ),
-    );
+  PoseTrackingRequirements? trackingRequirements,
+  PoseViewMode mode = PoseViewMode.cameraWithSkeleton,
+}) => MaterialApp(
+  home: SizedBox(
+    width: 320,
+    height: 480,
+    child: RealtimePoseView(
+      camera: const SizedBox(key: ValueKey('fake-camera')),
+      results: results,
+      errors: errors,
+      capabilities: _capabilities,
+      trackingConfig: trackingConfig,
+      trackingRequirements: trackingRequirements,
+      smoother: smoother,
+      mode: mode,
+      renderer: SkeletonPoseRenderer(),
+    ),
+  ),
+);
 
 class _RecordingSmoother implements PoseSmoother {
   _RecordingSmoother({this.leftShoulderOutputX});
@@ -102,36 +106,41 @@ class _RecordingSmoother implements PoseSmoother {
 void main() {
   final t0 = DateTime.utc(2026, 9, 10, 12);
 
-  testWidgets('tracking evaluates raw pose and renderer receives smoothed pose',
-      (tester) async {
-    final results = StreamController<PosePipelineResult>.broadcast(sync: true);
-    final smoother = _RecordingSmoother(leftShoulderOutputX: 0.75);
-    addTearDown(results.close);
+  testWidgets(
+    'tracking evaluates raw pose and renderer receives smoothed pose',
+    (tester) async {
+      final results = StreamController<PosePipelineResult>.broadcast(
+        sync: true,
+      );
+      final smoother = _RecordingSmoother(leftShoulderOutputX: 0.75);
+      addTearDown(results.close);
 
-    await tester.pumpWidget(
-      _app(
-        results: results.stream,
-        smoother: smoother,
-        trackingConfig: PoseTrackingConfig(
-          readyHoldDuration: Duration.zero,
-          trackingStartDuration: Duration.zero,
+      await tester.pumpWidget(
+        _app(
+          results: results.stream,
+          smoother: smoother,
+          trackingConfig: PoseTrackingConfig(
+            readyHoldDuration: Duration.zero,
+            trackingStartDuration: Duration.zero,
+          ),
         ),
-      ),
-    );
+      );
 
-    results.add(_result(t0, [_fullBodyPose(t0, leftShoulderX: 0.2)]));
-    await tester.pump();
+      results.add(_result(t0, [_fullBodyPose(t0, leftShoulderX: 0.2)]));
+      await tester.pump();
 
-    expect(smoother.lastInput![BodyJoint.leftShoulder]!.x, 0.2);
-    final paint = tester.widget<CustomPaint>(
-      find.byKey(const ValueKey('pose-skeleton-layer')),
-    );
-    final painter = paint.painter! as PosePainter;
-    expect(painter.pose![BodyJoint.leftShoulder]!.x, 0.75);
-  });
+      expect(smoother.lastInput![BodyJoint.leftShoulder]!.x, 0.2);
+      final paint = tester.widget<CustomPaint>(
+        find.byKey(const ValueKey('pose-skeleton-layer')),
+      );
+      final painter = paint.painter! as PosePainter;
+      expect(painter.pose![BodyJoint.leftShoulder]!.x, 0.75);
+    },
+  );
 
-  testWidgets('short lostTracking retains smoother history for recovery',
-      (tester) async {
+  testWidgets('short lostTracking retains smoother history for recovery', (
+    tester,
+  ) async {
     final results = StreamController<PosePipelineResult>.broadcast(sync: true);
     final smoother = _RecordingSmoother();
     addTearDown(results.close);
@@ -167,8 +176,9 @@ void main() {
     expect(smoother.resetCount, resetCountWhileTracking);
   });
 
-  testWidgets('noPerson resets smoother before a new person is accepted',
-      (tester) async {
+  testWidgets('noPerson resets smoother before a new person is accepted', (
+    tester,
+  ) async {
     final results = StreamController<PosePipelineResult>.broadcast(sync: true);
     final smoother = _RecordingSmoother();
     addTearDown(results.close);
@@ -205,4 +215,147 @@ void main() {
     await tester.pump();
     expect(smoother.updateCount, 2);
   });
+  testWidgets(
+    'equivalent tracking requirements do not blank stickman on rebuild',
+    (tester) async {
+      final results = StreamController<PosePipelineResult>.broadcast(
+        sync: true,
+      );
+      final smoother = _RecordingSmoother();
+      final config = PoseTrackingConfig();
+      addTearDown(results.close);
+      Widget app(PoseTrackingRequirements requirements) => _app(
+        results: results.stream,
+        smoother: smoother,
+        trackingConfig: config,
+        trackingRequirements: requirements,
+        mode: PoseViewMode.stickman,
+      );
+      // Windows creates an upperBody profile during every camera build. A player
+      // timer/analysis rebuild must not reset the last pose between camera frames.
+      await tester.pumpWidget(app(PoseTrackingRequirements.upperBody()));
+      results.add(_result(t0, [_fullBodyPose(t0)]));
+      await tester.pump();
+      final resets = smoother.resetCount;
+      final paint = tester
+          .widget<CustomPaint>(
+            find.byKey(const ValueKey('pose-stickman-layer')),
+          )
+          .painter;
+      for (var tick = 0; tick < 5; tick++) {
+        await tester.pumpWidget(app(PoseTrackingRequirements.upperBody()));
+        expect(
+          find.byKey(const ValueKey('pose-stickman-layer')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('pose-skeleton-empty-state')),
+          findsNothing,
+        );
+        expect(smoother.resetCount, resets);
+        expect(
+          (tester
+                      .widget<CustomPaint>(
+                        find.byKey(const ValueKey('pose-stickman-layer')),
+                      )
+                      .painter
+                  as PosePainter)
+              .pose,
+          same((paint as PosePainter).pose),
+        );
+      }
+      // An actual profile change still invalidates tracking and smoothing.
+      await tester.pumpWidget(app(PoseTrackingRequirements.fullBody()));
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsNothing);
+      expect(smoother.resetCount, resets + 1);
+    },
+  );
+
+  for (final threshold in ['joint', 'pose']) {
+    testWidgets(
+      'changed $threshold confidence still resets stickman tracking',
+      (tester) async {
+        final results = StreamController<PosePipelineResult>.broadcast(
+          sync: true,
+        );
+        final smoother = _RecordingSmoother();
+        final config = PoseTrackingConfig();
+        addTearDown(results.close);
+        Widget app(PoseTrackingRequirements requirements) => _app(
+          results: results.stream,
+          smoother: smoother,
+          trackingConfig: config,
+          trackingRequirements: requirements,
+          mode: PoseViewMode.stickman,
+        );
+        final profile = PoseTrackingRequirements.upperBody();
+        await tester.pumpWidget(app(profile));
+        results.add(_result(t0, [_fullBodyPose(t0)]));
+        await tester.pump();
+        final resets = smoother.resetCount;
+        expect(
+          find.byKey(const ValueKey('pose-stickman-layer')),
+          findsOneWidget,
+        );
+        await tester.pumpWidget(
+          app(
+            PoseTrackingRequirements(
+              requiredJoints: profile.requiredJoints,
+              minJointConfidence: threshold == 'joint' ? 0.7 : null,
+              minPoseConfidence: threshold == 'pose' ? 0.2 : 0,
+            ),
+          ),
+        );
+        expect(find.byKey(const ValueKey('pose-stickman-layer')), findsNothing);
+        expect(smoother.resetCount, resets + 1);
+      },
+    );
+  }
+
+  testWidgets(
+    'equivalent stream wrappers preserve pose; new source clears it',
+    (tester) async {
+      final results = StreamController<PosePipelineResult>.broadcast(
+        sync: true,
+      );
+      final replacement = StreamController<PosePipelineResult>.broadcast(
+        sync: true,
+      );
+      final errors = StreamController<PosePipelineError>.broadcast(sync: true);
+      final smoother = _RecordingSmoother();
+      final config = PoseTrackingConfig();
+      addTearDown(results.close);
+      addTearDown(replacement.close);
+      addTearDown(errors.close);
+      Widget app(Stream<PosePipelineResult> stream) => _app(
+        results: stream,
+        errors: errors.stream,
+        smoother: smoother,
+        trackingConfig: config,
+        mode: PoseViewMode.stickman,
+      );
+      await tester.pumpWidget(app(results.stream));
+      results.add(_result(t0, [_fullBodyPose(t0)]));
+      await tester.pump();
+      final resets = smoother.resetCount;
+      for (var tick = 0; tick < 5; tick++) {
+        await tester.pumpWidget(app(results.stream));
+        expect(
+          find.byKey(const ValueKey('pose-stickman-layer')),
+          findsOneWidget,
+        );
+        expect(smoother.resetCount, resets);
+      }
+      await tester.pumpWidget(app(replacement.stream));
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsNothing);
+      final later = t0.add(const Duration(seconds: 1));
+      results.add(_result(later, [_fullBodyPose(later)]));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsNothing);
+      replacement.add(_result(later, [_fullBodyPose(later)]));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsOneWidget);
+      expect(smoother.updateCount, 2);
+    },
+  );
 }
