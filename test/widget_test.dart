@@ -336,6 +336,11 @@ steps:
       );
       await tester.pump();
 
+      await tester.scrollUntilVisible(
+        find.text('Workout sources'),
+        260,
+        scrollable: find.byType(Scrollable).first,
+      );
       expect(find.text('Workout sources'), findsOneWidget);
 
       await tester.scrollUntilVisible(
