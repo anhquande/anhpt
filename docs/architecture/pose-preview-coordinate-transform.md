@@ -88,3 +88,15 @@ Controller stream getters can also return equal but non-identical wrappers.
 Subscription changes use stream equality, matching Flutter StreamBuilder, so
 ordinary parent rebuilds do not resubscribe and clear the displayed pose. A
 new source still cancels the old subscription and clears stale pose data.
+
+## Stickman joint dropouts
+
+The avatar has a presentation-only per-joint 300 ms hold at the renderer's 0.4
+confidence threshold. A briefly missing/uncertain landmark reuses its most recent
+confident position instead of immediately removing every connected limb. Each
+joint expires independently; uncertain observations do not renew its lifetime.
+A timer expires held landmarks even when inference stops delivering frames.
+Stream/profile/mode changes and disposal clear this presentation history.
+Canonical EMA, raw tracking confidence and exercise feature extraction never
+consume held landmarks. Real sustained loss still removes the corresponding
+limbs rather than displaying an indefinitely frozen avatar.

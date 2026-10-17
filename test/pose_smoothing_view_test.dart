@@ -358,4 +358,61 @@ void main() {
       expect(smoother.updateCount, 2);
     },
   );
+  testWidgets(
+    'stickman holds a brief joint dropout and expires on stream stall',
+    (tester) async {
+      final results = StreamController<PosePipelineResult>.broadcast(
+        sync: true,
+      );
+      final smoother = _RecordingSmoother();
+      addTearDown(results.close);
+      await tester.pumpWidget(
+        _app(
+          results: results.stream,
+          smoother: smoother,
+          trackingConfig: PoseTrackingConfig(),
+          mode: PoseViewMode.stickman,
+        ),
+      );
+      results.add(_result(t0, [_fullBodyPose(t0)]));
+      await tester.pump();
+      final lowAt = t0.add(const Duration(milliseconds: 67));
+      final high = _fullBodyPose(lowAt);
+      final low = BodyPose(
+        joints: {
+          for (final entry in high.joints.entries)
+            entry.key: PosePoint(
+              x: entry.value.x,
+              y: entry.value.y,
+              confidence: .39,
+            ),
+        },
+        timestamp: lowAt,
+        confidence: .39,
+      );
+      await tester.pump(const Duration(milliseconds: 67));
+      results.add(_result(lowAt, [low]));
+      await tester.pump();
+      final painter =
+          tester
+                  .widget<CustomPaint>(
+                    find.byKey(const ValueKey('pose-stickman-layer')),
+                  )
+                  .painter
+              as PosePainter;
+      expect(painter.pose![BodyJoint.leftShoulder]!.confidence, .9);
+      expect(smoother.lastInput![BodyJoint.leftShoulder]!.confidence, .39);
+      await tester.pump(const Duration(milliseconds: 232));
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsNothing);
+      final recoveredAt = t0.add(const Duration(milliseconds: 400));
+      results.add(_result(recoveredAt, [_fullBodyPose(recoveredAt)]));
+      await tester.pump();
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsOneWidget);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.takeException(), isNull);
+    },
+  );
 }
