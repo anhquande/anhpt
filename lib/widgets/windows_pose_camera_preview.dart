@@ -18,7 +18,11 @@ class WindowsPoseCameraPreview extends StatefulWidget {
     this.posePipeline,
     this.onErrorChanged,
     this.onPoseFeatures,
+    this.camera,
   });
+
+  /// Optional camera implementation for lifecycle regression tests.
+  final UvcCamera? camera;
 
   final bool enabled;
   final WorkoutCameraFacing facing;
@@ -33,16 +37,19 @@ class WindowsPoseCameraPreview extends StatefulWidget {
 
 class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     with WidgetsBindingObserver {
-  final UvcCamera _camera = UvcCamera();
+  late final UvcCamera _camera = widget.camera ?? UvcCamera();
+  Future<void> _operations = Future<void>.value();
   final SkeletonPoseRenderer _poseRenderer = SkeletonPoseRenderer();
 
   List<UvcUsbDevice> _devices = const [];
   UvcUsbDevice? _selectedDevice;
   UvcCameraMode? _mode;
   int? _textureId;
+  PosePipeline? _activePipeline;
   Timer? _frameTimer;
   int _lastFrameSequence = -1;
   int _generation = 0;
+  Completer<void>? _initializationCancelled;
   bool _loading = false;
   String? _error;
   PoseViewMode _poseViewMode = PoseViewMode.camera;
@@ -84,17 +91,50 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     }
   }
 
-  Future<void> _initialize({UvcUsbDevice? preferred}) async {
-    if (!widget.enabled || _loading) return;
-    final generation = ++_generation;
+  // Invalidate synchronously; serialize the entire transaction, not just the
+  // native calls. A stale transaction must release its handles before reopening.
+  Future<void> _enqueue(Future<void> Function() operation) {
+    final next = _operations.then((_) => operation());
+    _operations = next.catchError((Object error, StackTrace stack) {
+      debugPrint('Windows camera lifecycle failed: $error');
+    });
+    return _operations;
+  }
+
+  bool _isCurrent(int generation) =>
+      mounted && widget.enabled && generation == _generation;
+
+  int _invalidate() {
+    ++_generation;
+    final cancelled = _initializationCancelled;
+    _initializationCancelled = null;
+    if (cancelled != null && !cancelled.isCompleted) cancelled.complete();
+    _frameTimer?.cancel();
+    _frameTimer = null;
+    return _generation;
+  }
+
+  Future<void> _initialize({UvcUsbDevice? preferred}) {
+    final generation = _invalidate();
+    return _enqueue(() => _initializeCamera(generation, preferred));
+  }
+
+  Future<void> _initializeCamera(
+    int generation,
+    UvcUsbDevice? preferred,
+  ) async {
+    if (!_isCurrent(generation)) return;
+    final cancelled = Completer<void>();
+    _initializationCancelled = cancelled;
     setState(() => _loading = true);
     _setError(null);
 
     try {
-      await _teardown(invalidateGeneration: false);
+      await _releaseCamera();
       if (!mounted || generation != _generation || !widget.enabled) return;
 
       final devices = await _camera.listUsbDevices();
+      if (!_isCurrent(generation)) return;
       if (devices.isEmpty) {
         throw StateError('No Windows webcam was found.');
       }
@@ -104,12 +144,14 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       if (!mounted || generation != _generation || !widget.enabled) return;
 
       final textureId = await _camera.createPreviewTexture();
+      _textureId = textureId;
+      if (!_isCurrent(generation)) return;
       final previewResult = await _camera.startPreviewAuto(
         preference: UvcAutoPreviewPreference.reliability,
       );
+      if (!_isCurrent(generation)) return;
       final mode = previewResult.mode;
       if (!previewResult.success || mode == null) {
-        await _camera.disposePreviewTexture(textureId);
         throw StateError(
           'Windows webcam opened but no working preview mode was found.',
         );
@@ -121,8 +163,6 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       );
 
       if (!mounted || generation != _generation || !widget.enabled) {
-        await _camera.stopPreview();
-        await _camera.disposePreviewTexture(textureId);
         return;
       }
 
@@ -135,7 +175,9 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
 
       final pipeline = widget.posePipeline;
       if (pipeline != null) {
-        await pipeline.start();
+        _activePipeline = pipeline;
+        await Future.any([pipeline.start(), cancelled.future]);
+        if (!_isCurrent(generation)) return;
         if (!pipeline.isRunning) {
           throw StateError(
             'Windows pose model could not start. '
@@ -144,6 +186,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
         }
       }
 
+      if (!_isCurrent(generation)) return;
       _lastFrameSequence = -1;
       _startFramePump();
       setState(() {});
@@ -151,8 +194,9 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       if (mounted && generation == _generation) {
         _setError('Windows camera/pose could not start: $error');
       }
-      await _teardown(invalidateGeneration: false);
+      await _releaseCamera();
     } finally {
+      if (!_isCurrent(generation)) await _releaseCamera();
       if (mounted && generation == _generation) {
         setState(() => _loading = false);
       }
@@ -207,14 +251,28 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     await _initialize(preferred: device);
   }
 
-  Future<void> _teardown({bool invalidateGeneration = true}) async {
-    if (invalidateGeneration) ++_generation;
+  Future<void> _teardown() {
+    _invalidate();
+    return _enqueue(() async {
+      await _releaseCamera();
+      if (mounted) {
+        setState(() {
+          _devices = const [];
+          _selectedDevice = null;
+          _loading = false;
+        });
+      }
+    });
+  }
+
+  Future<void> _releaseCamera() async {
     _frameTimer?.cancel();
     _frameTimer = null;
     _lastFrameSequence = -1;
-
-    await widget.posePipeline?.stop();
-
+    // Stop accepting frames now, but release native capture independently of
+    // slow model initialization/inference. The pipeline drains before reuse.
+    final poseStopped = _activePipeline?.stop();
+    _activePipeline = null;
     try {
       await _camera.stopPreview();
     } catch (_) {
@@ -238,13 +296,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       // Safe if no device was fully opened.
     }
 
-    if (mounted && invalidateGeneration) {
-      setState(() {
-        _devices = const [];
-        _selectedDevice = null;
-        _loading = false;
-      });
-    }
+    await poseStopped;
   }
 
   void _setError(String? value) {
@@ -255,11 +307,11 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   }
 
   IconData _poseViewIcon(PoseViewMode mode) => switch (mode) {
-        PoseViewMode.camera => Icons.videocam_outlined,
-        PoseViewMode.skeleton => Icons.accessibility_new_rounded,
-        PoseViewMode.cameraWithSkeleton => Icons.layers_outlined,
-        PoseViewMode.stickman => Icons.account_circle_outlined,
-      };
+    PoseViewMode.camera => Icons.videocam_outlined,
+    PoseViewMode.skeleton => Icons.accessibility_new_rounded,
+    PoseViewMode.cameraWithSkeleton => Icons.layers_outlined,
+    PoseViewMode.stickman => Icons.account_circle_outlined,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -363,7 +415,9 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
             top: 8,
             right: 8,
             child: Material(
-              color: Theme.of(context).colorScheme.surface.withValues(alpha: .82),
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: .82),
               borderRadius: BorderRadius.circular(24),
               child: PopupMenuButton<UvcUsbDevice>(
                 tooltip: 'Choose camera',
@@ -386,15 +440,17 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    ++_generation;
-    _frameTimer?.cancel();
-    _frameTimer = null;
-    unawaited(_disposeCamera());
+    _invalidate();
+    // Queue outside synchronous widget disposal; never race an open/attach.
+    unawaited(_enqueue(_disposeCamera));
     super.dispose();
   }
 
   Future<void> _disposeCamera() async {
-    await _teardown(invalidateGeneration: false);
-    await _camera.dispose();
+    try {
+      await _releaseCamera();
+    } finally {
+      await _camera.dispose();
+    }
   }
 }

@@ -129,3 +129,26 @@ The architectural reason for the separation is that muting coach guidance should
 ## Player responsibilities
 
 `WorkoutPlayerScreen` is the integration layer for a live session. It should remain responsible for UI and wiring rather than becoming the owner of timing rules. Changes to progression belong in `SessionEngine`; changes to spoken behavior belong in `VoiceGuideController` or `AudioFeedbackService`.
+
+## Windows camera shutdown
+
+Terminal session states disable the camera before the summary is displayed,
+including an incomplete workout that keeps the Player route underneath a dialog.
+Camera capture must not depend on pressing Done to stop.
+
+The Windows preview serializes complete open/attach/close transactions. Every
+asynchronous startup boundary checks its generation; cancellation cannot publish
+an old texture or restart the frame timer. Textures are retained as soon as they
+are created so failed attachment and cancellation can release them. Model startup
+can be cancelled from the camera transaction: native capture/texture/device are
+released before waiting for pose initialization or inference to drain. Pipeline
+ownership remains with the comparison widget; camera cleanup stops the pipeline
+it actually started, including when the configured pipeline changes.
+
+The Flutter AXTree console message alone does not establish a native deadlock.
+Regression coverage exercises cancellation at discovery/open/texture/start/attach,
+pose initialization, failed attachment, rapid disable/re-enable, and the Player's
+End workout flow. Hardware QA must additionally repeat Side by side -> End ->
+Done with a real Windows webcam, including during first-run model download and
+with accessibility enabled, and verify that the camera indicator turns off and a
+second workout opens it successfully.

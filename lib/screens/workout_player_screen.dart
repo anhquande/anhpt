@@ -375,6 +375,7 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
       }
       if (status == SessionStatus.completed ||
           status == SessionStatus.incomplete) {
+        _cameraEnabled = false;
         _screenOffTimer?.cancel();
         unawaited(_wakeAndroidDisplay());
         unawaited(music.stop());
