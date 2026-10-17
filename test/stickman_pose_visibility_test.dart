@@ -72,4 +72,16 @@ void main() {
     visibility.reset();
     expect(visibility.nextExpiry, isNull);
   });
+  test('a last confident observation is not evidence of joint loss', () {
+    final visibility = StickmanPoseVisibility();
+    visibility.update(pose(0), timestamp: t0);
+    expect(visibility.nextExpiry, isNull);
+    final shown = visibility.expire(t0.add(const Duration(milliseconds: 600)));
+    expect(shown![BodyJoint.leftWrist], isNotNull);
+    final uncertain = pose(700, confidence: .1);
+    expect(
+      visibility.update(uncertain, timestamp: uncertain.timestamp),
+      isNull,
+    );
+  });
 }

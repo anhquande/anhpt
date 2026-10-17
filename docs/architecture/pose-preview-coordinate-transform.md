@@ -95,7 +95,11 @@ The avatar has a presentation-only per-joint 300 ms hold at the renderer's 0.4
 confidence threshold. A briefly missing/uncertain landmark reuses its most recent
 confident position instead of immediately removing every connected limb. Each
 joint expires independently; uncertain observations do not renew its lifetime.
-A timer expires held landmarks even when inference stops delivering frames.
+Only joints explicitly missing/uncertain in the latest observation use this
+300 ms expiry. Confident joints must not expire while awaiting the next result:
+CPU inference can take longer than 300 ms. A separate two-second stream-silence
+timer clears the avatar when inference genuinely stalls. This avoids whole-avatar
+blanking at low but healthy inference rates, while keeping stale data bounded.
 Stream/profile/mode changes and disposal clear this presentation history.
 Canonical EMA, raw tracking confidence and exercise feature extraction never
 consume held landmarks. Real sustained loss still removes the corresponding

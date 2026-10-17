@@ -415,4 +415,39 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets(
+    'healthy slow inference does not blank the whole avatar between results',
+    (tester) async {
+      final results = StreamController<PosePipelineResult>.broadcast(
+        sync: true,
+      );
+      addTearDown(results.close);
+      await tester.pumpWidget(
+        _app(
+          results: results.stream,
+          smoother: _RecordingSmoother(),
+          trackingConfig: PoseTrackingConfig(),
+          mode: PoseViewMode.stickman,
+        ),
+      );
+      for (var frame = 0; frame < 4; frame++) {
+        final timestamp = t0.add(Duration(milliseconds: frame * 600));
+        results.add(_result(timestamp, [_fullBodyPose(timestamp)]));
+        await tester.pump();
+        for (var tick = 0; tick < 6; tick++) {
+          await tester.pump(const Duration(milliseconds: 100));
+          expect(
+            find.byKey(const ValueKey('pose-stickman-layer')),
+            findsOneWidget,
+          );
+        }
+      }
+      // An actual stalled stream still clears the avatar, independently of the
+      // much shorter timeout used after an explicitly uncertain joint result.
+      await tester.pump(const Duration(milliseconds: 1399));
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 1));
+      expect(find.byKey(const ValueKey('pose-stickman-layer')), findsNothing);
+    },
+  );
 }

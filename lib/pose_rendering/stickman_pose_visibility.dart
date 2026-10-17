@@ -13,11 +13,13 @@ class StickmanPoseVisibility {
   final double minConfidence;
   final Map<BodyJoint, PosePoint> _joints = {};
   final Map<BodyJoint, DateTime> _seenAt = {};
+  final Set<BodyJoint> _uncertain = {};
   DateTime? _timestamp;
   double _confidence = 0;
 
   BodyPose? update(BodyPose? pose, {required DateTime timestamp}) {
     if (_timestamp != null && timestamp.isBefore(_timestamp!)) reset();
+    _uncertain.addAll(_joints.keys);
     if (pose != null) {
       _confidence = pose.confidence;
       for (final entry in pose.joints.entries) {
@@ -27,6 +29,7 @@ class StickmanPoseVisibility {
             point.y.isFinite) {
           _joints[entry.key] = point;
           _seenAt[entry.key] = timestamp;
+          _uncertain.remove(entry.key);
         }
       }
     }
@@ -36,12 +39,17 @@ class StickmanPoseVisibility {
   BodyPose? expire(DateTime timestamp) {
     _timestamp = timestamp;
     final expired = _seenAt.entries
-        .where((entry) => !timestamp.isBefore(entry.value.add(holdDuration)))
+        .where(
+          (entry) =>
+              _uncertain.contains(entry.key) &&
+              !timestamp.isBefore(entry.value.add(holdDuration)),
+        )
         .map((entry) => entry.key)
         .toList();
     for (final joint in expired) {
       _joints.remove(joint);
       _seenAt.remove(joint);
+      _uncertain.remove(joint);
     }
     return _joints.isEmpty
         ? null
@@ -53,14 +61,19 @@ class StickmanPoseVisibility {
   }
 
   DateTime? get nextExpiry {
-    if (_seenAt.isEmpty) return null;
-    final first = _seenAt.values.reduce((a, b) => a.isBefore(b) ? a : b);
+    // A confident joint must not expire just because the next inference takes
+    // longer than holdDuration. Stream silence is handled separately by the view.
+    if (_uncertain.isEmpty) return null;
+    final first = _uncertain
+        .map((joint) => _seenAt[joint]!)
+        .reduce((a, b) => a.isBefore(b) ? a : b);
     return first.add(holdDuration);
   }
 
   void reset() {
     _joints.clear();
     _seenAt.clear();
+    _uncertain.clear();
     _timestamp = null;
     _confidence = 0;
   }

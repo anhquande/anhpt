@@ -95,6 +95,10 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   StreamSubscription<PosePipelineError>? _errorSubscription;
   Timer? _trackingStatusTimer;
   Timer? _stickmanExpiryTimer;
+  Timer? _stickmanStallTimer;
+  // Inference may run below 3 FPS on slower CPUs. Silence between healthy
+  // results is different from a result explicitly reporting a missing joint.
+  static const _stickmanStallTimeout = Duration(seconds: 2);
   final _stickmanVisibility = StickmanPoseVisibility();
   BodyPose? _stickmanPose;
   late PoseTrackingEvaluator _trackingEvaluator;
@@ -300,6 +304,8 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   }
 
   void _resetStickman() {
+    _stickmanStallTimer?.cancel();
+    _stickmanStallTimer = null;
     _stickmanExpiryTimer?.cancel();
     _stickmanExpiryTimer = null;
     _stickmanVisibility.reset();
@@ -309,6 +315,11 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   void _updateStickman(BodyPose? pose, DateTime timestamp) {
     _stickmanPose = _stickmanVisibility.update(pose, timestamp: timestamp);
     _scheduleStickmanExpiry(timestamp);
+    _stickmanStallTimer?.cancel();
+    _stickmanStallTimer = Timer(_stickmanStallTimeout, () {
+      if (!mounted) return;
+      setState(_resetStickman);
+    });
   }
 
   void _scheduleStickmanExpiry(DateTime timestamp) {
