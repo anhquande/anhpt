@@ -6,3 +6,5 @@ export 'pose_view_transform.dart';
 export 'primary_pose_selector.dart';
 export 'realtime_pose_view.dart';
 export 'skeleton_pose_renderer.dart';
+
+export 'stickman_pose_renderer.dart';

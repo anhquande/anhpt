@@ -9,6 +9,7 @@ import 'pose_painter.dart';
 import 'pose_renderer.dart';
 import 'pose_view_mode.dart';
 import 'pose_view_transform.dart';
+import 'stickman_pose_renderer.dart';
 
 /// Presentation widget that consumes PR4 pipeline results and paints one pose.
 ///
@@ -84,6 +85,7 @@ class RealtimePoseView extends StatefulWidget {
 }
 
 class _RealtimePoseViewState extends State<RealtimePoseView> {
+  static final StickmanPoseRenderer _stickmanRenderer = StickmanPoseRenderer();
   static final PoseEstimatorCapabilities _fallbackCapabilities =
       PoseEstimatorCapabilities(supportedJoints: BodyJoint.values.toSet());
 
@@ -392,23 +394,26 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
                   child: widget.camera,
                 ),
               ),
-            if (widget.mode.showsSkeleton &&
+            if ((widget.mode.showsSkeleton || widget.mode.showsStickman) &&
                 pose != null &&
                 viewTransform != null)
               Positioned.fill(
                 child: IgnorePointer(
                   child: CustomPaint(
-                    key: const ValueKey('pose-skeleton-layer'),
+                    key: ValueKey(widget.mode.showsStickman
+                        ? 'pose-stickman-layer' : 'pose-skeleton-layer'),
                     painter: PosePainter(
                       pose: pose,
-                      renderer: widget.renderer,
+                      renderer: widget.mode.showsStickman
+                          ? _stickmanRenderer : widget.renderer,
                       viewTransform: viewTransform,
                       debugConfig: widget.debugConfig,
                     ),
                   ),
                 ),
               ),
-            if (widget.mode == PoseViewMode.skeleton && pose == null)
+            if ((widget.mode == PoseViewMode.skeleton ||
+                    widget.mode == PoseViewMode.stickman) && pose == null)
               const Center(
                 key: ValueKey('pose-skeleton-empty-state'),
                 child: Icon(

@@ -2,6 +2,7 @@ enum PoseViewMode {
   camera,
   skeleton,
   cameraWithSkeleton,
+  stickman,
 }
 
 extension PoseViewModeDisplay on PoseViewMode {
@@ -9,6 +10,7 @@ extension PoseViewModeDisplay on PoseViewMode {
         PoseViewMode.camera => 'Camera',
         PoseViewMode.skeleton => 'Skeleton',
         PoseViewMode.cameraWithSkeleton => 'Camera + Skeleton',
+        PoseViewMode.stickman => 'Stickman 2D',
       };
 
   bool get showsCamera =>
@@ -16,4 +18,6 @@ extension PoseViewModeDisplay on PoseViewMode {
 
   bool get showsSkeleton =>
       this == PoseViewMode.skeleton || this == PoseViewMode.cameraWithSkeleton;
+
+  bool get showsStickman => this == PoseViewMode.stickman;
 }
