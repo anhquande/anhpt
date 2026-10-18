@@ -49,3 +49,11 @@ abstract interface class PoseEstimator {
 
   Future<void> dispose();
 }
+
+/// Optional last-call timing of an estimator. Durations cover preprocessing
+/// and the backend invocation separately; the backend duration can also
+/// include tensor preparation/output conversion, not only native compute.
+abstract interface class PoseEstimatorTimings {
+  Duration? get lastPreprocessDuration;
+  Duration? get lastBackendDuration;
+}
