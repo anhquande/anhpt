@@ -262,6 +262,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         _previousFeaturePose = null;
         if (previousTrackingState != PoseTrackingState.noPerson) {
           _poseSmoother.reset();
+          _stickmanPresentationSmoother.reset();
         }
       } else if (evaluation.state == PoseTrackingState.lostTracking) {
         // Stop drawing when tracking is lost, but retain the EMA history during
@@ -306,6 +307,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         _previousFeaturePose = null;
         if (previousTrackingState != PoseTrackingState.noPerson) {
           _poseSmoother.reset();
+          _stickmanPresentationSmoother.reset();
         }
       } else if (evaluation.state == PoseTrackingState.lostTracking) {
         _smoothedPose = null;
