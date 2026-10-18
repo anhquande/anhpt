@@ -270,7 +270,10 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     final pipeline = widget.posePipeline;
     if (!mounted || pipeline == null || !pipeline.isRunning) return;
     try {
+      final copyWatch = Stopwatch()..start();
       final frame = _camera.copyLatestFrame();
+      copyWatch.stop();
+      _metrics.copiedFrame(copyWatch.elapsed);
       if (frame == null || frame.sequence == _lastFrameSequence) return;
       _lastFrameSequence = frame.sequence;
       final capturedAt = DateTime.now();
@@ -421,6 +424,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
                   trackingStatusDebounce:
                       RealtimePoseView.defaultTrackingStatusDebounce,
                   onPoseFeatures: widget.onPoseFeatures,
+                  onUiFrameCallback: _metrics.uiFrameScheduled,
                   mode: _poseViewMode,
                   renderer: _poseRenderer,
                 ),
@@ -584,6 +588,9 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     final diagnostics = widget.posePipeline?.diagnostics;
     final age = _metrics.frameAge(DateTime.now());
     final duration = diagnostics?.lastInferenceDuration;
+    final estimator = widget.posePipeline?.estimator;
+    final phases = estimator is PoseEstimatorTimings ? estimator : null;
+    String millis(Duration? value) => value == null ? '--' : '${value.inMilliseconds} ms';
     return DecoratedBox(
       key: const ValueKey('windows-pose-performance-overlay'),
       decoration: BoxDecoration(
@@ -601,7 +608,12 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
               const Text('POSE PERFORMANCE', style: TextStyle(fontWeight: FontWeight.bold)),
               Text('Sampled: ${_metrics.sampledFps.toStringAsFixed(1)} FPS'),
               Text('Pose: ${(diagnostics?.effectivePoseFps ?? 0).toStringAsFixed(1)} FPS'),
-              Text('Estimate: ${duration == null ? "--" : duration.inMilliseconds.toString()} ms'),
+              Text('Estimate: ${millis(duration)}'),
+              Text('Copy frame: ${millis(_metrics.lastCopyDuration)}'),
+              Text('Sample interval: ${millis(_metrics.lastSampleInterval)}'),
+              Text('Preprocess: ${millis(phases?.lastPreprocessDuration)}'),
+              Text('Backend (incl I/O): ${millis(phases?.lastBackendDuration)}'),
+              Text('UI frame callback: ${millis(_metrics.lastUiFrameDelay)}'),
               Text('Frame age: ${age == null ? "--" : age.inMilliseconds.toString()} ms'),
               Text('Dropped: ${diagnostics?.droppedFrameCount ?? 0}'),
             ],
