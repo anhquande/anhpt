@@ -127,20 +127,42 @@ Widget _preview(
   _Camera camera, {
   bool enabled = true,
   PosePipeline? pipeline,
+  double width = 640,
+  double height = 480,
 }) => MaterialApp(
-  home: SizedBox(
-    width: 640,
-    height: 480,
+  home: Center(child: SizedBox(
+    width: width,
+    height: height,
     child: WindowsPoseCameraPreview(
       camera: camera,
       enabled: enabled,
       facing: WorkoutCameraFacing.front,
       posePipeline: pipeline,
     ),
-  ),
+  )),
 );
 
 void main() {
+  testWidgets('diagnostics escape compact camera and close on disposal', (tester) async {
+    final camera = _Camera();
+    await tester.pumpWidget(_preview(camera, width: 150, height: 112));
+    await tester.pump();
+    expect(find.byType(Texture), findsOneWidget);
+    await tester.tap(find.byTooltip('Pose view'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stickman').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('windows-pose-performance-toggle')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('windows-pose-performance-overlay')), findsOneWidget);
+    expect(find.text('POSE PERFORMANCE'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(find.byKey(const ValueKey('windows-pose-performance-overlay')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final stage in ['list', 'open', 'texture', 'start', 'attach']) {
     testWidgets(
       'dispose during $stage releases handles without restarting capture',
