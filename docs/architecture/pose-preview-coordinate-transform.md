@@ -126,3 +126,17 @@ The overlay is diagnostic only. Its absence in camera-only mode is intentional.
 All measurement subscriptions and timers stop when the Windows camera closes.
 To diagnose latency, compare Pose FPS and Estimate first; use Frame age to detect
 backlogged or stalled pose output. Do not infer webcam FPS from Sampled FPS.
+
+### Windows pose latency profiling (PR157)
+
+The optional **POSE PERFORMANCE** dialog now separates diagnostic stages:
+
+- **Copy frame:** duration of the Dart-facing UVC `copyLatestFrame()` call, including any native-to-Dart copy cost. Measured on each polling attempt (including null frames).
+- **Sample interval:** wall-clock time between distinct frames accepted by the Windows frame sampler, not the camera sensor capture interval.
+- **Preprocess:** MoveNet RGBA letterbox and RGB tensor preparation in Dart.
+- **Backend (incl I/O):** elapsed time waiting for the inference backend's entire `run()` operation, including tensor setup/conversion and native ONNX execution; **not** pure ONNX compute time.
+- **UI frame callback:** elapsed time from receiving a pose result in `RealtimePoseView` to Flutter's next post-frame callback. It does **not** measure GPU raster, physical screen presentation, or camera sensor exposure.
+- **Estimate:** the complete estimator invocation; its phases may not add up perfectly due to mapping and scheduling overhead.
+- **Frame age:** time since Dart stamped a copied frame, **not** the original sensor-capture timestamp.
+
+All timings are last observed samples rather than rolling percentile statistics. Sampling FPS, Pose FPS and Dropped remain as before. Interpret these values under both an open and closed diagnostics panel, because UI load may affect the pipeline. Native UVC preview Texture and sensor-level latency cannot be inferred from this dialog.
