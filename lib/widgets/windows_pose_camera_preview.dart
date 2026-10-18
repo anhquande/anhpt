@@ -53,6 +53,13 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   final PosePerformanceMetrics _metrics = PosePerformanceMetrics();
   final ValueNotifier<int> _metricsRefresh = ValueNotifier<int>(0);
   bool _showDiagnostics = false;
+  String _diagnosticsState = 'closed';
+  void _traceDiagnostics(String action) {
+    debugPrint('[PoseDiagnostics] $action; generation=$_generation; '
+        'mounted=$mounted; cameraEnabled=${widget.enabled}; '
+        'mode=${_poseViewMode.name}; state=$_diagnosticsState');
+  }
+
   DialogRoute<void>? _diagnosticsRoute;
   int _lastFrameSequence = -1;
   int _generation = 0;
@@ -88,6 +95,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _traceDiagnostics('app lifecycle: ${state.name}');
     if (!widget.enabled) return;
     if (state == AppLifecycleState.inactive ||
         state == AppLifecycleState.paused ||
@@ -112,6 +120,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       mounted && widget.enabled && generation == _generation;
 
   int _invalidate() {
+    _traceDiagnostics('camera invalidated');
     ++_generation;
     final cancelled = _initializationCancelled;
     _initializationCancelled = null;
@@ -290,6 +299,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   }
 
   Future<void> _releaseCamera() async {
+    _traceDiagnostics('camera release');
     _frameTimer?.cancel();
     _frameTimer = null;
     _hideDiagnosticsOverlay();
@@ -485,11 +495,13 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   // OverlayEntry. The route is independent of camera viewport dimensions,
   // including workout split and picture-in-picture layouts.
   void _toggleDiagnosticsOverlay() {
+    _traceDiagnostics('toggle pressed');
     if (_diagnosticsRoute != null) {
       _hideDiagnosticsOverlay();
       if (mounted) setState(() {});
       return;
     }
+    _diagnosticsState = 'opening';
     final navigator = Navigator.of(context, rootNavigator: true);
     late final DialogRoute<void> route;
     route = DialogRoute<void>(
@@ -521,19 +533,26 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     );
     _diagnosticsRoute = route;
     _showDiagnostics = true;
+    _traceDiagnostics('pushing dialog route');
     setState(() {});
     unawaited(navigator.push(route).whenComplete(() {
+      _traceDiagnostics('dialog route completed');
       if (!identical(_diagnosticsRoute, route)) return;
       _diagnosticsRoute = null;
       _showDiagnostics = false;
+      _diagnosticsState = 'closed';
       if (mounted) setState(() {});
     }));
+    _diagnosticsState = 'open';
+    _traceDiagnostics('dialog route pushed');
   }
 
   void _hideDiagnosticsOverlay() {
+    _traceDiagnostics('dialog hide requested');
     final route = _diagnosticsRoute;
     _diagnosticsRoute = null;
     _showDiagnostics = false;
+    _diagnosticsState = 'closed';
     if (route != null && route.isActive) {
       route.navigator?.removeRoute(route);
     }
@@ -573,6 +592,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _traceDiagnostics('widget dispose');
     _invalidate();
     _metricsRefresh.dispose();
     // Queue outside synchronous widget disposal; never race an open/attach.
