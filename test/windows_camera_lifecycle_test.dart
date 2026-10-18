@@ -153,7 +153,7 @@ void main() {
     expect(find.byType(Texture), findsOneWidget);
     await tester.tap(find.byTooltip('Pose view'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Stickman'));
+    await tester.tap(find.text('Stickman 2D'));
     await tester.pumpAndSettle();
     await tester.pumpWidget(_preview(camera, width: 150, height: 112));
     await tester.pump();
