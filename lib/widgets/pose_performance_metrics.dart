@@ -18,7 +18,7 @@ class PosePerformanceMetrics {
     if (previous != null && !now.isBefore(previous)) {
       lastSampleInterval = now.difference(previous);
     }
-    _previousSample = now;
+    if (previous == null || !now.isBefore(previous)) _previousSample = now;
     _sampleCount++;
   }
 
