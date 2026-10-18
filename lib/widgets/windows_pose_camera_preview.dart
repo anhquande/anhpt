@@ -589,7 +589,8 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     final age = _metrics.frameAge(DateTime.now());
     final duration = diagnostics?.lastInferenceDuration;
     final estimator = widget.posePipeline?.estimator;
-    final phases = estimator is PoseEstimatorTimings ? estimator : null;
+    final PoseEstimatorTimings? phases =
+        estimator is PoseEstimatorTimings ? estimator as PoseEstimatorTimings : null;
     String millis(Duration? value) => value == null ? '--' : '${value.inMilliseconds} ms';
     return DecoratedBox(
       key: const ValueKey('windows-pose-performance-overlay'),
