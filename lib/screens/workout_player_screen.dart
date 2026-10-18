@@ -988,18 +988,23 @@ class _WorkoutPlayerScreenState extends State<WorkoutPlayerScreen> {
                             left: 14,
                             right: 14,
                             bottom: 12,
-                            child: Text(
-                              engine.currentStep.name,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .headlineSmall
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                    shadows: const [Shadow(blurRadius: 8)],
-                                  ),
+                            // The camera PiP controls occupy the bottom-right
+                            // corner. This full-width text overlay is visual
+                            // only and must not steal pointer hit tests.
+                            child: IgnorePointer(
+                              child: Text(
+                                engine.currentStep.name,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.center,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineSmall
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.w900,
+                                      shadows: const [Shadow(blurRadius: 8)],
+                                    ),
+                              ),
                             ),
                           ),
                         if (_centerFeedbackIcon != null)

@@ -65,6 +65,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   int _generation = 0;
   Completer<void>? _initializationCancelled;
   bool _loading = false;
+  bool _suspendedByLifecycle = false;
   String? _error;
   PoseViewMode _poseViewMode = PoseViewMode.camera;
 
@@ -80,8 +81,10 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.enabled != widget.enabled) {
       if (widget.enabled) {
+        _suspendedByLifecycle = false;
         unawaited(_initialize());
       } else {
+        _suspendedByLifecycle = false;
         unawaited(_teardown());
       }
       return;
@@ -97,11 +100,18 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _traceDiagnostics('app lifecycle: ${state.name}');
     if (!widget.enabled) return;
-    if (state == AppLifecycleState.inactive ||
-        state == AppLifecycleState.paused ||
+    // On Windows, "inactive" is a transient loss of focus (e.g. clicking a
+    // dialog or opening another window), not a camera-stop request. Closing
+    // the webcam here can dismiss the diagnostics route before it paints.
+    if (state == AppLifecycleState.inactive) return;
+    if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
+      if (_suspendedByLifecycle) return;
+      _suspendedByLifecycle = true;
       unawaited(_teardown());
-    } else if (state == AppLifecycleState.resumed) {
+    } else if (state == AppLifecycleState.resumed &&
+        _suspendedByLifecycle) {
+      _suspendedByLifecycle = false;
       unawaited(_initialize(preferred: _selectedDevice));
     }
   }
@@ -457,11 +467,23 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
           Positioned(
             bottom: 8,
             right: 8,
-            child: IconButton.filledTonal(
-              key: const ValueKey('windows-pose-performance-toggle'),
-              tooltip: _showDiagnostics ? 'Hide pose diagnostics' : 'Show pose diagnostics',
-              icon: Icon(_showDiagnostics ? Icons.close_rounded : Icons.speed_rounded),
-              onPressed: _toggleDiagnosticsOverlay,
+            child: Listener(
+              onPointerDown: (_) => _traceDiagnostics('diagnostics pointer down'),
+              onPointerUp: (_) => _traceDiagnostics('diagnostics pointer up'),
+              child: TooltipVisibility(
+                visible: false,
+                child: IconButton.filledTonal(
+                  key: const ValueKey('windows-pose-performance-toggle'),
+                  // Avoid a transient Windows tooltip overlay on the camera
+                  // control while diagnosing accessibility-tree instability.
+                  tooltip: _showDiagnostics
+                      ? 'Hide pose diagnostics'
+                      : 'Show pose diagnostics',
+                  icon: Icon(_showDiagnostics
+                      ? Icons.close_rounded : Icons.speed_rounded),
+                  onPressed: _toggleDiagnosticsOverlay,
+                ),
+              ),
             ),
           ),
         if (_devices.length > 1)

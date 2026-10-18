@@ -164,6 +164,13 @@ void main() {
     expect(find.text('POSE PERFORMANCE'), findsOneWidget);
     expect(find.byKey(const ValueKey('windows-pose-performance-dialog')), findsOneWidget);
     expect(find.text('Close diagnostics'), findsOneWidget);
+    // A visible diagnostic dialog must remain functional even when Flutter's
+    // accessibility tree is enabled and the camera is embedded in compact UI.
+    final semantics = tester.ensureSemantics();
+    await tester.pump();
+    expect(find.byKey(const ValueKey('windows-pose-performance-dialog')),
+        findsOneWidget);
+    semantics.dispose();
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
@@ -258,13 +265,42 @@ void main() {
     await tester.pump();
     expect(camera.calls.last, 'dispose');
   });
+  testWidgets('Windows inactive focus change keeps diagnostics and camera alive', (tester) async {
+    final camera = _Camera();
+    await tester.pumpWidget(_preview(camera));
+    await tester.pump();
+    await tester.tap(find.byTooltip('Pose view'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Stickman 2D'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('windows-pose-performance-toggle')));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('windows-pose-performance-dialog')), findsOneWidget);
+
+    camera.calls.clear();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    await tester.pump();
+    expect(find.byKey(const ValueKey('windows-pose-performance-dialog')), findsOneWidget);
+    expect(camera.calls, isNot(contains('close')));
+    expect(camera.calls, isNot(contains('stop')));
+    expect(camera.calls, isNot(contains('open')));
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+    expect(camera.calls, isNot(contains('open')));
+    expect(find.byKey(const ValueKey('windows-pose-performance-dialog')), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('pause and immediate resume serialize camera replacement', (tester) async {
     final camera = _Camera();
     await tester.pumpWidget(_preview(camera));
     await tester.pump();
     camera.calls.clear();
     camera.blocked = 'close';
-    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
     await tester.pump();
     tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await tester.pump();
