@@ -325,7 +325,15 @@ class PosePipeline {
     final previous = _lastInferenceFrameTimestamp;
     if (previous == null) return true;
     final delta = frame.timestamp.difference(previous);
-    return delta >= config.minimumFrameInterval;
+    // Timer.periodic uses integer millisecond scheduling and can fire just
+    // before the nominal 15 FPS interval (66 ms vs 66.667 ms). Without a small
+    // tolerance, the next distinct camera frame is skipped and pose output
+    // effectively falls toward half the target rate despite fast inference.
+    // Cap tolerance at 5 ms or 10% of the target interval, whichever is less.
+    // This is only scheduling-jitter tolerance, not an unbounded FPS increase.
+    final intervalMicros = config.minimumFrameInterval.inMicroseconds;
+    final toleranceMicros = (intervalMicros ~/ 10).clamp(0, 5000);
+    return delta.inMicroseconds >= intervalMicros - toleranceMicros;
   }
 
   double get _effectivePoseFps {
