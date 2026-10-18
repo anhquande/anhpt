@@ -145,13 +145,19 @@ Widget _preview(
 void main() {
   testWidgets('diagnostics escape compact camera and close on disposal', (tester) async {
     final camera = _Camera();
-    await tester.pumpWidget(_preview(camera, width: 150, height: 112));
+    // Select the menu in a normal-sized camera before resizing to PiP.
+    // A 150x112 popup can be constrained by the test viewport and isn't
+    // reliable for selecting the display mode itself.
+    await tester.pumpWidget(_preview(camera));
     await tester.pump();
     expect(find.byType(Texture), findsOneWidget);
     await tester.tap(find.byTooltip('Pose view'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Stickman').last);
+    await tester.tap(find.text('Stickman'));
     await tester.pumpAndSettle();
+    await tester.pumpWidget(_preview(camera, width: 150, height: 112));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('windows-pose-performance-toggle')), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('windows-pose-performance-toggle')));
     await tester.pump();
     expect(find.byKey(const ValueKey('windows-pose-performance-overlay')), findsOneWidget);
