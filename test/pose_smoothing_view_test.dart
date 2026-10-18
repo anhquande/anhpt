@@ -107,6 +107,53 @@ void main() {
   final t0 = DateTime.utc(2026, 9, 10, 12);
 
   testWidgets(
+    'default Stickman display responds faster than canonical skeleton EMA',
+    (tester) async {
+      final results = StreamController<PosePipelineResult>.broadcast(sync: true);
+      addTearDown(results.close);
+      final tracking = PoseTrackingConfig(
+        readyHoldDuration: Duration.zero,
+        trackingStartDuration: Duration.zero,
+      );
+      Widget view(PoseViewMode mode) => SizedBox(
+        width: 320,
+        height: 400,
+        child: RealtimePoseView(
+          camera: const SizedBox(),
+          results: results.stream,
+          capabilities: _capabilities,
+          trackingConfig: tracking,
+          trackingRequirements: PoseTrackingRequirements.fullBody(),
+          mode: mode,
+          renderer: SkeletonPoseRenderer(),
+        ),
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: Row(children: [
+          Expanded(child: view(PoseViewMode.stickman)),
+          Expanded(child: view(PoseViewMode.skeleton)),
+        ]),
+      ));
+      results.add(_result(t0, [_fullBodyPose(t0, leftShoulderX: 0.2)]));
+      await tester.pump();
+      final t1 = t0.add(const Duration(milliseconds: 100));
+      results.add(_result(t1, [_fullBodyPose(t1, leftShoulderX: 0.8)]));
+      await tester.pump();
+      final stickman = tester.widget<CustomPaint>(
+        find.byKey(const ValueKey('pose-stickman-layer')),
+      ).painter! as PosePainter;
+      final skeleton = tester.widget<CustomPaint>(
+        find.byKey(const ValueKey('pose-skeleton-layer')),
+      ).painter! as PosePainter;
+      final displayX = stickman.pose![BodyJoint.leftShoulder]!.x;
+      final canonicalX = skeleton.pose![BodyJoint.leftShoulder]!.x;
+      expect(displayX, greaterThan(canonicalX + 0.1));
+      expect(displayX, lessThan(0.8));
+      expect(canonicalX, greaterThan(0.2));
+    },
+  );
+
+  testWidgets(
     'tracking evaluates raw pose and renderer receives smoothed pose',
     (tester) async {
       final results = StreamController<PosePipelineResult>.broadcast(
