@@ -15,6 +15,26 @@ void main() {
     expect(metrics.sampledFps, 0);
   });
 
+  test('captures copy, sample cadence and Flutter callback delays', () {
+    final metrics = PosePerformanceMetrics();
+    final start = DateTime.utc(2026, 10, 18);
+    metrics.sampledFrame(start);
+    expect(metrics.lastSampleInterval, isNull);
+    metrics.sampledFrame(start.add(const Duration(milliseconds: 105)));
+    expect(metrics.lastSampleInterval, const Duration(milliseconds: 105));
+    metrics.sampledFrame(start.add(const Duration(milliseconds: 90)));
+    // Out-of-order timing must never report a negative interval.
+    expect(metrics.lastSampleInterval, const Duration(milliseconds: 105));
+    metrics.copiedFrame(const Duration(milliseconds: 6));
+    metrics.uiFrameScheduled(const Duration(milliseconds: 13));
+    expect(metrics.lastCopyDuration, const Duration(milliseconds: 6));
+    expect(metrics.lastUiFrameDelay, const Duration(milliseconds: 13));
+    metrics.reset();
+    expect(metrics.lastSampleInterval, isNull);
+    expect(metrics.lastCopyDuration, isNull);
+    expect(metrics.lastUiFrameDelay, isNull);
+  });
+
   test('frame age is based on latest pose timestamp and reset clears history', () {
     final metrics = PosePerformanceMetrics();
     final start = DateTime.utc(2026, 10, 18);
