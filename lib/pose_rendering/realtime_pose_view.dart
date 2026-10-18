@@ -35,6 +35,7 @@ class RealtimePoseView extends StatefulWidget {
     this.smoother,
     this.featureExtractor = const CanonicalPoseFeatureExtractor(),
     this.onPoseFeatures,
+    this.onUiFrameCallback,
     this.previewFit = BoxFit.fill,
     this.debugConfig = const PoseRenderDebugConfig(),
     this.trackingStatusDebounce = Duration.zero,
@@ -65,6 +66,10 @@ class RealtimePoseView extends StatefulWidget {
 
   /// Optional feature stream for future exercise analyzers and diagnostics.
   final ValueChanged<PoseFeatures>? onPoseFeatures;
+
+  /// Optional diagnostics: time from pose callback to the next Flutter
+  /// post-frame callback. This does not measure GPU raster/presentation.
+  final ValueChanged<Duration>? onUiFrameCallback;
 
   final PoseViewMode mode;
   final PoseRenderer renderer;
@@ -230,6 +235,14 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
 
   void _onResult(PosePipelineResult result) {
     if (!mounted) return;
+    final onUiFrameCallback = widget.onUiFrameCallback;
+    if (onUiFrameCallback != null) {
+      final frameWatch = Stopwatch()..start();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        frameWatch.stop();
+        if (mounted) onUiFrameCallback(frameWatch.elapsed);
+      });
+    }
 
     // PR7 remains authoritative for tracking quality and sees only raw poses.
     final evaluation = _trackingEvaluator.evaluate(
