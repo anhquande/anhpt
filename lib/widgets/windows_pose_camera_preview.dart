@@ -53,6 +53,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   final PosePerformanceMetrics _metrics = PosePerformanceMetrics();
   final ValueNotifier<int> _metricsRefresh = ValueNotifier<int>(0);
   bool _showDiagnostics = false;
+  OverlayEntry? _diagnosticsOverlay;
   int _lastFrameSequence = -1;
   int _generation = 0;
   Completer<void>? _initializationCancelled;
@@ -117,6 +118,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     if (cancelled != null && !cancelled.isCompleted) cancelled.complete();
     _frameTimer?.cancel();
     _frameTimer = null;
+    _hideDiagnosticsOverlay();
     _diagnosticsTimer?.cancel();
     _diagnosticsTimer = null;
     unawaited(_poseResultSubscription?.cancel());
@@ -290,6 +292,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   Future<void> _releaseCamera() async {
     _frameTimer?.cancel();
     _frameTimer = null;
+    _hideDiagnosticsOverlay();
     _lastFrameSequence = -1;
     _diagnosticsTimer?.cancel();
     _diagnosticsTimer = null;
@@ -415,7 +418,10 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
               tooltip: 'Pose view',
               initialValue: _poseViewMode,
               icon: Icon(_poseViewIcon(_poseViewMode)),
-              onSelected: (mode) => setState(() => _poseViewMode = mode),
+              onSelected: (mode) {
+                if (mode != PoseViewMode.stickman) _hideDiagnosticsOverlay();
+                setState(() => _poseViewMode = mode);
+              },
               itemBuilder: (_) => [
                 for (final mode in PoseViewMode.values)
                   PopupMenuItem(
@@ -437,28 +443,17 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
             ),
           ),
         ),
-        if (_poseViewMode == PoseViewMode.stickman) ...[
+        if (_poseViewMode == PoseViewMode.stickman)
           Positioned(
             bottom: 8,
             right: 8,
             child: IconButton.filledTonal(
+              key: const ValueKey('windows-pose-performance-toggle'),
               tooltip: _showDiagnostics ? 'Hide pose diagnostics' : 'Show pose diagnostics',
-              icon: const Icon(Icons.speed_rounded),
-              onPressed: () => setState(() => _showDiagnostics = !_showDiagnostics),
+              icon: Icon(_showDiagnostics ? Icons.speed : Icons.speed_outlined),
+              onPressed: _toggleDiagnosticsOverlay,
             ),
           ),
-          if (_showDiagnostics)
-            Positioned(
-              bottom: 8,
-              left: 8,
-              child: IgnorePointer(
-                child: ValueListenableBuilder<int>(
-                  valueListenable: _metricsRefresh,
-                  builder: (context, _, __) => _buildDiagnostics(),
-                ),
-              ),
-            ),
-        ],
         if (_devices.length > 1)
           Positioned(
             top: 8,
@@ -484,6 +479,46 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
           ),
       ],
     );
+  }
+
+  // Root Overlay is deliberately outside the camera subtree: workout split
+  // and picture-in-picture layouts can be narrower than the diagnostics panel.
+  // Keeping the entry independent of the camera Stack also avoids clipping.
+  void _toggleDiagnosticsOverlay() {
+    if (_diagnosticsOverlay != null) {
+      _hideDiagnosticsOverlay();
+      setState(() {});
+      return;
+    }
+    final overlay = Overlay.of(context, rootOverlay: true);
+    _diagnosticsOverlay = OverlayEntry(
+      builder: (overlayContext) => Positioned(
+        top: MediaQuery.paddingOf(overlayContext).top + 72,
+        right: 16,
+        child: Material(
+          elevation: 8,
+          color: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 260),
+            child: ValueListenableBuilder<int>(
+              valueListenable: _metricsRefresh,
+              builder: (context, _, __) => _buildDiagnostics(),
+            ),
+          ),
+        ),
+      ),
+    );
+    overlay.insert(_diagnosticsOverlay!);
+    _showDiagnostics = true;
+    setState(() {});
+  }
+
+  void _hideDiagnosticsOverlay() {
+    final entry = _diagnosticsOverlay;
+    _diagnosticsOverlay = null;
+    _showDiagnostics = false;
+    entry?.remove();
+    entry?.dispose();
   }
 
   Widget _buildDiagnostics() {
