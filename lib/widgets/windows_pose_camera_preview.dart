@@ -53,7 +53,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   final PosePerformanceMetrics _metrics = PosePerformanceMetrics();
   final ValueNotifier<int> _metricsRefresh = ValueNotifier<int>(0);
   bool _showDiagnostics = false;
-  OverlayEntry? _diagnosticsOverlay;
+  DialogRoute<void>? _diagnosticsRoute;
   int _lastFrameSequence = -1;
   int _generation = 0;
   Completer<void>? _initializationCancelled;
@@ -481,44 +481,62 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     );
   }
 
-  // Root Overlay is deliberately outside the camera subtree: workout split
-  // and picture-in-picture layouts can be narrower than the diagnostics panel.
-  // Keeping the entry independent of the camera Stack also avoids clipping.
+  // Use a Navigator-managed route instead of a manually inserted root
+  // OverlayEntry. The route is independent of camera viewport dimensions,
+  // including workout split and picture-in-picture layouts.
   void _toggleDiagnosticsOverlay() {
-    if (_diagnosticsOverlay != null) {
+    if (_diagnosticsRoute != null) {
       _hideDiagnosticsOverlay();
-      setState(() {});
+      if (mounted) setState(() {});
       return;
     }
-    final overlay = Overlay.of(context, rootOverlay: true);
-    _diagnosticsOverlay = OverlayEntry(
-      builder: (overlayContext) => Positioned(
-        top: MediaQuery.paddingOf(overlayContext).top + 72,
-        right: 16,
-        child: Material(
-          elevation: 8,
-          color: Colors.transparent,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 260),
-            child: ValueListenableBuilder<int>(
-              valueListenable: _metricsRefresh,
-              builder: (context, _, __) => _buildDiagnostics(),
+    final navigator = Navigator.of(context, rootNavigator: true);
+    late final DialogRoute<void> route;
+    route = DialogRoute<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) => Dialog(
+        key: const ValueKey('windows-pose-performance-dialog'),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ValueListenableBuilder<int>(
+                  valueListenable: _metricsRefresh,
+                  builder: (context, _, __) => _buildDiagnostics(),
+                ),
+                const SizedBox(height: 12),
+                TextButton(
+                  onPressed: _hideDiagnosticsOverlay,
+                  child: const Text('Close diagnostics'),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
-    overlay.insert(_diagnosticsOverlay!);
+    _diagnosticsRoute = route;
     _showDiagnostics = true;
     setState(() {});
+    unawaited(navigator.push(route).whenComplete(() {
+      if (!identical(_diagnosticsRoute, route)) return;
+      _diagnosticsRoute = null;
+      _showDiagnostics = false;
+      if (mounted) setState(() {});
+    }));
   }
 
   void _hideDiagnosticsOverlay() {
-    final entry = _diagnosticsOverlay;
-    _diagnosticsOverlay = null;
+    final route = _diagnosticsRoute;
+    _diagnosticsRoute = null;
     _showDiagnostics = false;
-    entry?.remove();
-    entry?.dispose();
+    if (route != null && route.isActive) {
+      route.navigator?.removeRoute(route);
+    }
   }
 
   Widget _buildDiagnostics() {
