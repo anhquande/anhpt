@@ -162,6 +162,8 @@ void main() {
     await tester.pump();
     expect(find.byKey(const ValueKey('windows-pose-performance-overlay')), findsOneWidget);
     expect(find.text('POSE PERFORMANCE'), findsOneWidget);
+    expect(find.byKey(const ValueKey('windows-pose-performance-dialog')), findsOneWidget);
+    expect(find.text('Close diagnostics'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump();
