@@ -186,6 +186,44 @@ void main() {
       await pipeline.dispose();
     });
 
+    test('accepts 15 FPS periodic-timer jitter without halving output', () async {
+      final estimator = _FakePoseEstimator();
+      final pipeline = PosePipeline(
+        estimator: estimator,
+        config: PosePipelineConfig(targetFps: 15),
+      );
+      final start = DateTime.utc(2026, 10, 18);
+      await pipeline.start();
+      for (var i = 0; i < 10; i++) {
+        final resultFuture = pipeline.results.first;
+        pipeline.submit(_frame(start.add(Duration(milliseconds: i * 66))));
+        await resultFuture.timeout(const Duration(seconds: 1));
+      }
+      expect(estimator.estimateCount, 10);
+      expect(pipeline.diagnostics.droppedFrameCount, 0);
+      await pipeline.dispose();
+    });
+
+    test('throttle tolerance still rejects genuinely early frames', () async {
+      final estimator = _FakePoseEstimator();
+      final pipeline = PosePipeline(
+        estimator: estimator,
+        config: PosePipelineConfig(targetFps: 15),
+      );
+      final start = DateTime.utc(2026, 10, 18);
+      await pipeline.start();
+      final first = pipeline.results.first;
+      pipeline.submit(_frame(start));
+      await first;
+      pipeline.submit(_frame(start.add(const Duration(milliseconds: 40))));
+      final second = pipeline.results.first;
+      pipeline.submit(_frame(start.add(const Duration(milliseconds: 66))));
+      await second.timeout(const Duration(seconds: 1));
+      expect(estimator.estimateCount, 2);
+      expect(pipeline.diagnostics.droppedFrameCount, 1);
+      await pipeline.dispose();
+    });
+
     test('stop suppresses stale results and pipeline can restart', () async {
       final firstGate = Completer<void>();
       final estimator = _FakePoseEstimator(blockFirstEstimate: firstGate);
