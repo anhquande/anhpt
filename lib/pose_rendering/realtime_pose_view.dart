@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 
 import '../core/pose/pose.dart';
@@ -10,6 +11,7 @@ import 'pose_renderer.dart';
 import 'pose_view_mode.dart';
 import 'pose_view_transform.dart';
 import 'stickman_pose_renderer.dart';
+import 'stickman_pose_visibility.dart';
 
 /// Presentation widget that consumes PR4 pipeline results and paints one pose.
 ///
@@ -92,6 +94,13 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   StreamSubscription<PosePipelineResult>? _subscription;
   StreamSubscription<PosePipelineError>? _errorSubscription;
   Timer? _trackingStatusTimer;
+  Timer? _stickmanExpiryTimer;
+  Timer? _stickmanStallTimer;
+  // Inference may run below 3 FPS on slower CPUs. Silence between healthy
+  // results is different from a result explicitly reporting a missing joint.
+  static const _stickmanStallTimeout = Duration(seconds: 2);
+  final _stickmanVisibility = StickmanPoseVisibility();
+  BodyPose? _stickmanPose;
   late PoseTrackingEvaluator _trackingEvaluator;
   late PoseSmoother _poseSmoother;
   PoseTrackingEvaluation? _trackingEvaluation;
@@ -118,7 +127,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     super.didUpdateWidget(oldWidget);
     final trackingInputsChanged =
         !identical(oldWidget.capabilities, widget.capabilities) ||
-            !identical(
+            !_sameTrackingRequirements(
               oldWidget.trackingRequirements,
               widget.trackingRequirements,
             ) ||
@@ -126,8 +135,10 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     final statusPresentationChanged =
         oldWidget.trackingStatusDebounce != widget.trackingStatusDebounce;
     final smootherChanged = !identical(oldWidget.smoother, widget.smoother);
-    final streamsChanged = !identical(oldWidget.results, widget.results) ||
-        !identical(oldWidget.errors, widget.errors);
+    // Controller.stream may return a fresh wrapper for the same source. As in
+    // StreamBuilder, stream equality identifies an actual subscription change.
+    final streamsChanged = oldWidget.results != widget.results ||
+        oldWidget.errors != widget.errors;
 
     if (trackingInputsChanged) {
       _resetTrackingEvaluator();
@@ -146,9 +157,25 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
       _smoothedPose = null;
       _previousFeaturePose = null;
     }
+    if (trackingInputsChanged || smootherChanged || oldWidget.mode != widget.mode) {
+      _resetStickman();
+    }
     if (streamsChanged) {
       _subscribe();
     }
+  }
+
+  // Callers may recreate an equivalent profile on every timer/analysis build.
+  // Identity changes alone must not blank the rendered pose or reset the EMA.
+  bool _sameTrackingRequirements(
+    PoseTrackingRequirements? previous,
+    PoseTrackingRequirements? current,
+  ) {
+    if (identical(previous, current)) return true;
+    if (previous == null || current == null) return false;
+    return previous.minJointConfidence == current.minJointConfidence &&
+        previous.minPoseConfidence == current.minPoseConfidence &&
+        setEquals(previous.requiredJoints, current.requiredJoints);
   }
 
   void _resetTrackingEvaluator() {
@@ -177,6 +204,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _errorSubscription = null;
     _trackingEvaluator.reset();
     _poseSmoother.reset();
+    _resetStickman();
     _resetTrackingStatus();
     _trackingEvaluation = null;
     _smoothedPose = null;
@@ -233,6 +261,10 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         // the short PR7 recovery window. noPerson performs the hard reset.
         _smoothedPose = null;
       }
+      if (widget.mode.showsStickman) {
+        _updateStickman(rawPose == null ? null : _smoothedPose,
+            result.frame.timestamp);
+      }
       // During a brief invalid observation that is still inside PR7 hysteresis,
       // keep the previous smoothed pose only in this presentation layer.
       // Raw BodyPose observations remain available in the pipeline result and
@@ -265,7 +297,41 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         _smoothedPose = null;
       }
     });
+    if (widget.mode.showsStickman && error.frameTimestamp != null) {
+      setState(() => _updateStickman(null, error.frameTimestamp!));
+    }
     _queueTrackingMessage(evaluation);
+  }
+
+  void _resetStickman() {
+    _stickmanStallTimer?.cancel();
+    _stickmanStallTimer = null;
+    _stickmanExpiryTimer?.cancel();
+    _stickmanExpiryTimer = null;
+    _stickmanVisibility.reset();
+    _stickmanPose = null;
+  }
+
+  void _updateStickman(BodyPose? pose, DateTime timestamp) {
+    _stickmanPose = _stickmanVisibility.update(pose, timestamp: timestamp);
+    _scheduleStickmanExpiry(timestamp);
+    _stickmanStallTimer?.cancel();
+    _stickmanStallTimer = Timer(_stickmanStallTimeout, () {
+      if (!mounted) return;
+      setState(_resetStickman);
+    });
+  }
+
+  void _scheduleStickmanExpiry(DateTime timestamp) {
+    _stickmanExpiryTimer?.cancel();
+    _stickmanExpiryTimer = null;
+    final expiry = _stickmanVisibility.nextExpiry;
+    if (expiry == null) return;
+    _stickmanExpiryTimer = Timer(expiry.difference(timestamp), () {
+      if (!mounted) return;
+      setState(() => _stickmanPose = _stickmanVisibility.expire(expiry));
+      _scheduleStickmanExpiry(expiry);
+    });
   }
 
   void _queueTrackingMessage(PoseTrackingEvaluation? evaluation) {
@@ -376,7 +442,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         final viewportSize = Size(width, height);
         final geometry = _previewGeometry(viewportSize);
         final viewTransform = _viewTransform(geometry);
-        final pose = _smoothedPose;
+        final pose = widget.mode.showsStickman ? _stickmanPose : _smoothedPose;
         final trackingMessage = _displayedTrackingMessage;
 
         return Stack(
@@ -469,6 +535,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _errorSubscription = null;
     _trackingStatusTimer?.cancel();
     _trackingStatusTimer = null;
+    _resetStickman();
     _previousFeaturePose = null;
     _poseSmoother.reset();
     super.dispose();
