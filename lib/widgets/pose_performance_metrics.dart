@@ -7,10 +7,27 @@ class PosePerformanceMetrics {
   DateTime? _windowStart;
   DateTime? _lastPoseFrame;
   double sampledFps = 0;
+  Duration? lastCopyDuration;
+  Duration? lastSampleInterval;
+  Duration? lastUiFrameDelay;
+  DateTime? _previousSample;
 
   void sampledFrame(DateTime now) {
     _windowStart ??= now;
+    final previous = _previousSample;
+    if (previous != null && !now.isBefore(previous)) {
+      lastSampleInterval = now.difference(previous);
+    }
+    _previousSample = now;
     _sampleCount++;
+  }
+
+  void copiedFrame(Duration duration) {
+    lastCopyDuration = duration;
+  }
+
+  void uiFrameScheduled(Duration delay) {
+    lastUiFrameDelay = delay;
   }
 
   void receivedPose(PosePipelineResult result) {
@@ -43,5 +60,9 @@ class PosePerformanceMetrics {
     _windowStart = null;
     _lastPoseFrame = null;
     sampledFps = 0;
+    lastCopyDuration = null;
+    lastSampleInterval = null;
+    lastUiFrameDelay = null;
+    _previousSample = null;
   }
 }
