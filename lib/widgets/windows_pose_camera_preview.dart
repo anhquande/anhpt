@@ -450,7 +450,7 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
             child: IconButton.filledTonal(
               key: const ValueKey('windows-pose-performance-toggle'),
               tooltip: _showDiagnostics ? 'Hide pose diagnostics' : 'Show pose diagnostics',
-              icon: Icon(_showDiagnostics ? Icons.speed : Icons.speed_outlined),
+              icon: Icon(_showDiagnostics ? Icons.close_rounded : Icons.speed_rounded),
               onPressed: _toggleDiagnosticsOverlay,
             ),
           ),
