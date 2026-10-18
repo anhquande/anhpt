@@ -182,7 +182,7 @@ class OnnxMoveNetInferenceBackend implements MoveNetInferenceBackend {
 /// The estimator consumes only RGBA [PoseFrame] values. It letterboxes each
 /// frame into MoveNet Lightning's 192x192 input while preserving aspect ratio,
 /// then maps output coordinates back into the original normalized frame space.
-class MoveNetPoseEstimator implements PoseEstimator {
+class MoveNetPoseEstimator implements PoseEstimator, PoseEstimatorTimings {
   MoveNetPoseEstimator({MoveNetInferenceBackend? backend})
       : _backend = backend ?? OnnxMoveNetInferenceBackend();
 
@@ -197,6 +197,11 @@ class MoveNetPoseEstimator implements PoseEstimator {
   );
 
   final MoveNetInferenceBackend _backend;
+
+  @override
+  Duration? lastPreprocessDuration;
+  @override
+  Duration? lastBackendDuration;
 
   @override
   PoseEstimatorCapabilities get capabilities => _capabilities;
@@ -214,8 +219,24 @@ class MoveNetPoseEstimator implements PoseEstimator {
         'MoveNetPoseEstimator must be initialized before estimate.',
       );
     }
-    final prepared = _preprocess(frame);
-    final output = await _backend.run(prepared.rgbInput);
+    lastPreprocessDuration = null;
+    lastBackendDuration = null;
+    final preprocessWatch = Stopwatch()..start();
+    late final _MoveNetPreparedFrame prepared;
+    try {
+      prepared = _preprocess(frame);
+    } finally {
+      preprocessWatch.stop();
+      lastPreprocessDuration = preprocessWatch.elapsed;
+    }
+    final backendWatch = Stopwatch()..start();
+    late final List<double> output;
+    try {
+      output = await _backend.run(prepared.rgbInput);
+    } finally {
+      backendWatch.stop();
+      lastBackendDuration = backendWatch.elapsed;
+    }
     return [
       MoveNetPoseMapper.fromFlatOutput(
         output,
