@@ -141,6 +141,10 @@ void main() {
         ),
       );
 
+      expect(estimator.lastPreprocessDuration, isNotNull);
+      expect(estimator.lastBackendDuration, isNotNull);
+      expect(estimator.lastPreprocessDuration!.isNegative, isFalse);
+      expect(estimator.lastBackendDuration!.isNegative, isFalse);
       expect(poses, hasLength(1));
       final pose = poses.single;
       expect(pose.timestamp, timestamp);
