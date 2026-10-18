@@ -103,6 +103,13 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
   BodyPose? _stickmanPose;
   late PoseTrackingEvaluator _trackingEvaluator;
   late PoseSmoother _poseSmoother;
+  // Presentation-only, faster EMA for Stickman. Feature extraction and
+  // exercise analysis continue using the canonical 120 ms smoother.
+  final EmaPoseSmoother _stickmanPresentationSmoother = EmaPoseSmoother(
+    config: PoseSmoothingConfig(
+      timeConstant: Duration(milliseconds: 45),
+    ),
+  );
   PoseTrackingEvaluation? _trackingEvaluation;
   BodyPose? _smoothedPose;
   BodyPose? _previousFeaturePose;
@@ -262,8 +269,15 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
         _smoothedPose = null;
       }
       if (widget.mode.showsStickman) {
-        _updateStickman(rawPose == null ? null : _smoothedPose,
-            result.frame.timestamp);
+        // Avoid feeding the already smoothed canonical pose through another
+        // lag-inducing filter. Injected smoothers retain their previous
+        // presentation contract for alternate clients and deterministic tests.
+        final presentationPose = rawPose == null
+            ? null
+            : widget.smoother != null
+                ? _smoothedPose
+                : _stickmanPresentationSmoother.update(rawPose);
+        _updateStickman(presentationPose, result.frame.timestamp);
       }
       // During a brief invalid observation that is still inside PR7 hysteresis,
       // keep the previous smoothed pose only in this presentation layer.
@@ -309,6 +323,7 @@ class _RealtimePoseViewState extends State<RealtimePoseView> {
     _stickmanExpiryTimer?.cancel();
     _stickmanExpiryTimer = null;
     _stickmanVisibility.reset();
+    _stickmanPresentationSmoother.reset();
     _stickmanPose = null;
   }
 
