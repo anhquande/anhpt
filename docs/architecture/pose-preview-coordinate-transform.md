@@ -104,3 +104,25 @@ Stream/profile/mode changes and disposal clear this presentation history.
 Canonical EMA, raw tracking confidence and exercise feature extraction never
 consume held landmarks. Real sustained loss still removes the corresponding
 limbs rather than displaying an indefinitely frozen avatar.
+
+## Windows pose performance diagnostics
+
+In Windows Stickman mode, use the speedometer button at the bottom right to
+toggle the pose diagnostics panel. The panel refreshes once per second, without
+changing pose tracking, rendering, or the workout analyzer.
+
+- **Sampled FPS** measures the rate of distinct webcam frames copied and
+  submitted by the 15 FPS pose frame pump. It is *not* the webcam's native
+  preview FPS (the preview Texture runs independently).
+- **Pose FPS** is the pipeline's effective processed-frame rate, based on
+  timestamps of processed frames since the session started.
+- **Estimate (ms)** is the last full estimator call, including preprocessing,
+  ONNX execution, and output mapping. It does not isolate ONNX execution.
+- **Frame age (ms)** is the elapsed wall time since capture of the last pose
+  result received by the Windows view. It is not compositor/presentation latency.
+- **Dropped** is the cumulative count of throttled/replaced pipeline frames.
+
+The overlay is diagnostic only. Its absence in camera-only mode is intentional.
+All measurement subscriptions and timers stop when the Windows camera closes.
+To diagnose latency, compare Pose FPS and Estimate first; use Frame age to detect
+backlogged or stalled pose output. Do not infer webcam FPS from Sampled FPS.

@@ -7,6 +7,7 @@ import '../app/workout_camera_preference.dart';
 import '../camera/windows_pose_frame_adapter.dart';
 import '../core/pose/pose.dart';
 import '../pose_rendering/pose_rendering.dart';
+import 'pose_performance_metrics.dart';
 
 /// Windows camera surface that exposes raw UVC frames to the canonical pose
 /// pipeline while rendering the same native stream through a Flutter Texture.
@@ -47,6 +48,11 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
   int? _textureId;
   PosePipeline? _activePipeline;
   Timer? _frameTimer;
+  Timer? _diagnosticsTimer;
+  StreamSubscription<PosePipelineResult>? _poseResultSubscription;
+  final PosePerformanceMetrics _metrics = PosePerformanceMetrics();
+  final ValueNotifier<int> _metricsRefresh = ValueNotifier<int>(0);
+  bool _showDiagnostics = false;
   int _lastFrameSequence = -1;
   int _generation = 0;
   Completer<void>? _initializationCancelled;
@@ -111,6 +117,11 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     if (cancelled != null && !cancelled.isCompleted) cancelled.complete();
     _frameTimer?.cancel();
     _frameTimer = null;
+    _diagnosticsTimer?.cancel();
+    _diagnosticsTimer = null;
+    unawaited(_poseResultSubscription?.cancel());
+    _poseResultSubscription = null;
+    _metrics.reset();
     return _generation;
   }
 
@@ -188,6 +199,15 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
 
       if (!_isCurrent(generation)) return;
       _lastFrameSequence = -1;
+      _metrics.reset();
+      if (pipeline != null) {
+        _poseResultSubscription = pipeline.results.listen(_metrics.receivedPose);
+        _diagnosticsTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+          if (!mounted || !_isCurrent(generation)) return;
+          _metrics.tick(DateTime.now());
+          _metricsRefresh.value++;
+        });
+      }
       _startFramePump();
       setState(() {});
     } catch (error) {
@@ -232,13 +252,15 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
       final frame = _camera.copyLatestFrame();
       if (frame == null || frame.sequence == _lastFrameSequence) return;
       _lastFrameSequence = frame.sequence;
+      final capturedAt = DateTime.now();
+      _metrics.sampledFrame(capturedAt);
       pipeline.submit(
         WindowsPoseFrameAdapter.fromPreviewFrame(
           frame: frame,
           cameraFacing: widget.facing == WorkoutCameraFacing.front
               ? PoseCameraFacing.front
               : PoseCameraFacing.back,
-          timestamp: DateTime.now(),
+          timestamp: capturedAt,
         ),
       );
     } catch (error) {
@@ -269,6 +291,11 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     _frameTimer?.cancel();
     _frameTimer = null;
     _lastFrameSequence = -1;
+    _diagnosticsTimer?.cancel();
+    _diagnosticsTimer = null;
+    await _poseResultSubscription?.cancel();
+    _poseResultSubscription = null;
+    _metrics.reset();
     // Stop accepting frames now, but release native capture independently of
     // slow model initialization/inference. The pipeline drains before reuse.
     final poseStopped = _activePipeline?.stop();
@@ -410,6 +437,28 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
             ),
           ),
         ),
+        if (_poseViewMode == PoseViewMode.stickman) ...[
+          Positioned(
+            bottom: 8,
+            right: 8,
+            child: IconButton.filledTonal(
+              tooltip: _showDiagnostics ? 'Hide pose diagnostics' : 'Show pose diagnostics',
+              icon: const Icon(Icons.speed_rounded),
+              onPressed: () => setState(() => _showDiagnostics = !_showDiagnostics),
+            ),
+          ),
+          if (_showDiagnostics)
+            Positioned(
+              bottom: 8,
+              left: 8,
+              child: IgnorePointer(
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _metricsRefresh,
+                  builder: (context, _, __) => _buildDiagnostics(),
+                ),
+              ),
+            ),
+        ],
         if (_devices.length > 1)
           Positioned(
             top: 8,
@@ -437,10 +486,42 @@ class _WindowsPoseCameraPreviewState extends State<WindowsPoseCameraPreview>
     );
   }
 
+  Widget _buildDiagnostics() {
+    final diagnostics = widget.posePipeline?.diagnostics;
+    final age = _metrics.frameAge(DateTime.now());
+    final duration = diagnostics?.lastInferenceDuration;
+    return DecoratedBox(
+      key: const ValueKey('windows-pose-performance-overlay'),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: .8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: DefaultTextStyle(
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('POSE PERFORMANCE', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('Sampled: ${_metrics.sampledFps.toStringAsFixed(1)} FPS'),
+              Text('Pose: ${(diagnostics?.effectivePoseFps ?? 0).toStringAsFixed(1)} FPS'),
+              Text('Estimate: ${duration == null ? "--" : duration.inMilliseconds.toString()} ms'),
+              Text('Frame age: ${age == null ? "--" : age.inMilliseconds.toString()} ms'),
+              Text('Dropped: ${diagnostics?.droppedFrameCount ?? 0}'),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _invalidate();
+    _metricsRefresh.dispose();
     // Queue outside synchronous widget disposal; never race an open/attach.
     unawaited(_enqueue(_disposeCamera));
     super.dispose();
